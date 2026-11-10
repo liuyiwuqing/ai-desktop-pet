@@ -43,22 +43,14 @@
 ├── README.md                     项目入口与目录说明
 ├── docs/                         架构与模块方案（00–08）
 ├── firmware/                     ESP32-S3 固件工程（ESP-IDF）
-│   ├── main/
-│   │   ├── app/                  启动、任务编排、事件分发
-│   │   ├── core/                 事件总线、模块生命周期、配置、契约
-│   │   ├── modules/
-│   │   │   ├── ai_agent/         语音会话、上下文、状态事件
-│   │   │   ├── message_hub/      消息接入、队列、渲染调度、ACK
-│   │   │   ├── climate/          温湿度采集、滤波、告警
-│   │   │   └── growth/           成长数值、互动、存档
-│   │   ├── presentation/         状态→表情/动作映射（纯逻辑）
-│   │   ├── hal/                  I2S、SPI、GPIO、I2C、RMT、网络
-│   │   ├── ui/                   LVGL 页面、组件、主题、动画
-│   │   └── storage/              NVS、LittleFS、版本化存档
+│   ├── main/                     组合根：app_main、启动编排、诊断
+│   ├── components/               ESP-IDF 组件（只暴露 include/）
+│   │   ├── contracts/            跨模块契约（纯 C，可主机测试）
+│   │   ├── core/                 事件总线与基础服务
+│   │   └── svc_growth/           成长模块骨架（Kconfig 开关控制）
 │   ├── boards/dodo-s3-lcd/       板级 board.json（引脚/能力唯一事实源）
-│   ├── components/               可复用 ESP-IDF 组件
 │   ├── partitions/               分区表与迁移说明
-│   └── tests/                    主机测试与目标测试入口
+│   └── tests/host/               主机测试
 ├── server/                       独立 AI 网关（消息中心归 nexus-core）
 │   └── ai-gateway/               ASR/LLM/TTS 会话编排与供应商适配
 ├── integration/                  与 nexus-core 的契约与部署（不放业务代码）
@@ -80,7 +72,7 @@
 └── tests/                        跨模块契约与集成测试
 ```
 
-空目录用 `.gitkeep` 占位；`firmware/main/CMakeLists.txt` 等构建文件在架构确认后再生成。扩展能力不放 `main/modules/`，统一在 `extensions/` 下，通过编译开关接入。
+`main` 只做组合根，业务与基础能力放在 `components/`，每个组件只暴露 `include/`，依赖通过 `REQUIRES` 显式声明。扩展能力统一在 `extensions/` 下，通过编译开关接入。
 
 ## 与现有工程的关系
 

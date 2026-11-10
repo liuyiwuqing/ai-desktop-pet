@@ -4,6 +4,9 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 firmware_dir="${repo_root}/firmware"
 
+python3 "${repo_root}/tools/ci/check_deps.py"
+"${repo_root}/tools/ci/test_host.sh"
+
 if ! command -v idf.py >/dev/null 2>&1; then
     : "${IDF_PATH:?IDF_PATH must point to ESP-IDF 6.1}"
     if [[ -z "${IDF_PYTHON_ENV_PATH:-}" && -d "${HOME}/.espressif/tools/python/v6.1/venv" ]]; then

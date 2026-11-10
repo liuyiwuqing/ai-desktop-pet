@@ -1,0 +1,10 @@
+menu "PET modules"
+
+config PET_MODULE_GROWTH_ENABLED
+    bool "Enable growth module"
+    default y
+    help
+      Growth module skeleton (components/svc_growth). Disable to verify the
+      composition root builds without it.
+
+endmenu

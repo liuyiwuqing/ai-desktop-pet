@@ -1,6 +1,6 @@
 # firmware
 
-ESP-IDF 6.1 固件工程。S1 可构建骨架已落地：CMake、sdkconfig、16 MB 分区表、最小事件总线与启动诊断。
+ESP-IDF 6.1 固件工程。S2 组件化已落地：`main` 只做组合根，契约、事件总线与业务模块拆为独立组件。
 
 ## 构建
 
@@ -14,22 +14,28 @@ idf.py build
 idf.py size
 ```
 
-或使用 CI 入口：`../tools/ci/build_firmware.sh`。
+或使用 CI 入口：`../tools/ci/build_firmware.sh`。当前构建结果：0 warning，镜像约 181 KB。只构建，不烧录、不擦除 Flash。
 
-当前构建结果：0 warning，镜像约 181 KB。只构建，不烧录、不擦除 Flash。
+## 校验
+
+```bash
+python3 ../tools/ci/check_deps.py   # 组件依赖图无环
+../tools/ci/test_host.sh            # 主机测试（纯 C 契约）
+```
+
+`build_firmware.sh` 会依次执行依赖检查、主机测试、`idf.py build` 与 `idf.py size`。
 
 ## 布局
 
-- `main/app/`：启动、任务编排、事件分发、看门狗。
-- `main/core/`：事件总线、模块生命周期、配置、契约。
-- `main/modules/`：业务模块；每个模块只暴露 `include/` 契约，不互相直接调用。
-- `main/hal/`：I2S、SPI、GPIO、I2C、RMT、Wi-Fi。
-- `main/ui/`：LVGL 页面、组件、主题。
-- `main/storage/`：NVS、LittleFS、版本化存档。
+- `main/`：组合根，只含 `main.c`、`app/` 启动编排与 `Kconfig.projbuild`。
+- `components/contracts/`：跨模块契约（`include/pet/`），纯 C、不依赖 ESP-IDF，可主机测试。
+- `components/core/`：事件总线等基础服务，`REQUIRES contracts`。
+- `components/svc_growth/`：成长模块骨架，受 `CONFIG_PET_MODULE_GROWTH_ENABLED` 控制。
 - `boards/dodo-s3-lcd/`：板级 `board.json`（引脚/能力唯一事实源）。
-- `components/`：可复用 ESP-IDF 组件。
 - `partitions/`：新分区表与迁移说明，不复用 02/03 的分区表。
-- `tests/`：主机测试与目标测试入口。
+- `tests/host/`：主机测试。
+
+每个组件只暴露 `include/`，`src/` 私有；依赖通过 `REQUIRES`/`PRIV_REQUIRES` 显式声明。`hal`、`bsp_*`、`storage`、`presentation`、`ui_lvgl` 随首个真实实现创建，不建空壳。
 
 ## 分区
 

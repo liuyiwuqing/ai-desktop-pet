@@ -1,8 +1,8 @@
 # 08 · 目录结构与生产级架构评审
 
-状态：评审中（2026-11-10）。S1 可构建骨架已完成（`idf.py build` 通过，0 warning）。已确认 Q1（独立 Git 仓库）、Q2（冻结 `02`，`03` 作 donor）、Q3（方案 C：消息中心归 `nexus-core`，AI 网关独立）、Q4（独立 `model` 分区 1 MB）、Q5（`board.json` 生成 C/Kconfig）、Q6（`presentation` 独立）、Q8（管理台复用 `nexus-core`），以及 A/B 组决策。评审对象：工作区根目录、`04-ai-desktop-pet` 骨架，以及被复用的 `02-desktop-pet`、`03-xiaozhi-voice`、`nexus-core`、`mac-bridge`。
+状态：评审中（2026-11-10）。S1 可构建骨架已完成（`idf.py build` 通过，0 warning）；S2 组件化已完成（`contracts`/`core`/`svc_growth` 组件、模块开关、依赖图检查、主机测试）。已确认 Q1（独立 Git 仓库）、Q2（冻结 `02`，`03` 作 donor）、Q3（方案 C：消息中心归 `nexus-core`，AI 网关独立）、Q4（独立 `model` 分区 1 MB）、Q5（`board.json` 生成 C/Kconfig）、Q6（`presentation` 独立）、Q8（管理台复用 `nexus-core`），以及 A/B 组决策。评审对象：工作区根目录、`04-ai-desktop-pet` 骨架，以及被复用的 `02-desktop-pet`、`03-xiaozhi-voice`、`nexus-core`、`mac-bridge`。
 
-结论：分层方向正确。S1 已把“不可构建”变为可构建骨架；剩余问题集中在模块边界、契约、测试与发布流程，进入功能开发前仍需补齐 P0-2、P0-4、P0-5 的落地项和高风险项。
+结论：分层方向正确。S1 已把“不可构建”变为可构建骨架，S2 已建立由构建系统强制的组件边界；剩余问题集中在契约、测试与发布流程，进入功能开发前仍需补齐 P0-3、P0-4、P0-5 的落地项和高风险项。
 
 ## 1. 评审方法与证据
 
@@ -63,7 +63,15 @@
 
 **验收**：`idf.py build` 通过；`idf.py size` 输出 app/DRAM/PSRAM 占用；分区表通过 `parttool.py` 校验；不改 `02/03`。
 
-### P0-2 模块边界没有由构建系统强制
+### P0-2 模块边界没有由构建系统强制（S2 已建立机制）
+
+**已完成（2026-11-10，S2）**：`main` 收敛为组合根，只保留 `main.c`、`app/app.c` 与 Kconfig。已建立三个组件：
+
+- `components/contracts`：`pet/event.h` 跨模块契约，纯 C、不依赖 ESP-IDF，可在主机上直接编译测试。
+- `components/core`：事件总线实现，`REQUIRES contracts`。
+- `components/svc_growth`：空业务模块，由 `CONFIG_PET_MODULE_GROWTH_ENABLED` 控制是否编入。
+
+验证结果：默认构建 0 warning、镜像 181,240 B；关闭成长模块后构建通过，ELF 中 `pet_growth_init` 符号数为 0；`tools/ci/check_deps.py` 报告 3 个组件无依赖环；`tools/ci/test_host.sh` 运行事件契约主机测试通过。`hal`/`bsp_*`/`storage`/`presentation`/`ui_lvgl` 随首个真实实现落地，不建空壳组件。
 
 **现象**：计划把 `ai_agent`、`message_hub`、`climate`、`growth` 放在 `firmware/main/modules/`，而 `main` 在 ESP-IDF 中是单一组件。`02` 已经展示了后果：49 个文件平铺在 `main/`，一个 `idf_component_register` 注册全部源码，任何文件都能 `#include` 任何头文件。`03` 则是 1589 行 CMake 加板级 `if/else` 链。
 
@@ -505,7 +513,7 @@ SemVer、签名 OTA、A/B 回滚、factory 恢复、依赖锁、SBOM、许可证
 | --- | --- | --- |
 | S0 结构定稿 | 确认本报告、目标目录、仓库策略、服务端归属 | 第 8 节决策有结论；`00` 不一致项修正 |
 | S1 可构建骨架 | CMake、sdkconfig、分区、CI、空事件总线、诊断串口 | `idf.py build` 通过；size report 产出；CI 绿 |
-| S2 组件化 | `core/contracts/hal/bsp/storage/presentation/ui_lvgl` + 一个空模块 | 关闭任一模块可构建；依赖图无环；主机测试可跑 |
+| S2 组件化（已完成 2026-11-10） | `contracts`/`core`/`svc_growth` 组件、模块开关、依赖图检查、主机测试；其余组件随实现落地 | 关闭模块可构建；依赖图无环；主机测试可跑 |
 | S3 契约与配置 | schema、codegen、扩展 manifest、契约测试 | 配置与消息 schema 校验通过；扩展开关生效 |
 | S4 首个纵向切片 | 温湿度或成长（不依赖网络），含 UI、存储、主机测试 | 实机采样/展示/存档通过；异常与掉电测试通过 |
 | S5 网络能力 | 消息中心、AI 会话、TLS、重连、离线队列 | 断网/重连/重复消息/ACK 通过；延迟与内存达标 |

@@ -2,9 +2,13 @@ idf_component_register(
     SRCS
         "main.c"
         "app/app.c"
-        "core/event_bus.c"
     INCLUDE_DIRS
         "."
         "app"
+    REQUIRES
+        "contracts"
         "core"
+        "svc_growth"
+    PRIV_REQUIRES
+        "esp_timer"
 )

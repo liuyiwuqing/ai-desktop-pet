@@ -1,4 +1,4 @@
-#include "event_bus.h"
+#include "pet/event_bus.h"
 
 #include <stddef.h>
 
@@ -18,9 +18,6 @@ static void event_bus_task(void *arg)
     pet_event_t event;
 
     while (xQueueReceive(s_queue, &event, portMAX_DELAY) == pdTRUE) {
-        if (event.id >= PET_EVT_COUNT) {
-            continue;
-        }
         for (uint8_t i = 0; i < s_handler_count[event.id]; i++) {
             s_handlers[event.id][i](&event);
         }
@@ -49,7 +46,7 @@ esp_err_t pet_event_bus_init(void)
 
 esp_err_t pet_event_bus_subscribe(pet_event_id_t id, pet_event_handler_t handler)
 {
-    if (id >= PET_EVT_COUNT || handler == NULL) {
+    if (id < PET_EVT_BOOT || id >= PET_EVT_COUNT || handler == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
     if (s_handler_count[id] >= PET_EVENT_MAX_HANDLERS) {
@@ -62,7 +59,7 @@ esp_err_t pet_event_bus_subscribe(pet_event_id_t id, pet_event_handler_t handler
 
 esp_err_t pet_event_bus_publish(const pet_event_t *event)
 {
-    if (event == NULL) {
+    if (!pet_event_is_valid(event)) {
         return ESP_ERR_INVALID_ARG;
     }
     if (s_queue == NULL) {

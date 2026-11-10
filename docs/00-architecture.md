@@ -115,7 +115,7 @@ typedef struct {
 
 ## 5. 核心契约
 
-所有跨模块接口放在 `firmware/main/core/contracts/`，实现放在各模块内部。
+所有跨模块契约放在 `firmware/components/contracts/include/pet/`，实现放在各组件内部；`main` 只做组合根。
 
 ```c
 // ai_session.h

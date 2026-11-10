@@ -2,13 +2,19 @@
 
 #include <inttypes.h>
 
+#include "sdkconfig.h"
+
 #include "esp_heap_caps.h"
 #include "esp_idf_version.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 
-#include "event_bus.h"
+#include "pet/event_bus.h"
+
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+#include "svc_growth/api.h"
+#endif
 
 static const char *TAG = "app";
 
@@ -26,6 +32,10 @@ esp_err_t app_start(void)
 
     ESP_ERROR_CHECK(pet_event_bus_init());
     ESP_ERROR_CHECK(pet_event_bus_subscribe(PET_EVT_BOOT, on_boot));
+
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+    ESP_ERROR_CHECK(pet_growth_init());
+#endif
 
     const pet_event_t boot = {
         .id = PET_EVT_BOOT,
