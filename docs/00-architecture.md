@@ -30,6 +30,8 @@
 ├─────────────────────────────────────────────────────────────┤
 │ core/         事件总线、模块生命周期、配置、契约、错误码     │
 ├─────────────────────────────────────────────────────────────┤
+│ presentation/ 状态→表情/动作映射（纯逻辑，可主机测试）        │
+├─────────────────────────────────────────────────────────────┤
 │ ui/           LVGL 页面、组件、主题、动画                     │
 ├─────────────────────────────────────────────────────────────┤
 │ hal/          I2S、SPI、GPIO、I2C、RMT、Wi-Fi、时间          │
@@ -38,19 +40,20 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-依赖只能向下：`modules → core/storage/hal`，`app → modules`，`ui` 只消费事件与只读快照。禁止 `modules` 反向依赖 `app`，禁止 `hal` 依赖业务。
+依赖只能向下：`modules → core/storage/hal`，`app → modules`，`presentation` 只依赖契约与状态快照，`ui` 消费事件、只读快照与 presentation 输出。禁止 `modules` 反向依赖 `app`，禁止 `hal` 依赖业务。
 
 ## 3. 模块职责
 
 | 模块 | 职责 | 不负责 |
 | --- | --- | --- |
-| `ai_agent` | 唤醒、录音、ASR/LLM/TTS 会话、上下文、意图产出、表情动作编排 | 消息投递、成长数值、具体设备执行 |
+| `ai_agent` | 唤醒、录音、ASR/LLM/TTS 会话、上下文、意图产出、状态事件 | 消息投递、成长数值、具体设备执行、表情绘制 |
 | `message_hub` | 消息接入、校验、去重、优先级队列、渲染调度、ACK | 第三方平台协议细节、UI 绘制 |
 | `climate` | 温湿度采样、滤波、校准、异常检测、告警事件 | 图表绘制、成长数值修改 |
 | `growth` | 成长数值、互动结算、状态推导、存档 | 表情绘制、语音播放 |
 | `device_control`（扩展） | 能力注册、意图路由、风险确认、适配器调用 | 任意命令执行、绕过白名单 |
 | `servo`（扩展） | 指令解析、角度/速度限制、序列播放、急停 | 语音识别、意图理解 |
-| `ui` | 页面、表情/动作表现、消息卡片、图表 | 业务规则、网络、存储 |
+| `presentation` | 状态→表情/动作映射、动作序列选择、优先级仲裁 | LVGL 绘制、网络、存储 |
+| `ui` | 页面、表现播放、消息卡片、图表 | 业务规则、状态映射、网络、存储 |
 | `core` | 事件总线、模块生命周期、配置、契约、错误码 | 业务逻辑 |
 | `hal` | 外设初始化与读写 | 业务状态机 |
 | `storage` | NVS/LittleFS 封装、版本迁移、CRC | 业务字段解释 |
@@ -81,15 +84,17 @@ typedef struct {
     pet_event_id_t id;
     uint32_t timestamp_ms;
     uint16_t payload_len;
-    uint8_t priority;          // 0 最高
-    void *payload;             // 由发布者持有，分发完成后释放
+    uint8_t payload[32];       // 固定内联，禁止跨任务裸指针
+    // S3 补齐：priority、correlation_id、schema_version、source、sequence
 } pet_event_t;
 ```
+
+> S1 事件总线仅支持 ≤32 B 内联 payload；S3 扩展到 64 B + 可选引用计数块，长文本/消息通过事件池传递，避免分发后悬空。
 
 ### 规则
 
 - 事件 payload 使用固定大小结构体或事件池，不在中断/回调中 `malloc`。
-- 事件队列深度 32；满时按优先级丢弃最低优先级，并累加 `dropped_total` 指标。
+- 事件队列深度 32；S1 为 FIFO，队满丢新并累加 `dropped_total`；S3 改为关键/可合并分队列并按优先级丢弃。
 - 订阅者处理时间上限 10 ms；超时任务降级为“标记 + 异步处理”，禁止在事件回调里做网络/Flash 写入。
 - 事件只描述“发生了什么”，不描述“该做什么”；业务决策留在模块内。
 - 高频事件（音频电平）可合并，只保留最新值；状态类事件必须保序。
@@ -106,7 +111,7 @@ typedef struct {
 } pet_module_t;
 ```
 
-`app` 按依赖顺序启动：`storage → hal → core → climate → growth → message_hub → ai_agent → ui`。任一必需模块失败进入安全模式：保留屏幕与基础输入，关闭网络与扩展，显示故障码。
+`app` 按依赖顺序启动：`storage → hal → core → presentation → climate → growth → message_hub → ai_agent → ui`。任一必需模块失败进入安全模式：保留屏幕与基础输入，关闭网络与扩展，显示故障码。
 
 ## 5. 核心契约
 
@@ -188,7 +193,7 @@ typedef struct {
 
 | 层 | 位置 | 内容 | 是否入库 |
 | --- | --- | --- | --- |
-| 编译期 | `firmware/boards/<board>/`、`config/profiles/*.json` | 板型、引脚、功能开关、默认参数 | 是（无凭据） |
+| 编译期 | `firmware/boards/<board>/board.json`（引脚/能力唯一事实源，构建生成 C 头与 Kconfig）、`config/profiles/*.json` | 板型、引脚、功能开关、默认参数 | 是（无凭据） |
 | 运行期 | NVS `pet_cfg` | 用户设置、DND、音量、亮度、校准 | 否 |
 | 凭据 | NVS `nexus` / 服务端私有 env | Wi-Fi、设备令牌、证书、API Key | 绝不入库 |
 
@@ -204,7 +209,7 @@ typedef struct {
 
 ### 分区建议
 
-新建独立分区表，不复用 02/03；以下为 16 MB Flash 草案，落地前用 `esptool flash_id` 和实际 bootloader 偏移核对。
+新建独立分区表，不复用 02/03；以下为 16 MB Flash 分区表，已落盘 `firmware/partitions/16m.csv`。首次烧录前用 `esptool flash_id` 和实际 bootloader 偏移核对。
 
 | 分区 | 偏移 | 大小 | 用途 |
 | --- | --- | --- | --- |
@@ -214,11 +219,14 @@ typedef struct {
 | `ota_0` | 0x20000 | 0x400000 | 4 MB 应用槽 A |
 | `ota_1` | 0x420000 | 0x400000 | 4 MB 应用槽 B |
 | `storage` | 0x820000 | 0x200000 | 2 MB LittleFS |
-| `assets` | 0xA20000 | 0x300000 | 3 MB 表情/字体/音效 |
-| `coredump` | 0xD20000 | 0x10000 | 崩溃转储 |
-| 保留 | 0xD30000 | 0x2D0000 | 后续扩展 |
+| `assets` | 0xA20000 | 0x400000 | 4 MB 表情/字体/音效 |
+| `model` | 0xE20000 | 0x100000 | 1 MB WakeNet 模型（SPIFFS） |
+| `coredump` | 0xF20000 | 0x10000 | 崩溃转储 |
+| 保留 | 0xF30000 | 0xD0000 | 832 KB 后续扩展 |
 
 约束：OTA 镜像必须校验项目 ID/版本/签名；迁移与回滚单独设计，不能直接互刷 02/03。
+
+Q4 已确认：模型使用独立 `model` 分区，不并入 `assets`。首版 WakeNet9 你好小智打包后约 284 KB（291,069 B），1 MB 分区保留约 3.5 倍余量；构建期校验 `srmodels.bin` ≤ 960 KB。ESP-SR 通过 `esp_srmodel_init("model")` 直接 mmap 加载，不进入 assets 索引。模型不随应用 OTA 更新：首次烧录写入，后续变更走独立数据写入或 USB 恢复。自定义唤醒词约 3.9 MB，不在首版范围；启用时必须调整分区表并 USB 重刷。
 
 ## 7. 任务与内存预算
 
@@ -232,11 +240,13 @@ typedef struct {
 | `sensor` | 2 | 3 KB | internal | 5 s 采样、滤波 |
 | `growth` | 2 | 3 KB | internal | 结算、存档 |
 | `app` | 1 | 4 KB | internal | 事件分发、看门狗 |
+| `pet_events` | 5 | 3 KB | internal | 事件队列分发，订阅者处理 ≤10 ms |
 
 内存策略：
 
 - LVGL 绘制缓冲 2 × 240 × 320 × 2 B ≈ 300 KB，放 PSRAM；DMA 描述符与音频缓冲放 internal。
 - 字体/图片/动画放 `assets` 分区，按需映射；不整包加载。
+- 唤醒模型放独立 `model` 分区，ESP-SR 直接 mmap；模型不进入 `assets`，也不随应用 OTA 更新。
 - 每个任务记录栈高水位；内部 heap 最低值目标 ≥80 KB，最大连续块 ≥32 KB。
 - 禁止在 UI 任务里读 Flash/NVS；禁止在音频任务里做网络请求。
 
@@ -246,7 +256,7 @@ typedef struct {
 消息面
 ┌──────────────┐  MQTT/TLS 8883   ┌────────────────┐   HTTPS    ┌───────────────────┐
 │ 04 固件      │◄────────────────►│ MQTT Broker    │◄──────────►│ nexus-core        │
-│              │                  │ EMQX/Mosquitto │            │ 消息/配置/管理台  │
+│              │                  │ Mosquitto      │            │ 消息/配置/管理台  │
 └──────┬───────┘                  └────────────────┘            └────┬──────┬───────┘
        │                                                             │      │
        │ I2S/SPI/GPIO                                                │      ▼
@@ -279,7 +289,7 @@ AI 会话面
 
 - 固件通过 MQTT/TLS 收发消息与配置，通过 WSS/HTTPS 建立 AI 会话；两条链路互不代理。
 - 设备身份由 `nexus-core` 校验并签发短期 AI 会话令牌；`ai-gateway` 只校验令牌，不共享数据库、不直连设备管理数据。
-- AI 网关首版可直接复用 `03` 的小智 WebSocket 服务作为实现；固件只依赖 `ai_session` 契约，替换供应商或自建实现不改 UI/成长/消息模块。
+- 已确认（A3）：AI 网关首版复用 `03` 的小智 WebSocket 服务作为实现；固件只依赖 `ai_session` 契约，替换供应商或自建实现不改 UI/成长/消息模块。
 - 第三方 Webhook 只进 `nexus-core`，不直连 AI 网关；与 `nexus-core` 的契约和部署配置放在 `integration/`。
 
 ## 9. 技术栈总表
@@ -291,6 +301,7 @@ AI 会话面
 | 语音前端 | ESP-SR WakeNet + AEC + VAD | 片上唤醒与回声消除，降低云端依赖 |
 | 音频编码 | Opus 16 kHz 单声道 / PCM 回退 | 带宽与音质平衡；TTS 输出 24 kHz PCM |
 | 设备消息 | MQTT 3.1.1 over TLS，QoS 1 | 持久会话、离线队列、成熟运维 |
+| 消息 Broker | Mosquitto 2.0.22 | 与 `nexus-core` 一致；单设备足够，集群再评估 EMQX |
 | 设备 HTTP | HTTPS + Bearer/HMAC | 配网、测试、第三方 webhook |
 | 消息中心 | Java 21 / Spring Boot / PostgreSQL / Flyway | 复用 nexus-core，事务、审计与设备管理成熟 |
 | AI 网关 | 独立服务；首版复用 03 小智 WebSocket 实现 | 音频会话独立扩缩容；供应商密钥集中管理 |
@@ -314,7 +325,7 @@ AI 会话面
 - 传输：MQTT TLS、HTTPS/WSS；证书校验，不复用 02/03 的明文配置。
 - 消息：payload 上限 8 KB；签名/HMAC；时间戳容差 5 分钟；重放保护。
 - 设备控制：L0 只读、L1 可逆、L2 破坏性；L2 必须二次确认并绑定请求。
-- 隐私：麦克风在 DND/静音时硬件或软件门控；日志不写原始音频、私信、令牌、Wi-Fi 密码；会话转写默认只存服务端短期。
+- 隐私：麦克风在 DND/静音时硬件或软件门控；日志不写原始音频、私信、令牌、Wi-Fi 密码；会话转写默认只存服务端短期；消息全文保留 7 天、元数据保留 30 天。
 - 记忆：只把公开、可复核的内容写入 OpenViking；不写凭据与 NVS 二进制。
 
 ## 12. 验证策略
@@ -330,11 +341,13 @@ AI 会话面
 
 ## 13. 待确认项
 
-1. 最终板型与引脚：03 背光 GPIO42 PWM 与 02 BLK 3V3 不一致，需实物确认。
-2. 分区表与 OTA 身份校验方案；是否需要安全启动/Flash 加密。
-3. AI 供应商、唤醒词、TTS 音色与授权。
-4. 已确认（Q3=C）：消息中心复用 `nexus-core`，AI 网关独立在 `server/ai-gateway`；待确认首版 AI 网关直接复用 03 小智服务还是新建实现。
+1. 已确认（A5）：S1 板级基线为 `03` DODO-S3-LCD，背光 GPIO42 PWM；其他板型后续以独立 board profile 接入。
+2. 分区表已确认 Q4（`model` 1 MB、`assets` 4 MB）；安全启动与 Flash 加密已确认（A4）：开发不启用、量产启用；待确认 OTA 身份校验细节与 USB 恢复流程。
+3. 已确认（A1/A2）：AI 供应商沿用 `03` 小智服务；唤醒词用内置 `wn9_nihaoxiaozhi_tts`（你好小智），可替换为其他内置词；TTS 音色沿用供应商默认。待确认 TTS 商用授权。
+4. 已确认（Q3=C/A3）：消息中心复用 `nexus-core`，AI 网关独立在 `server/ai-gateway`；首版复用 `03` 小智 WebSocket 服务，对外以 `ai_session` 契约隔离。
 5. 舵机数量、供电与安装结构。
-6. 中文字体子集与商用授权。
+6. 已确认（B3）：中文字体用 Noto Sans SC 子集（SIL OFL），16/24 px，授权文本随资源入库。
+7. 已确认（B1/B2）：Broker 用 Mosquitto 2.0.22；消息全文保留 7 天、元数据 30 天；设备未读队列默认 8 条。
+8. 已确认（D 组）：冻结 `02`，`03` 作 donor；`board.json` 为源，构建生成 C 头与 Kconfig；`presentation` 独立组件；管理台复用 `nexus-core`。
 
 以上确认后再进入编码；未确认项不得用占位实现冒充已落地。

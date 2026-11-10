@@ -47,14 +47,15 @@
 │   │   ├── app/                  启动、任务编排、事件分发
 │   │   ├── core/                 事件总线、模块生命周期、配置、契约
 │   │   ├── modules/
-│   │   │   ├── ai_agent/         语音会话、上下文、表情动作编排
+│   │   │   ├── ai_agent/         语音会话、上下文、状态事件
 │   │   │   ├── message_hub/      消息接入、队列、渲染调度、ACK
 │   │   │   ├── climate/          温湿度采集、滤波、告警
 │   │   │   └── growth/           成长数值、互动、存档
+│   │   ├── presentation/         状态→表情/动作映射（纯逻辑）
 │   │   ├── hal/                  I2S、SPI、GPIO、I2C、RMT、网络
 │   │   ├── ui/                   LVGL 页面、组件、主题、动画
 │   │   └── storage/              NVS、LittleFS、版本化存档
-│   ├── boards/dodo-s3-lcd/       板级引脚、显示、音频配置
+│   ├── boards/dodo-s3-lcd/       板级 board.json（引脚/能力唯一事实源）
 │   ├── components/               可复用 ESP-IDF 组件
 │   ├── partitions/               分区表与迁移说明
 │   └── tests/                    主机测试与目标测试入口
@@ -88,7 +89,7 @@
 | `02-desktop-pet` | 复用离线玩法、DHT11/光敏/摇杆/触摸驱动思路、NVS 存档经验；不复制整仓。 |
 | `03-xiaozhi-voice` | 语音底座、DODO 板型、ST7789/INMP441/MAX98357A 接线与构建经验。 |
 | `nexus-core` | 消息中心：Halo/Webhook 接入、消息去重、MQTT/TLS 与设备认证、配置下发、管理台；签发短期 AI 会话令牌。 |
-| `server/ai-gateway` | 独立 AI 会话服务：ASR/LLM/TTS 编排与供应商密钥；首版可复用 03 小智服务实现。 |
+| `server/ai-gateway` | 独立 AI 会话服务：ASR/LLM/TTS 编排与供应商密钥；首版复用 03 小智服务，经 `ai_session` 契约隔离。 |
 | `mac-bridge` | 手机/电脑控制的本机执行适配器，继续用固定白名单与确认机制。 |
 | `docs/HARDWARE.md` | 硬件与分区事实来源；新工程重新定义分区，不复用 02/03 的分区表。 |
 

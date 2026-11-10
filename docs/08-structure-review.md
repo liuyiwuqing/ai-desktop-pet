@@ -1,8 +1,8 @@
 # 08 · 目录结构与生产级架构评审
 
-状态：评审中（2026-11-10）。已确认 Q1（独立 Git 仓库）、Q3（方案 C：消息中心归 `nexus-core`，AI 网关独立）。评审对象：工作区根目录、`04-ai-desktop-pet` 骨架，以及被复用的 `02-desktop-pet`、`03-xiaozhi-voice`、`nexus-core`、`mac-bridge`。
+状态：评审中（2026-11-10）。S1 可构建骨架已完成（`idf.py build` 通过，0 warning）。已确认 Q1（独立 Git 仓库）、Q2（冻结 `02`，`03` 作 donor）、Q3（方案 C：消息中心归 `nexus-core`，AI 网关独立）、Q4（独立 `model` 分区 1 MB）、Q5（`board.json` 生成 C/Kconfig）、Q6（`presentation` 独立）、Q8（管理台复用 `nexus-core`），以及 A/B 组决策。评审对象：工作区根目录、`04-ai-desktop-pet` 骨架，以及被复用的 `02-desktop-pet`、`03-xiaozhi-voice`、`nexus-core`、`mac-bridge`。
 
-结论：分层方向正确，但当前是“文档架构”，还不是“可构建、可约束、可发布”的工程架构。进入功能开发前，必须先补齐 5 个阻断项和 8 个高风险项，否则后续迭代会把问题固化进代码。
+结论：分层方向正确。S1 已把“不可构建”变为可构建骨架；剩余问题集中在模块边界、契约、测试与发布流程，进入功能开发前仍需补齐 P0-2、P0-4、P0-5 的落地项和高风险项。
 
 ## 1. 评审方法与证据
 
@@ -45,9 +45,9 @@
 - **P1 高风险**：短期能跑，但会在 1–2 个迭代后造成返工或线上故障。
 - **P2 优化**：影响效率、可维护性或一致性，可排期处理。
 
-### P0-1 骨架不可构建
+### P0-1 骨架不可构建（S1 已修复）
 
-**现象**：`04` 没有 `firmware/CMakeLists.txt`、`main/CMakeLists.txt`、`sdkconfig.defaults`、`partitions/*.csv`、`idf_component.yml`、`Kconfig.projbuild`、`.gitignore`、CI 配置。`README` 明确写着“构建文件在架构确认后再生成”。
+**现象（评审时）**：`04` 没有 `firmware/CMakeLists.txt`、`main/CMakeLists.txt`、`sdkconfig.defaults`、`partitions/*.csv`、`idf_component.yml`、`Kconfig.projbuild`、`.gitignore`、CI 配置。`README` 明确写着“构建文件在架构确认后再生成”。
 
 **风险**：目录结构只是假设。模块能否编译、依赖是否成环、分区是否放得下、LVGL/PSRAM 配置是否可用，全都没有证据；后续任何“按目录开发”都可能在第一轮构建时推倒重来。
 
@@ -58,6 +58,8 @@
 - 提交 `sdkconfig.defaults`（16 MB Flash、8 MB PSRAM、自定义分区、LVGL 基础配置）。
 - 提交 `partitions/16m.csv` 与容量预算表。
 - CI 执行 `idf.py build`，产出 size report。
+
+**已完成（2026-11-10，S1）**：已提交 `firmware/CMakeLists.txt`、`main/CMakeLists.txt`、`sdkconfig.defaults`、`partitions/16m.csv`、最小事件总线与启动诊断；`idf.py build` 通过，0 warning，镜像 181,068 B；`idf.py size` 可产出报告。S1 事件总线为固定 32 B payload、FIFO，队满丢新并计数；优先级队列、correlation id 与 schema version 留到 S3。
 
 **验收**：`idf.py build` 通过；`idf.py size` 输出 app/DRAM/PSRAM 占用；分区表通过 `parttool.py` 校验；不改 `02/03`。
 
@@ -97,26 +99,32 @@ firmware/
 
 **验收**：删除任一 `svc_*` 组件后，除 `main` 的组合代码外无编译错误；`idf.py depgraph` 或脚本检查无环；扩展关闭时二进制中不出现其符号。
 
-### P0-3 Flash 与语音模型预算不闭合
+### P0-3 Flash 与语音模型预算（Q4 已确认，待落地）
 
-**现象**：`00-architecture.md` 的 16 MB 分区表没有 `model` 分区，只有 3 MB `assets`；但技术栈选择了 ESP-SR WakeNet。`03` 的 v1 分区表明确保留 `model`（960 KB，自定义唤醒词为 3.9 MB），v2 则把模型并入 8 MB `assets`。
+**现象（评审时）**：`00-architecture.md` 的 16 MB 分区表没有 `model` 分区，只有 3 MB `assets`；但技术栈选择了 ESP-SR WakeNet。`03` 的 v1 分区表明确保留 `model`（960 KB，自定义唤醒词为 3.9 MB），v2 则把模型并入 8 MB `assets`。
 
 **风险**：
 
 - WakeNet 模型没有明确存放位置和大小，语音功能可能在链接或运行期直接失败。
-- 3 MB `assets` 同时承载唤醒模型、中文字体、表情图、动画帧、提示音，大概率不够。
+- `assets` 同时承载中文字体、表情图、动画帧、提示音，预算不足会挤压表现资源。
 - 4 MB OTA 槽要容纳 ESP-SR、LVGL、TLS、音频与业务代码，未做 size report 前不能视为可行。
 - 没有 `factory` 分区或明确 USB 恢复流程，双槽 OTA 都失败时设备变砖。
 
-**建议**：
+**已确认（2026-11-10，Q4）**：采用独立 `model` 分区，不并入 `assets`。
 
-1. 先做容量预算表，而不是先定分区数字：app 二进制、唤醒模型、字体子集、表情资源、音频、NVS、LittleFS 各自上限。
-2. 明确模型加载方式：独立 `model` 分区，或放入 `assets` 并配置 ESP-SR 自定义路径；二选一写进契约。
-3. 增加 `factory` 分区或定义可验证的 USB 恢复流程；OTA 必须支持回滚。
-4. 在 CI 中加入 `idf.py size` 与资源打包体积门禁，超过预算直接失败。
-5. 用实机 `esptool flash_id` 与 `parttool.py` 核对偏移，不靠文档推算。
+- 分区：`model` 从 `0xE20000` 起 1 MB；`assets` 扩到 4 MB（`0xA20000`–`0xE20000`）；`coredump` 移到 `0xF20000`；保留 832 KB。
+- 依据：当前 `CONFIG_SR_WN_WN9_NIHAOXIAOZHI_TTS=y` 的 `srmodels.bin` 实测 291,069 B，1 MB 有约 3.5 倍余量。
+- 加载：ESP-SR 使用 `esp_srmodel_init("model")` 直接 mmap，不经过 `assets` 索引；模型不随应用 OTA 更新。
+- 边界：自定义唤醒词约 3.9 MB，首版不支持；启用需破坏性重分区并 USB 重刷。
 
-**验收**：预算表每项有实测或保守估算；构建产物小于槽位 75%；双槽升级与回滚在实机通过；模型能从声明位置加载。
+**建议（剩余）**：
+
+1. 提交 `tools/model.py`：按选型打包 `srmodels.bin`，CI 校验 ≤960 KB。
+2. 在 CI 中加入 `idf.py size` 与资源打包体积门禁，超过预算直接失败。
+3. 定义可验证的 USB 恢复流程；OTA 必须支持回滚。
+4. 用实机 `esptool flash_id` 与 `parttool.py` 核对偏移，不靠文档推算。
+
+**验收**：分区表可由 `parttool.py` 校验；`srmodels.bin` 能从 `model` 分区加载；app/DRAM/PSRAM 与资源体积均在预算内；双槽升级、回滚与 USB 恢复在实机通过。
 
 ### P0-4 仓库与版本边界（Q1 已确认，待落地）
 
@@ -150,7 +158,7 @@ firmware/
 **已确认（2026-11-10）**：采用方案 C，按能力拆分归属。
 
 - 消息中心归 `nexus-core`：第三方 Webhook/Halo 接入、消息去重与保留、设备注册与 MQTT 主题 ACL、配置下发、管理台。`04` 不新建 `message-gateway`。
-- AI 网关独立：`04/server/ai-gateway/` 承载 ASR/LLM/TTS 会话编排、供应商适配与密钥、上下文策略；首版可复用 `03` 的小智 WebSocket 服务作为实现，对外仍以 `ai_session` 契约暴露。
+- AI 网关独立：`04/server/ai-gateway/` 承载 ASR/LLM/TTS 会话编排、供应商适配与密钥、上下文策略；已确认首版复用 `03` 的小智 WebSocket 服务作为实现，对外仍以 `ai_session` 契约暴露。
 - 集成边界：`04/integration/` 只放与 `nexus-core` 的 OpenAPI/AsyncAPI/JSON Schema、部署配置与联调脚本，不放业务代码。
 - 鉴权：设备在 `nexus-core` 完成身份校验并换取短期 AI 会话令牌；`ai-gateway` 只校验该令牌，不直连设备管理数据，也不共享数据库。
 - 部署：`nexus-core` 不代理音频流；MQTT 消息与 WSS 音频分别走各自服务。
@@ -168,7 +176,7 @@ firmware/
 **建议**：
 
 - `hal/` 只定义接口：`audio_in`、`audio_out`、`display`、`sensor_bus`、`actuator_bus`、`net`、`time`。
-- `bsp_dodo_s3_lcd/` 实现接口，持有引脚表、时钟、初始化顺序和能力清单 `board.json`。
+- `bsp_dodo_s3_lcd/` 实现接口，持有引脚表、时钟、初始化顺序和能力清单 `board.json`。已确认（Q5）：`board.json` 为唯一事实源，构建生成 C 头与 Kconfig 默认值。
 - 业务模块只依赖接口，不依赖具体 BSP；`app` 负责注入。
 - 板型选择通过 Kconfig 选 BSP 组件，不写长 `if/else` 链。
 
@@ -186,7 +194,7 @@ firmware/
 
 **建议**：
 
-- 新增 `presentation/`：只做 `pet_state + event → expression/action` 的纯函数映射，可主机测试。
+- 已确认（Q6）：新增 `presentation/`，只做 `pet_state + event → expression/action` 的纯函数映射，可主机测试。
 - `ai_agent` 只产出状态与文本/音频事件，不知道表情名称。
 - `message_hub` 只产出“展示意图”（优先级、停留时长、卡片类型），不负责绘制。
 - `ui_lvgl/` 只消费展示意图与表现快照，负责 LVGL 对象与动画。
@@ -333,7 +341,7 @@ CI 分阶段：静态检查 → 主机测试 → 构建与 size gate → 契约�
 | 第 113 行 | 契约固定放 `main/core/contracts/` | 组件化后 `main` 不再是业务容器 | 独立 `components/contracts` |
 | 第 156 行 | 风险等级 3 级 | `05` 文档使用 L0–L3 四级 | 统一为 L0 只读、L1 可逆、L2 破坏性、L3 高危 |
 | 第 160、170 行 | 公共契约暴露 `cJSON *` | 契约耦合 cJSON 与堆所有权 | 序列化字节 + schema，或 opaque 参数句柄 |
-| 第 217 行 | `assets` 3 MB | 未含唤醒模型，资源预算不闭合 | 单独 `model` 或扩大 `assets`，并给预算表 |
+| 第 217 行 | `assets` 3 MB | 未含唤醒模型，资源预算不闭合 | 已确认：独立 `model` 1 MB，`assets` 4 MB |
 | 第 234 行 | `app` 任务优先级 1 | 可能被 sensor/growth 饿死 | 做速率单调分析，事件分发与看门狗独立 |
 | 第 240 行 | 内部 heap 目标 ≥80 KB | 未扣除 Wi-Fi/TLS/ESP-SR 峰值 | 分模块预算，实机测最低值与最大连续块 |
 | 第 262 行 | 首版复用“小智 WebSocket 服务” | 与 `01` 的云 ASR/LLM/TTS 选型需对齐 | 已改为独立 `ai-gateway` 承载，小智服务只作为首版实现 |
@@ -510,13 +518,31 @@ SemVer、签名 OTA、A/B 回滚、factory 恢复、依赖锁、SBOM、许可证
 | 编号 | 决策 | 选项 | 建议 |
 | --- | --- | --- | --- |
 | Q1 | 仓库策略 | **已确认：独立仓库**；不采用 monorepo | `04` 自管文档、锁文件、CI 与 tag；跨仓库用版本化契约 |
-| Q2 | 02/03 定位 | 冻结参考 / 持续维护 / 抽取共享组件 | 冻结 `02`，`03` 作 donor，稳定组件抽到 `04` |
+| Q2 | 02/03 定位 | **已确认：冻结 02，03 作 donor** | `02` 不再修改；`03` 只读抽取语音/板级经验，稳定组件抽到 `04`；不跟随 03 上游升级 |
 | Q3 | 服务端归属 | **已确认：方案 C** | 消息中心（Webhook/Halo、MQTT/ACL、配置、管理台）归 `nexus-core`；AI 网关独立在 `04/server/ai-gateway`；`04/integration/` 只放契约与部署 |
-| Q4 | 语音模型存放 | 独立 `model` 分区 / 并入 `assets` | 先做容量预算，再定；3 MB `assets` 需重新核算 |
-| Q5 | 板级能力描述 | `board.json` / Kconfig / 两者 | `board.json` 供运行期能力查询，Kconfig 供编译期裁剪 |
-| Q6 | 表现层归属 | `presentation` 独立 / 放入 `ui` | 独立，便于主机测试与无屏版本复用 |
-| Q7 | 安全启动/Flash 加密 | 首版启用 / 量产启用 / 不启用 | 至少预留 eFuse 与签名流程，避免后期无法升级 |
-| Q8 | 管理台归属 | `nexus-core` 扩展 / `04` 自建 | 复用 `nexus-core`，避免第二套鉴权与审计 |
+| Q4 | 语音模型存放 | **已确认：独立 `model` 1 MB** | `0xE20000` 起 1 MB，ESP-SR mmap；`assets` 扩到 4 MB；当前模型 284 KB；自定义唤醒词不在首版 |
+| Q5 | 板级能力描述 | **已确认：`board.json` 生成 C/Kconfig** | 单一事实源；构建时生成 C 头与 Kconfig 默认值，避免两处漂移 |
+| Q6 | 表现层归属 | **已确认：`presentation` 独立** | 纯函数映射，主机可测；`ui` 只消费表现快照，便于无屏版本复用 |
+| Q7 | 安全启动/Flash 加密 | **已确认：开发不启用，量产启用** | 开发期保持可烧录；量产启用 Secure Boot + Flash Encryption；eFuse 不可逆，量产前完成密钥与签名流程 |
+| Q8 | 管理台归属 | **已确认：复用 `nexus-core`** | 同一套鉴权、审计、设备管理与消息时间线，不建第二套后台 |
+
+### A 组已确认（2026-11-10）
+
+| 项 | 决策 | 说明 |
+| --- | --- | --- |
+| A1 AI 供应商 | 沿用 `03` 小智服务 | 首版不自建 ASR/LLM/TTS，不引入第二家供应商 |
+| A2 唤醒词 | 内置 `wn9_nihaoxiaozhi_tts`（你好小智） | 模型约 291 KB，1 MB 分区可容纳；可换其他内置词；自定义词约 3.9 MB 不在首版 |
+| A3 AI 网关 | 复用 `03` + `ai_session` 契约隔离 | 固件只依赖契约，替换实现不改 UI/成长/消息模块 |
+| A4 安全基线 | 开发不启用，量产启用 Secure Boot + Flash Encryption | eFuse 不可逆；开发期不锁芯片 |
+| A5 板级基线 | `03` DODO-S3-LCD，背光 GPIO42 PWM | S1 只落此板；其他板型后续独立 board profile |
+
+### B 组已确认（2026-11-10）
+
+| 项 | 决策 | 说明 |
+| --- | --- | --- |
+| B1 消息保留 | 全文 7 天，元数据 30 天 | 到期每日清理；审计与导出默认不含正文 |
+| B2 MQTT Broker | Mosquitto 2.0.22 | 与 `nexus-core` 现有 compose/ACL/集成测试一致；集群再评估 EMQX |
+| B3 中文字体 | Noto Sans SC 子集（SIL OFL） | 16/24 px 子集，授权文本随资源入库 |
 
 ## 9. 结论
 

@@ -28,7 +28,7 @@
 ### 2.3 推荐技术栈
 
 - 设备：ESP-IDF `esp-mqtt`，MQTT 3.1.1 over TLS 8883，QoS 1，`clean_session=false`，keepalive 60 s，LWT。
-- Broker：EMQX 或 Mosquitto（开发用 Mosquitto 即可）。
+- Broker：Mosquitto 2.0.22（与 `nexus-core` 现有 compose、ACL、集成测试一致）；单设备足够，集群或多租户再评估 EMQX。
 - 服务端：Java 21 / Spring Boot / PostgreSQL / Flyway / Vue 3（复用 `nexus-core`）。
 - 第三方入口：HTTPS Webhook + Bearer Token + HMAC 签名；管理台手动测试发送。
 - 实时状态：管理台用 SSE；失败回退 5 s 轮询。
@@ -94,9 +94,16 @@
 
 `displayed` 失败不得发送；渲染超时/失败只保留 `received`，服务端可重试。
 
+### 3.4 服务端保留与隐私
+
+- 全文（标题、正文、原始 payload）保留 7 天；消息 ID、来源、设备、优先级、状态、时间等元数据保留 30 天。
+- 到期由每日清理任务删除；审计日志只记录消息 ID 与操作，不含正文。
+- 管理台默认只导出元数据；导出正文需显式勾选并写审计。
+- 设备未 ACK 的消息在保留窗口内可重投；超出窗口按失败处理并记录。
+
 ## 4. 设备侧队列与去重
 
-- 未读队列上限 8 条；按 `priority` 降序、`createdAt` 升序。
+- 未读队列上限 8 条（默认值，P3 实机压测后调整）；按 `priority` 降序、`createdAt` 升序。
 - 队列满：丢弃最低优先级最旧消息；`critical` 不丢，除非同 ID 重复。
 - 持久化：NVS `msg_inbox`，带版本、长度、CRC；写入成功才 ACK `received`。
 - 去重环：最近 16 个 `id`/`dedupeKey`，掉电保持；重复消息只更新状态，不重复展示。
@@ -244,4 +251,4 @@ IDLE → RECEIVED → QUEUED → RENDERING → DISPLAYED → READ
 | 中文换行/字体 | 截断/乱码 | 子集字体、UTF-8 换行、缺字回退 |
 | 管理台权限过宽 | 误操作 | RBAC、二次确认、审计 |
 
-已确认（Q3=C）：消息中心与管理台复用 `nexus-core`，不新建 `message-gateway`。待确认：消息保留天数、是否允许云端保存消息全文、Broker 选型、设备队列上限是否 8 条。
+已确认（Q3=C / B 组）：消息中心与管理台复用 `nexus-core`，不新建 `message-gateway`；Broker 用 Mosquitto 2.0.22；消息全文保留 7 天、元数据保留 30 天。设备未读队列上限 8 条为默认值，P3 压测后调整。
