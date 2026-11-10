@@ -1,6 +1,6 @@
 # firmware
 
-ESP-IDF 6.1 固件工程。S2 组件化、S3 契约/配置与 S4 温湿度纵向切片已落地：`main` 只做组合根，契约、事件总线、业务模块、板级实现与扩展拆为独立组件。
+ESP-IDF 6.1 固件工程。S2 组件化、S3 契约/配置、S4 温湿度纵向切片与 S5-A 消息中心纯逻辑已落地：`main` 只做组合根，契约、事件总线、业务模块、板级实现与扩展拆为独立组件。
 
 ## 构建
 
@@ -21,7 +21,7 @@ idf.py size
 ```bash
 python3 ../tools/ci/check_deps.py       # 组件依赖图无环
 python3 ../tools/ci/check_contracts.py  # schema、profile、example、扩展 manifest、生成物一致性
-../tools/ci/test_host.sh                # 主机测试（事件契约、生成配置头、扩展清单、温湿度解码/滤波/告警/存档/卡片）
+../tools/ci/test_host.sh                # 主机测试（事件契约、生成配置头、扩展清单、温湿度、消息时间/校验/队列）
 ```
 
 `build_firmware.sh` 会依次执行依赖检查、契约校验、主机测试、`idf.py build` 与 `idf.py size`。
@@ -61,6 +61,7 @@ xtensa-esp32s3-elf-nm build-fake/nexus_pet.elf | grep fake_climate
 - `components/bsp_dodo_s3_lcd/`：DODO-S3-LCD 板级实现，当前含 RMT 读取 DHT11。
 - `components/storage/`：NVS 薄封装 `pet_storage_*`。
 - `components/svc_climate/`：温湿度采样任务、滤波、告警、60 分钟缓冲与当日极值，受 `CONFIG_PET_MODULE_CLIMATE_ENABLED` 控制。
+- `components/svc_message_hub/`：消息 ISO-8601 解析、信封校验、8 条优先级队列、16 槽去重、TTL/DND/ACK 状态机；传输与 NVS 持久化在 S5-B/C 接入。
 - `components/svc_growth/`：成长模块骨架，受 `CONFIG_PET_MODULE_GROWTH_ENABLED` 控制。
 - `components/presentation/`：纯逻辑表现快照，当前含温湿度卡片。
 - `../extensions/`：扩展组件，受 `CONFIG_PET_EXT_*` 控制；`EXTRA_COMPONENT_DIRS` 收集。

@@ -1,0 +1,10 @@
+idf_component_register(
+    SRCS
+        "src/message_time.c"
+        "src/message_validate.c"
+        "src/message_queue.c"
+    PRIV_INCLUDE_DIRS
+        "private_include"
+    REQUIRES
+        "contracts"
+)

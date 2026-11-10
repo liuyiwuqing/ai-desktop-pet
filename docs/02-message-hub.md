@@ -1,6 +1,6 @@
 # 02 · 万能信息接收端模块
 
-状态：待评审。依赖：`00-architecture.md`、`01-ai-agent.md`（表情联动）。
+状态：待评审；S5-A 设备侧纯逻辑已落地（2026-11-10）。依赖：`00-architecture.md`、`01-ai-agent.md`（表情联动）。
 
 ## 1. 范围
 
@@ -256,3 +256,17 @@ IDLE → RECEIVED → QUEUED → RENDERING → DISPLAYED → READ
 | 管理台权限过宽 | 误操作 | RBAC、二次确认、审计 |
 
 已确认（Q3=C / B 组）：消息中心与管理台复用 `nexus-core`，不新建 `message-gateway`；Broker 用 Mosquitto 2.0.22；消息全文保留 7 天、元数据保留 30 天。设备未读队列上限 8 条为默认值，P3 压测后调整。
+
+## 11. 落地记录
+
+### S5-A 设备侧纯逻辑（2026-11-10）
+
+已落地：
+
+- `contracts/include/pet/message.h`：消息视图、优先级、模板/声音、ACK 状态与事件 payload。事件只带 `id + state + queueDepth`（56 B），正文通过消息中心快照读取。
+- `svc_message_hub`：ISO-8601 子集解析、信封字段校验、8 条有界优先级队列（优先级降序、创建时间升序）、16 槽 FNV-1a 去重环、TTL 清理、DND 通知策略、ACK 状态机。
+- 主机测试：`test_message_time`、`test_message_validate`、`test_message_queue`；默认构建 0 warning，镜像 242,052 B，DIRAM 69,650 B。
+
+内存约束：`pet_message_view_t` 为 2,448 B，8 条队列存储约 19.1 KB；S5-C 持久化与运行期队列应分配到 PSRAM，避免占用内部 heap 预算。
+
+未落地：Wi-Fi/MQTT/TLS 传输、NVS `msg_inbox` 持久化、ACK 发布、消息渲染与 UI 接入、实机断网/重连验收。
