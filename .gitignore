@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+
+# ESP-IDF 构建产物（锁文件 dependencies.lock 必须提交）
+firmware/build/
+firmware/build-*/
+firmware/sdkconfig
+firmware/sdkconfig.old
+firmware/managed_components/
+firmware/*.map
+firmware/*.bin
+firmware/*.elf
+firmware/*.uf2
+
+# 本地配置与凭据
+*.env
+*.local.json
+config/local/
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# 编辑器与工具
+.idea/
+.vscode/
+*.swp
+*.log
+
+# 测试与覆盖率产物
+coverage/
+htmlcov/
+build/
+build-*/
