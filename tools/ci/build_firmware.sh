@@ -5,6 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 firmware_dir="${repo_root}/firmware"
 
 python3 "${repo_root}/tools/ci/check_deps.py"
+python3 "${repo_root}/tools/ci/check_contracts.py"
 "${repo_root}/tools/ci/test_host.sh"
 
 if ! command -v idf.py >/dev/null 2>&1; then

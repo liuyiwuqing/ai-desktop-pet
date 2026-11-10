@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "device_control",
+  "version": "0.1.0",
+  "contractVersion": 1,
+  "capabilities": ["device.discover", "app.open", "media.play_pause"],
+  "risk": "l2_destructive",
+  "defaultEnabled": false,
+  "description": "手机/电脑控制扩展：白名单能力注册、风险分级与适配器调用。"
+}

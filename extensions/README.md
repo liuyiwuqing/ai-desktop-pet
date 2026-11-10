@@ -4,16 +4,34 @@
 
 ## 目录
 
-- `device_control/`：手机/电脑控制的能力注册与适配器。
-- `servo/`：舵机执行器、指令解析、序列播放与安全限制。
+- `device_control/`：手机/电脑控制的能力注册与适配器（S6 实现）。
+- `servo/`：舵机执行器、指令解析、序列播放与安全限制（S6 实现）。
+
+每个扩展目录固定结构：
+
+```text
+extensions/<name>/
+├── extension.json        # id、version、contractVersion、capabilities、risk、defaultEnabled
+├── CMakeLists.txt
+├── include/pet_ext/<name>.h
+├── src/<name>.c
+├── test/host/test_<name>_contract.c
+└── README.md
+```
 
 ## 契约
 
-- 扩展只通过 `EVT_INTENT_READY` 接收意图，通过结果事件回报。
-- 核心模块不 `#include` 扩展头；扩展依赖 `core/contracts`。
-- 编译期开关：`CONFIG_EXT_DEVICE_CONTROL`、`CONFIG_EXT_SERVO`。
-- 每个扩展必须有 mock 适配器与主机契约测试。
-- 新增扩展不得修改 `ai_agent` 状态机或消息信封。
+- `extension.json` 由 `config/schemas/extension.schema.json` 校验；核心契约版本在 `firmware/components/contracts/include/pet/extension.h`，两者不一致时 `check_contracts.py` 失败。
+- 扩展只通过 `EVT_INTENT_READY` 接收意图，通过结果事件回报；核心模块不 `#include` 扩展头。
+- 编译期开关：`CONFIG_PET_EXT_DEVICE_CONTROL`、`CONFIG_PET_EXT_SERVO`，默认关闭；关闭时组合根不引用扩展，二进制不出现 `*_init` 符号。
+- 新增扩展需要：manifest、唯一公开头、组件 CMake、主机清单测试、Kconfig 开关，且不修改 `ai_agent` 状态机或消息信封。
+
+## 校验
+
+```bash
+python3 tools/ci/check_contracts.py   # manifest、契约版本、目录结构、Kconfig 开关
+tools/ci/test_host.sh                 # 每个扩展的清单契约测试
+```
 
 ## 文档
 

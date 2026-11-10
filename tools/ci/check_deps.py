@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-COMPONENTS = ROOT / "firmware" / "components"
+COMPONENT_ROOTS = (ROOT / "firmware" / "components", ROOT / "extensions")
 
 
 def parse_deps(cmake_file: Path, known: set[str]) -> set[str]:
@@ -50,18 +50,29 @@ def find_cycle(graph: dict[str, set[str]]) -> list[str] | None:
 
 
 def main() -> int:
-    if not COMPONENTS.is_dir():
-        print(f"missing component dir: {COMPONENTS}", file=sys.stderr)
+    roots = [root for root in COMPONENT_ROOTS if root.is_dir()]
+    if not roots:
+        print(f"missing component directories: {COMPONENT_ROOTS}", file=sys.stderr)
         return 1
 
-    known = {path.name for path in COMPONENTS.iterdir() if path.is_dir()}
+    dirs: dict[str, Path] = {}
+    for root in roots:
+        for path in sorted(root.iterdir()):
+            if not path.is_dir() or not (path / "CMakeLists.txt").is_file():
+                continue
+            if path.name in dirs:
+                print(
+                    f"FAIL duplicate component name '{path.name}': "
+                    f"{dirs[path.name]} and {path}",
+                    file=sys.stderr,
+                )
+                return 1
+            dirs[path.name] = path
+
+    known = set(dirs)
     graph: dict[str, set[str]] = {}
     for name in sorted(known):
-        cmake_file = COMPONENTS / name / "CMakeLists.txt"
-        if not cmake_file.is_file():
-            print(f"FAIL component '{name}' has no CMakeLists.txt", file=sys.stderr)
-            return 1
-        graph[name] = parse_deps(cmake_file, known)
+        graph[name] = parse_deps(dirs[name] / "CMakeLists.txt", known)
 
     for name, deps in graph.items():
         print(f"{name}: {', '.join(sorted(deps)) or '-'}")

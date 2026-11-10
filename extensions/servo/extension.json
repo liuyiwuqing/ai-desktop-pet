@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "servo",
+  "version": "0.1.0",
+  "contractVersion": 1,
+  "capabilities": ["servo.move", "servo.stop", "servo.emergency_stop"],
+  "risk": "l1_reversible",
+  "defaultEnabled": false,
+  "description": "舵机执行器扩展：角度/速度限制、序列播放与软件急停。"
+}

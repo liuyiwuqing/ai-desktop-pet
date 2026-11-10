@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "msg_01JABCDEF",
+  "source": "halo.comment",
+  "type": "comment",
+  "priority": "normal",
+  "title": "新评论",
+  "body": "这篇文章很有帮助，想请教一下……",
+  "payload": {
+    "postTitle": "ESP32 入门",
+    "author": "读者"
+  },
+  "createdAt": "2026-11-10T10:00:00+08:00",
+  "expiresAt": "2026-11-11T10:00:00+08:00",
+  "dedupeKey": "halo:comment:123456",
+  "display": {
+    "template": "comment_card",
+    "durationMs": 8000,
+    "sound": "chime",
+    "icon": "comment"
+  },
+  "requireAck": true
+}

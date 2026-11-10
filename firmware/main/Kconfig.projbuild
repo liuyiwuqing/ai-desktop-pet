@@ -8,3 +8,21 @@ config PET_MODULE_GROWTH_ENABLED
       composition root builds without it.
 
 endmenu
+
+menu "PET extensions"
+
+config PET_EXT_DEVICE_CONTROL
+    bool "Enable device_control extension"
+    default n
+    help
+      Phone/computer control extension (extensions/device_control). Disabled by
+      default; S6 implements adapters and confirmation flow.
+
+config PET_EXT_SERVO
+    bool "Enable servo extension"
+    default n
+    help
+      Servo actuator extension (extensions/servo). Disabled by default; S6
+      implements LEDC output, limits and emergency stop.
+
+endmenu

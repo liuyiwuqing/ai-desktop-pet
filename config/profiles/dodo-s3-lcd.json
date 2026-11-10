@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "boardId": "dodo-s3-lcd",
+  "features": {
+    "aiAgent": true,
+    "messageHub": true,
+    "climate": true,
+    "growth": true,
+    "deviceControl": false,
+    "servo": false
+  }
+}

@@ -1,6 +1,6 @@
 # firmware
 
-ESP-IDF 6.1 固件工程。S2 组件化已落地：`main` 只做组合根，契约、事件总线与业务模块拆为独立组件。
+ESP-IDF 6.1 固件工程。S2 组件化与 S3 契约/配置已落地：`main` 只做组合根，契约、事件总线、业务模块与扩展拆为独立组件。
 
 ## 构建
 
@@ -14,23 +14,37 @@ idf.py build
 idf.py size
 ```
 
-或使用 CI 入口：`../tools/ci/build_firmware.sh`。当前构建结果：0 warning，镜像约 181 KB。只构建，不烧录、不擦除 Flash。
+或使用 CI 入口：`../tools/ci/build_firmware.sh`。当前构建结果：0 warning，默认镜像 181,936 B，DIRAM 55,018 B（16.1%）。只构建，不烧录、不擦除 Flash。
 
 ## 校验
 
 ```bash
-python3 ../tools/ci/check_deps.py   # 组件依赖图无环
-../tools/ci/test_host.sh            # 主机测试（纯 C 契约）
+python3 ../tools/ci/check_deps.py       # 组件依赖图无环
+python3 ../tools/ci/check_contracts.py  # schema、profile、example、扩展 manifest、生成物一致性
+../tools/ci/test_host.sh                # 主机测试（事件契约、生成配置头、扩展清单）
 ```
 
-`build_firmware.sh` 会依次执行依赖检查、主机测试、`idf.py build` 与 `idf.py size`。
+`build_firmware.sh` 会依次执行依赖检查、契约校验、主机测试、`idf.py build` 与 `idf.py size`。
+
+## 扩展开关
+
+两个扩展默认关闭，关闭时二进制不含 `pet_ext_*_init`：
+
+```bash
+# 启用示例：复制 sdkconfig 后追加，再用独立 build 目录构建
+cp sdkconfig /tmp/pet-sdkconfig.ext
+printf '\nCONFIG_PET_EXT_DEVICE_CONTROL=y\nCONFIG_PET_EXT_SERVO=y\n' >> /tmp/pet-sdkconfig.ext
+idf.py -B build-ext -D SDKCONFIG=/tmp/pet-sdkconfig.ext build
+nm build-ext/nexus_pet.elf | grep pet_ext_
+```
 
 ## 布局
 
 - `main/`：组合根，只含 `main.c`、`app/` 启动编排与 `Kconfig.projbuild`。
-- `components/contracts/`：跨模块契约（`include/pet/`），纯 C、不依赖 ESP-IDF，可主机测试。
-- `components/core/`：事件总线等基础服务，`REQUIRES contracts`。
+- `components/contracts/`：跨模块契约（`include/pet/`），纯 C、不依赖 ESP-IDF，可主机测试；`config_generated.h`、`extension.h` 均由 S3 契约生成或固化。
+- `components/core/`：事件总线（4 条优先级队列，总深度 32），`REQUIRES contracts`。
 - `components/svc_growth/`：成长模块骨架，受 `CONFIG_PET_MODULE_GROWTH_ENABLED` 控制。
+- `../extensions/`：扩展组件，受 `CONFIG_PET_EXT_*` 控制；`EXTRA_COMPONENT_DIRS` 收集。
 - `boards/dodo-s3-lcd/`：板级 `board.json`（引脚/能力唯一事实源）。
 - `partitions/`：新分区表与迁移说明，不复用 02/03 的分区表。
 - `tests/host/`：主机测试。

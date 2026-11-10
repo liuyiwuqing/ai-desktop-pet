@@ -9,6 +9,8 @@ idf_component_register(
         "contracts"
         "core"
         "svc_growth"
+        "device_control"
+        "servo"
     PRIV_REQUIRES
         "esp_timer"
 )

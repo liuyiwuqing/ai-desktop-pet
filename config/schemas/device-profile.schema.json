@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pet.local/schemas/device-profile.schema.json",
+  "title": "DeviceProfile",
+  "description": "板型与功能开关；只引用 boardId，不重复引脚与凭据。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "boardId", "features"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "boardId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aiAgent", "messageHub", "climate", "growth", "deviceControl", "servo"],
+      "properties": {
+        "aiAgent": {
+          "type": "boolean"
+        },
+        "messageHub": {
+          "type": "boolean"
+        },
+        "climate": {
+          "type": "boolean"
+        },
+        "growth": {
+          "type": "boolean"
+        },
+        "deviceControl": {
+          "type": "boolean"
+        },
+        "servo": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

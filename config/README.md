@@ -1,12 +1,25 @@
 # config
 
-非敏感配置与契约。
+非敏感配置与契约。`schemas/` 是唯一事实源，C 头与 TypeScript 类型由它生成。
 
 ## 目录
 
-- `schemas/`：消息信封、回执、设备能力、舵机指令、存档等 JSON Schema。
-- `profiles/`：板型与功能开关，例如 `dodo-s3-lcd.json`；不含凭据。
-- `examples/`：示例配置，供文档与测试使用。
+- `schemas/`：`device-config`、`device-profile`、`message`、`message-ack`、`extension` 五个 JSON Schema。
+- `profiles/`：板型与功能开关，例如 `dodo-s3-lcd.json`；只引用 `boardId` 与开关，不含引脚与凭据。
+- `examples/`：设备配置、消息、回执示例，供文档与 CI 校验使用。
+
+## 生成与校验
+
+```bash
+python3 tools/schema_codegen.py         # 生成 C 头与 TS 类型
+python3 tools/schema_codegen.py --check # 检查生成物是否过期
+python3 tools/ci/check_contracts.py     # schema、profile、example、扩展 manifest 全量校验
+```
+
+生成产物（入库，不手改）：
+
+- `firmware/components/contracts/include/pet/config_generated.h`
+- `integration/contracts/generated/pet-contracts.ts`
 
 ## 规则
 

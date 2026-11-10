@@ -16,11 +16,20 @@
 #include "svc_growth/api.h"
 #endif
 
+#if CONFIG_PET_EXT_DEVICE_CONTROL
+#include "pet_ext/device_control.h"
+#endif
+
+#if CONFIG_PET_EXT_SERVO
+#include "pet_ext/servo.h"
+#endif
+
 static const char *TAG = "app";
 
 static void on_boot(const pet_event_t *event)
 {
-    ESP_LOGI(TAG, "boot event: uptime=%" PRIu32 " ms", event->timestamp_ms);
+    ESP_LOGI(TAG, "boot event: uptime=%" PRIu32 " ms, seq=%" PRIu32,
+             event->timestamp_ms, event->sequence);
 }
 
 esp_err_t app_start(void)
@@ -37,10 +46,17 @@ esp_err_t app_start(void)
     ESP_ERROR_CHECK(pet_growth_init());
 #endif
 
-    const pet_event_t boot = {
-        .id = PET_EVT_BOOT,
-        .timestamp_ms = (uint32_t)(esp_timer_get_time() / 1000ULL),
-    };
+#if CONFIG_PET_EXT_DEVICE_CONTROL
+    pet_ext_device_control_init();
+#endif
+
+#if CONFIG_PET_EXT_SERVO
+    pet_ext_servo_init();
+#endif
+
+    pet_event_t boot;
+    pet_event_prepare(&boot, PET_EVT_BOOT, PET_EVENT_SOURCE_APP, PET_EVENT_PRIORITY_NORMAL);
+    boot.timestamp_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
     ESP_ERROR_CHECK(pet_event_bus_publish(&boot));
 
     ESP_LOGI(TAG, "skeleton started, idf=%s", esp_get_idf_version());

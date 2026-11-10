@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pet.local/schemas/device-config.schema.json",
+  "title": "DeviceConfig",
+  "description": "设备运行期用户配置（NVS pet_cfg），不含凭据。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "timezone", "language", "volume", "brightness", "dnd", "message"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "timezone": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "default": "Asia/Shanghai"
+    },
+    "language": {
+      "type": "string",
+      "enum": ["zh-CN", "en-US"],
+      "default": "zh-CN"
+    },
+    "volume": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 60
+    },
+    "brightness": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 80
+    },
+    "dnd": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "startMinute", "endMinute", "allowCritical"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "startMinute": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1439,
+          "default": 1320,
+          "description": "本地时间分钟数，1320 = 22:00"
+        },
+        "endMinute": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1439,
+          "default": 420,
+          "description": "本地时间分钟数，420 = 07:00"
+        },
+        "allowCritical": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["queueDepth", "durationMs"],
+      "properties": {
+        "queueDepth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "default": 8
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 5000,
+          "maximum": 30000,
+          "default": 8000
+        }
+      }
+    }
+  }
+}

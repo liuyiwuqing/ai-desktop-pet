@@ -1,6 +1,6 @@
 # 04 AI 超级桌面宠物（AI Desktop Pet）
 
-状态：**规划中，未进入功能实现**。本目录只提供工程骨架与模块边界；所有功能方案先评审，确认后再写代码。目录与构建边界的评审结论见 [`docs/08-structure-review.md`](docs/08-structure-review.md)。
+状态：**骨架与契约基线阶段（S1–S3 已完成），未进入业务功能实现**。已有可构建固件、组件边界、配置/消息/扩展 schema 与生成契约；所有功能方案先评审，确认后再写代码。目录与构建边界的评审结论见 [`docs/08-structure-review.md`](docs/08-structure-review.md)。
 
 ## 目标
 
@@ -54,9 +54,10 @@
 ├── server/                       独立 AI 网关（消息中心归 nexus-core）
 │   └── ai-gateway/               ASR/LLM/TTS 会话编排与供应商适配
 ├── integration/                  与 nexus-core 的契约与部署（不放业务代码）
+│   └── contracts/generated/      Schema 生成的 TypeScript 类型
 ├── bridge/                       本机工具桥（复用 mac-bridge）
-├── config/                       非敏感配置与 JSON Schema
-│   ├── schemas/                  配置/消息/存档契约
+├── config/                       非敏感配置与 JSON Schema（唯一事实源）
+│   ├── schemas/                  设备配置/profile/消息/回执/扩展 manifest
 │   ├── profiles/                 板型与功能开关
 │   └── examples/                 示例配置（不含凭据）
 ├── resources/                    运行时资源
@@ -65,14 +66,14 @@
 │   ├── animations/               表情/动作帧序列
 │   ├── audio/                    提示音、音效
 │   └── i18n/                     中英文文案
-├── extensions/                   扩展包
+├── extensions/                   扩展包（manifest + 组件 + 主机契约测试）
 │   ├── device_control/           设备控制适配器与能力注册
 │   └── servo/                    舵机执行器与安全限制
-├── tools/                        构建、资源打包、迁移、诊断脚本
+├── tools/                        构建、契约生成、资源打包、迁移、诊断脚本
 └── tests/                        跨模块契约与集成测试
 ```
 
-`main` 只做组合根，业务与基础能力放在 `components/`，每个组件只暴露 `include/`，依赖通过 `REQUIRES` 显式声明。扩展能力统一在 `extensions/` 下，通过编译开关接入。
+`main` 只做组合根，业务与基础能力放在 `components/`，每个组件只暴露 `include/`，依赖通过 `REQUIRES` 显式声明。扩展能力统一在 `extensions/` 下，通过 `CONFIG_PET_EXT_*` 编译开关接入，默认关闭。配置与消息以 `config/schemas/` 为唯一事实源，生成 C 头与 TypeScript 类型并由 CI 校验。
 
 ## 与现有工程的关系
 

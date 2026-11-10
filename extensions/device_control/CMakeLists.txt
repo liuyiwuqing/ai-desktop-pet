@@ -1,0 +1,10 @@
+idf_component_register(
+    SRCS
+        "src/device_control.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        "contracts"
+    PRIV_REQUIRES
+        "log"
+)

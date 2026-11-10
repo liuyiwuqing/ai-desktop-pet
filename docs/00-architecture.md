@@ -81,20 +81,24 @@ typedef enum {
 } pet_event_id_t;
 
 typedef struct {
-    pet_event_id_t id;
     uint32_t timestamp_ms;
+    uint32_t correlation_id;   // 同一次交互/消息链路共享，0 表示未关联
+    uint32_t sequence;         // 发布时由事件总线赋值，单调递增
+    pet_event_id_t id;
+    uint16_t schema_version;   // 当前 1；不匹配拒收
     uint16_t payload_len;
-    uint8_t payload[32];       // 固定内联，禁止跨任务裸指针
-    // S3 补齐：priority、correlation_id、schema_version、source、sequence
+    pet_event_priority_t priority;
+    pet_event_source_t source;
+    uint8_t payload[64];       // 固定内联，禁止跨任务裸指针
 } pet_event_t;
 ```
 
-> S1 事件总线仅支持 ≤32 B 内联 payload；S3 扩展到 64 B + 可选引用计数块，长文本/消息通过事件池传递，避免分发后悬空。
+> S3 已落地：payload 64 B，补齐 `correlation_id`、`sequence`、`schema_version`、`priority`、`source`；`pet_event_t` 固定 ≤96 B。可合并事件的 latest-value 槽与长文本事件池待对应模块落地时引入，避免分发后悬空。
 
 ### 规则
 
 - 事件 payload 使用固定大小结构体或事件池，不在中断/回调中 `malloc`。
-- 事件队列深度 32；S1 为 FIFO，队满丢新并累加 `dropped_total`；S3 改为关键/可合并分队列并按优先级丢弃。
+- 事件队列总深度 32，按优先级拆为 4 条（critical 4 / high 8 / normal 16 / low 4）；高优先级先出队，同优先级保序，队满按优先级计数丢弃并暴露 `dropped_total`。
 - 订阅者处理时间上限 10 ms；超时任务降级为“标记 + 异步处理”，禁止在事件回调里做网络/Flash 写入。
 - 事件只描述“发生了什么”，不描述“该做什么”；业务决策留在模块内。
 - 高频事件（音频电平）可合并，只保留最新值；状态类事件必须保序。
@@ -313,9 +317,11 @@ AI 会话面
 
 ## 10. 扩展机制
 
-- 扩展目录：`extensions/<name>/`，包含 `include/`、`src/`、`README.md`、契约测试。
-- 编译期开关：`CONFIG_EXT_DEVICE_CONTROL`、`CONFIG_EXT_SERVO`。
-- 运行期能力注册：`capability_registry` 保存能力名、参数 schema、风险级别、适配器 ID。
+- 扩展目录：`extensions/<name>/`，每个扩展必须包含 `extension.json`、`CMakeLists.txt`、唯一公开头 `include/pet_ext/<name>.h`、`src/`、`test/host/` 与 `README.md`。
+- `extension.json` 由 `config/schemas/extension.schema.json` 约束：`id`、SemVer `version`、`contractVersion`、`capabilities`、最高 `risk`、`defaultEnabled=false`、`description`。核心契约版本在 `firmware/components/contracts/include/pet/extension.h`。
+- 编译期开关：`CONFIG_PET_EXT_DEVICE_CONTROL`、`CONFIG_PET_EXT_SERVO`，默认关闭；组合根只调用已开启扩展的 `*_init()`。
+- 校验入口：`tools/ci/check_contracts.py` 校验 manifest、契约版本、目录结构与 Kconfig 开关；`tools/ci/test_host.sh` 运行每个扩展的清单契约测试。
+- 运行期能力注册：`capability_registry` 保存能力名、参数 schema、风险级别、适配器 ID（S6 落地）。
 - 核心模块不 `#include` 扩展头；扩展通过 `EVT_INTENT_READY` 订阅意图，通过 `EVT_ACTUATOR_RESULT` 回报结果。
 - 新增扩展不得修改 `ai_agent` 的状态机；只消费意图、产出结果。
 

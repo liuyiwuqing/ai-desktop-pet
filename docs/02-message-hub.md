@@ -48,6 +48,8 @@
 
 ### 3.2 消息信封
 
+Schema：`config/schemas/message.schema.json`；示例：`config/examples/message.example.json`。
+
 ```json
 {
   "schemaVersion": 1,
@@ -81,6 +83,8 @@
 - 未知字段忽略；`schemaVersion` 不支持时拒收并上报。
 
 ### 3.3 回执
+
+Schema：`config/schemas/message-ack.schema.json`；示例：`config/examples/message-ack.example.json`。
 
 ```json
 { "schemaVersion": 1, "messageId": "msg_01JABCDEF", "state": "received", "at": "2026-11-10T10:00:01+08:00", "queueDepth": 0 }

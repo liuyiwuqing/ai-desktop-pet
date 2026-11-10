@@ -1,8 +1,8 @@
 # 08 · 目录结构与生产级架构评审
 
-状态：评审中（2026-11-10）。S1 可构建骨架已完成（`idf.py build` 通过，0 warning）；S2 组件化已完成（`contracts`/`core`/`svc_growth` 组件、模块开关、依赖图检查、主机测试）。已确认 Q1（独立 Git 仓库）、Q2（冻结 `02`，`03` 作 donor）、Q3（方案 C：消息中心归 `nexus-core`，AI 网关独立）、Q4（独立 `model` 分区 1 MB）、Q5（`board.json` 生成 C/Kconfig）、Q6（`presentation` 独立）、Q8（管理台复用 `nexus-core`），以及 A/B 组决策。评审对象：工作区根目录、`04-ai-desktop-pet` 骨架，以及被复用的 `02-desktop-pet`、`03-xiaozhi-voice`、`nexus-core`、`mac-bridge`。
+状态：评审中（2026-11-10）。S1 可构建骨架已完成（`idf.py build` 通过，0 warning）；S2 组件化已完成（`contracts`/`core`/`svc_growth` 组件、模块开关、依赖图检查、主机测试）；S3 契约与配置已完成（5 个 JSON Schema、C/TS codegen、扩展 manifest 与开关、事件契约扩展）。已确认 Q1（独立 Git 仓库）、Q2（冻结 `02`，`03` 作 donor）、Q3（方案 C：消息中心归 `nexus-core`，AI 网关独立）、Q4（独立 `model` 分区 1 MB）、Q5（`board.json` 生成 C/Kconfig）、Q6（`presentation` 独立）、Q8（管理台复用 `nexus-core`），以及 A/B 组决策。评审对象：工作区根目录、`04-ai-desktop-pet` 骨架，以及被复用的 `02-desktop-pet`、`03-xiaozhi-voice`、`nexus-core`、`mac-bridge`。
 
-结论：分层方向正确。S1 已把“不可构建”变为可构建骨架，S2 已建立由构建系统强制的组件边界；剩余问题集中在契约、测试与发布流程，进入功能开发前仍需补齐 P0-3、P0-4、P0-5 的落地项和高风险项。
+结论：分层方向正确。S1 已把“不可构建”变为可构建骨架，S2 已建立由构建系统强制的组件边界，S3 已把配置、消息与扩展契约变成可校验的单一事实源；剩余问题集中在测试门禁、资源管线与发布流程，进入功能开发前仍需补齐 P0-3、P0-4、P0-5 的落地项和高风险项。
 
 ## 1. 评审方法与证据
 
@@ -236,6 +236,8 @@ extensions/<name>/
 
 **验收**：关闭所有扩展可构建；启用单个扩展不修改核心源码；契约版本不匹配时构建或启动明确失败。
 
+**已完成（2026-11-10，S3）**：`extension.json` 规范落在 `config/schemas/extension.schema.json`；`device_control`、`servo` 均有 manifest、唯一公开头、组件 CMake 与主机清单测试；核心契约版本在 `pet/extension.h`，`tools/ci/check_contracts.py` 校验 manifest、契约版本、目录结构与 `CONFIG_PET_EXT_*` 开关。默认构建中两个扩展不产生符号；启用构建出现 `pet_ext_*_init` 且无需修改核心源码。运行期能力注册与适配器行为留到 S6。
+
 ### P1-4 三层配置没有单一事实来源
 
 **现象**：板级引脚在 `firmware/boards/`，功能开关在 `config/profiles/`，运行配置在 NVS，服务端还有一套配置；`config/schemas/` 为空。
@@ -251,6 +253,8 @@ extensions/<name>/
 - CI 校验所有 profile 与 example 通过 schema。
 
 **验收**：修改 schema 后生成代码同步更新；旧版本 NVS 能迁移或明确拒绝；仓库扫描无凭据。
+
+**已完成（2026-11-10，S3）**：`config/schemas/` 提供设备配置、设备 profile、消息信封、回执、扩展 manifest 五个 schema；`tools/schema_codegen.py` 无第三方依赖，生成 `firmware/components/contracts/include/pet/config_generated.h` 与 `integration/contracts/generated/pet-contracts.ts`；`config/profiles/dodo-s3-lcd.json` 与 `config/examples/*.json` 由 `tools/ci/check_contracts.py` 校验，并检查生成产物是否过期。NVS `cfg_version` 迁移与启动期校验随 `storage` 组件落地。
 
 ### P1-5 事件总线契约不完整
 
@@ -272,6 +276,8 @@ extensions/<name>/
 - 明确队列满时的优先级与指标，禁止静默丢弃。
 
 **验收**：主机测试覆盖 payload 生命周期、队列满、乱序与重复事件；ASan 无悬空引用。
+
+**已完成（2026-11-10，S3）**：`pet_event_t` 改为 64 B 内联 payload，补齐 `correlation_id`、`schema_version`、`priority`、`source`、`sequence`，固定 ≤96 B；队列按优先级拆为 4 条（4/16/8/4，总计 32），高优先级先出队，队满按优先级计数；`pet_event_prepare()` 统一初始化，主机测试覆盖字段校验、长度边界与清零。`pet_result_t` 领域错误码、可合并事件 latest-value 槽与事件池随首个真实业务模块落地。
 
 ### P1-6 测试分层与 CI 缺失
 
@@ -514,7 +520,7 @@ SemVer、签名 OTA、A/B 回滚、factory 恢复、依赖锁、SBOM、许可证
 | S0 结构定稿 | 确认本报告、目标目录、仓库策略、服务端归属 | 第 8 节决策有结论；`00` 不一致项修正 |
 | S1 可构建骨架 | CMake、sdkconfig、分区、CI、空事件总线、诊断串口 | `idf.py build` 通过；size report 产出；CI 绿 |
 | S2 组件化（已完成 2026-11-10） | `contracts`/`core`/`svc_growth` 组件、模块开关、依赖图检查、主机测试；其余组件随实现落地 | 关闭模块可构建；依赖图无环；主机测试可跑 |
-| S3 契约与配置 | schema、codegen、扩展 manifest、契约测试 | 配置与消息 schema 校验通过；扩展开关生效 |
+| S3 契约与配置（已完成 2026-11-10） | 5 个 JSON Schema、C/TS codegen、扩展 manifest 与 Kconfig 开关、事件契约扩展；配置/消息/扩展校验入口 `tools/ci/check_contracts.py` | 配置与消息 schema 校验通过；扩展开关生效（关闭无符号、启用出现 `pet_ext_*_init`） |
 | S4 首个纵向切片 | 温湿度或成长（不依赖网络），含 UI、存储、主机测试 | 实机采样/展示/存档通过；异常与掉电测试通过 |
 | S5 网络能力 | 消息中心、AI 会话、TLS、重连、离线队列 | 断网/重连/重复消息/ACK 通过；延迟与内存达标 |
 | S6 扩展能力 | 设备控制、舵机，默认关闭 | 关闭可构建；启用后白名单、确认、急停通过 |

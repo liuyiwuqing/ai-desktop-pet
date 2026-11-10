@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "timezone": "Asia/Shanghai",
+  "language": "zh-CN",
+  "volume": 60,
+  "brightness": 80,
+  "dnd": {
+    "enabled": false,
+    "startMinute": 1320,
+    "endMinute": 420,
+    "allowCritical": true
+  },
+  "message": {
+    "queueDepth": 8,
+    "durationMs": 8000
+  }
+}
