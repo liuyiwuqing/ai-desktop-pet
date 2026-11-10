@@ -8,7 +8,12 @@ idf_component_register(
     REQUIRES
         "contracts"
         "core"
+        "pet_hal"
+        "storage"
+        "presentation"
         "svc_growth"
+        "svc_climate"
+        "bsp_dodo_s3_lcd"
         "device_control"
         "servo"
     PRIV_REQUIRES

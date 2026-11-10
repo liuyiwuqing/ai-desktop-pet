@@ -1,6 +1,6 @@
 # 03 · 温湿度传感器接入模块
 
-状态：待评审。依赖：`00-architecture.md`。首版沿用现有 DHT11/KY-015，接口预留 SHT30/BME280。
+状态：S4 代码与主机测试已落地（2026-11-10），实机采样、掉电与 24 h 验收待硬件验证。依赖：`00-architecture.md`。首版沿用现有 DHT11/KY-015，接口预留 SHT30/BME280。
 
 ## 1. 范围
 
@@ -173,3 +173,22 @@ typedef struct {
 | 图表内存 | PSRAM 压力 | 环形缓冲、局部刷新 |
 
 待确认：最终数据脚、是否升级 SHT30、采样周期、告警阈值、是否上传云端历史。
+
+## 10. S4 实现映射
+
+| 项 | 落地位置 | 说明 |
+| --- | --- | --- |
+| 契约 | `firmware/components/contracts/include/pet/climate.h` | 读数/告警/快照结构、错误码与状态枚举；payload ≤64 B 静态断言 |
+| HAL | `firmware/components/pet_hal/` | `pet_climate_sensor_t` 接口、DHT11 解码纯函数、`pet_fake_climate_sensor()` |
+| BSP | `firmware/components/bsp_dodo_s3_lcd/src/bsp_climate_sensor.c` | RMT RX 400 kHz 解码，GPIO 由 `CONFIG_PET_CLIMATE_DHT11_GPIO` 决定 |
+| 业务 | `firmware/components/svc_climate/` | 采样任务、滤波、告警防抖、60 分钟环形缓冲、当日极值与校准 |
+| 存储 | `firmware/components/storage/` + `pet_climate` 命名空间 | NVS 薄封装；28 B blob，5 分钟或跨天写入 |
+| 表现 | `firmware/components/presentation/src/climate_card.c` | 纯逻辑卡片快照，输出温度/湿度/舒适度/趋势/更新时间文本 |
+| UI 出口 | `firmware/main/app/app.c` | 首版串口日志输出卡片；LVGL 实屏随板级 BSP 落地 |
+| 开关 | `firmware/main/Kconfig.projbuild` | `CONFIG_PET_MODULE_CLIMATE_ENABLED`、`CONFIG_PET_CLIMATE_FAKE_SENSOR`、GPIO、采样周期 |
+| 主机测试 | `firmware/tests/host/test_climate_*.c` | 解码、滤波、告警、存档、卡片 5 组，全部通过 |
+
+已验证：默认构建 0 warning，镜像 242,052 B，DIRAM 69,458 B（20.32%）；`CONFIG_PET_CLIMATE_FAKE_SENSOR=y` 构建出现 `pet_fake_climate_sensor`；关闭 `CONFIG_PET_MODULE_CLIMATE_ENABLED` 构建通过且 ELF 无 climate 符号。
+
+待实机验证：DHT11 时序与 5 s 采样稳定性、断线/重连恢复、NVS 掉电后极值与校准恢复、60 分钟窗口长期运行、串口卡片与真实环境一致性。
+

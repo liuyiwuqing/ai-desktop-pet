@@ -1,0 +1,18 @@
+idf_component_register(
+    SRCS
+        "src/climate_pipeline.c"
+        "src/climate_alert.c"
+        "src/climate_state.c"
+        "src/svc_climate.c"
+    INCLUDE_DIRS
+        "include"
+    PRIV_INCLUDE_DIRS
+        "private_include"
+    REQUIRES
+        "contracts"
+        "pet_hal"
+        "storage"
+    PRIV_REQUIRES
+        "core"
+        "esp_timer"
+)

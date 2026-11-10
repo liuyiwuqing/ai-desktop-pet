@@ -1,6 +1,6 @@
 # firmware
 
-ESP-IDF 6.1 固件工程。S2 组件化与 S3 契约/配置已落地：`main` 只做组合根，契约、事件总线、业务模块与扩展拆为独立组件。
+ESP-IDF 6.1 固件工程。S2 组件化、S3 契约/配置与 S4 温湿度纵向切片已落地：`main` 只做组合根，契约、事件总线、业务模块、板级实现与扩展拆为独立组件。
 
 ## 构建
 
@@ -14,14 +14,14 @@ idf.py build
 idf.py size
 ```
 
-或使用 CI 入口：`../tools/ci/build_firmware.sh`。当前构建结果：0 warning，默认镜像 181,936 B，DIRAM 55,018 B（16.1%）。只构建，不烧录、不擦除 Flash。
+或使用 CI 入口：`../tools/ci/build_firmware.sh`。当前构建结果：0 warning，默认镜像 242,052 B，DIRAM 69,458 B（20.32%）。只构建，不烧录、不擦除 Flash。
 
 ## 校验
 
 ```bash
 python3 ../tools/ci/check_deps.py       # 组件依赖图无环
 python3 ../tools/ci/check_contracts.py  # schema、profile、example、扩展 manifest、生成物一致性
-../tools/ci/test_host.sh                # 主机测试（事件契约、生成配置头、扩展清单）
+../tools/ci/test_host.sh                # 主机测试（事件契约、生成配置头、扩展清单、温湿度解码/滤波/告警/存档/卡片）
 ```
 
 `build_firmware.sh` 会依次执行依赖检查、契约校验、主机测试、`idf.py build` 与 `idf.py size`。
@@ -38,18 +38,37 @@ idf.py -B build-ext -D SDKCONFIG=/tmp/pet-sdkconfig.ext build
 nm build-ext/nexus_pet.elf | grep pet_ext_
 ```
 
+## 气候模块开关
+
+温湿度模块默认启用，使用 DHT11（GPIO15，5 s 采样）。无硬件时用 fake 传感器验证链路：
+
+```bash
+# 桌面验证：固定温湿度序列，不需要 DHT11
+cp sdkconfig /tmp/pet-sdkconfig.fake
+printf '\nCONFIG_PET_CLIMATE_FAKE_SENSOR=y\n' >> /tmp/pet-sdkconfig.fake
+idf.py -B build-fake -D SDKCONFIG=/tmp/pet-sdkconfig.fake build
+xtensa-esp32s3-elf-nm build-fake/nexus_pet.elf | grep fake_climate
+```
+
+关闭 `CONFIG_PET_MODULE_CLIMATE_ENABLED` 可验证组合根不依赖该模块：构建通过且 ELF 中无 climate 符号。首版 UI 出口为串口卡片日志，`presentation` 只产出纯文本快照。
+
 ## 布局
 
 - `main/`：组合根，只含 `main.c`、`app/` 启动编排与 `Kconfig.projbuild`。
-- `components/contracts/`：跨模块契约（`include/pet/`），纯 C、不依赖 ESP-IDF，可主机测试；`config_generated.h`、`extension.h` 均由 S3 契约生成或固化。
+- `components/contracts/`：跨模块契约（`include/pet/`），纯 C、不依赖 ESP-IDF，可主机测试；`config_generated.h`、`extension.h` 均由 S3 契约生成或固化，`climate.h` 为温湿度契约。
 - `components/core/`：事件总线（4 条优先级队列，总深度 32），`REQUIRES contracts`。
+- `components/pet_hal/`：HAL 接口与纯逻辑（`climate_sensor.h`、`climate_decode`、fake 传感器）。
+- `components/bsp_dodo_s3_lcd/`：DODO-S3-LCD 板级实现，当前含 RMT 读取 DHT11。
+- `components/storage/`：NVS 薄封装 `pet_storage_*`。
+- `components/svc_climate/`：温湿度采样任务、滤波、告警、60 分钟缓冲与当日极值，受 `CONFIG_PET_MODULE_CLIMATE_ENABLED` 控制。
 - `components/svc_growth/`：成长模块骨架，受 `CONFIG_PET_MODULE_GROWTH_ENABLED` 控制。
+- `components/presentation/`：纯逻辑表现快照，当前含温湿度卡片。
 - `../extensions/`：扩展组件，受 `CONFIG_PET_EXT_*` 控制；`EXTRA_COMPONENT_DIRS` 收集。
 - `boards/dodo-s3-lcd/`：板级 `board.json`（引脚/能力唯一事实源）。
 - `partitions/`：新分区表与迁移说明，不复用 02/03 的分区表。
 - `tests/host/`：主机测试。
 
-每个组件只暴露 `include/`，`src/` 私有；依赖通过 `REQUIRES`/`PRIV_REQUIRES` 显式声明。`hal`、`bsp_*`、`storage`、`presentation`、`ui_lvgl` 随首个真实实现创建，不建空壳。
+每个组件只暴露 `include/`，`src/` 私有；依赖通过 `REQUIRES`/`PRIV_REQUIRES` 显式声明。`ui_lvgl` 与其余 HAL 接口随对应切片创建，不建空壳。
 
 ## 分区
 

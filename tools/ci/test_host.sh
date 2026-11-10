@@ -4,6 +4,9 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 out_dir="${repo_root}/firmware/build-host"
 contracts_inc="${repo_root}/firmware/components/contracts/include"
+hal_inc="${repo_root}/firmware/components/pet_hal/include"
+climate_priv_inc="${repo_root}/firmware/components/svc_climate/private_include"
+presentation_inc="${repo_root}/firmware/components/presentation/include"
 
 mkdir -p "${out_dir}"
 
@@ -21,6 +24,36 @@ build_and_run test_event_contract \
 build_and_run test_config_generated \
     -I "${contracts_inc}" \
     "${repo_root}/firmware/tests/host/test_config_generated.c"
+
+build_and_run test_climate_decode \
+    -I "${contracts_inc}" \
+    -I "${hal_inc}" \
+    "${repo_root}/firmware/components/pet_hal/src/climate_decode.c" \
+    "${repo_root}/firmware/tests/host/test_climate_decode.c"
+
+build_and_run test_climate_pipeline \
+    -I "${contracts_inc}" \
+    -I "${climate_priv_inc}" \
+    "${repo_root}/firmware/components/svc_climate/src/climate_pipeline.c" \
+    "${repo_root}/firmware/tests/host/test_climate_pipeline.c"
+
+build_and_run test_climate_alert \
+    -I "${contracts_inc}" \
+    -I "${climate_priv_inc}" \
+    "${repo_root}/firmware/components/svc_climate/src/climate_alert.c" \
+    "${repo_root}/firmware/tests/host/test_climate_alert.c"
+
+build_and_run test_climate_state \
+    -I "${contracts_inc}" \
+    -I "${climate_priv_inc}" \
+    "${repo_root}/firmware/components/svc_climate/src/climate_state.c" \
+    "${repo_root}/firmware/tests/host/test_climate_state.c"
+
+build_and_run test_climate_card \
+    -I "${contracts_inc}" \
+    -I "${presentation_inc}" \
+    "${repo_root}/firmware/components/presentation/src/climate_card.c" \
+    "${repo_root}/firmware/tests/host/test_climate_card.c"
 
 for ext_dir in "${repo_root}"/extensions/*/; do
     [[ -f "${ext_dir}/extension.json" ]] || continue

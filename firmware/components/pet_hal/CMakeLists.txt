@@ -1,0 +1,9 @@
+idf_component_register(
+    SRCS
+        "src/climate_decode.c"
+        "src/fake_climate_sensor.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        "contracts"
+)

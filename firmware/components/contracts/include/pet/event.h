@@ -13,6 +13,8 @@ typedef enum {
     PET_EVT_BOOT = 0,
     PET_EVT_TICK,
     PET_EVT_FAULT,
+    PET_EVT_CLIMATE_READING,
+    PET_EVT_CLIMATE_ALERT,
     PET_EVT_COUNT,
 } pet_event_id_t;
 

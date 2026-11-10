@@ -1,0 +1,9 @@
+idf_component_register(
+    SRCS
+        "src/bsp_climate_sensor.c"
+    REQUIRES
+        "contracts"
+        "pet_hal"
+        "esp_driver_rmt"
+        "esp_driver_gpio"
+)

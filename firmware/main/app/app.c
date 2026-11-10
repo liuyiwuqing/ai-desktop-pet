@@ -1,6 +1,7 @@
 #include "app.h"
 
 #include <inttypes.h>
+#include <string.h>
 
 #include "sdkconfig.h"
 
@@ -14,6 +15,12 @@
 
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
 #include "svc_growth/api.h"
+#endif
+
+#if CONFIG_PET_MODULE_CLIMATE_ENABLED
+#include "pet/hal/climate_sensor.h"
+#include "pet/presentation/climate_card.h"
+#include "svc_climate/api.h"
 #endif
 
 #if CONFIG_PET_EXT_DEVICE_CONTROL
@@ -32,6 +39,57 @@ static void on_boot(const pet_event_t *event)
              event->timestamp_ms, event->sequence);
 }
 
+#if CONFIG_PET_MODULE_CLIMATE_ENABLED
+static const char *alert_text(pet_climate_alert_t alert)
+{
+    switch (alert) {
+    case PET_CLIMATE_ALERT_COLD:
+        return "cold";
+    case PET_CLIMATE_ALERT_HOT:
+        return "hot";
+    case PET_CLIMATE_ALERT_DRY:
+        return "dry";
+    case PET_CLIMATE_ALERT_HUMID:
+        return "humid";
+    case PET_CLIMATE_ALERT_CONDENSATION:
+        return "condensation";
+    default:
+        return "none";
+    }
+}
+
+/* 首版以串口日志充当 UI 出口；LVGL 卡片后续复用同一快照。 */
+static void on_climate_reading(const pet_event_t *event)
+{
+    pet_climate_reading_t reading;
+    if (event->payload_len < sizeof(reading)) {
+        return;
+    }
+    memcpy(&reading, event->payload, sizeof(reading));
+
+    pet_climate_snapshot_t snapshot;
+    if (pet_climate_get_snapshot(&snapshot) != ESP_OK) {
+        return;
+    }
+
+    pet_climate_card_t card;
+    pet_climate_card_render(&snapshot, &card);
+    ESP_LOGI(TAG, "climate | %s | %s | %s | %s | %s | q=%u err=%u",
+             card.temperature, card.humidity, card.comfort, card.trend, card.updated,
+             reading.quality, reading.error_code);
+}
+
+static void on_climate_alert(const pet_event_t *event)
+{
+    pet_climate_alert_payload_t payload;
+    if (event->payload_len < sizeof(payload)) {
+        return;
+    }
+    memcpy(&payload, event->payload, sizeof(payload));
+    ESP_LOGW(TAG, "climate alert: %s", alert_text(payload.alert));
+}
+#endif
+
 esp_err_t app_start(void)
 {
     ESP_LOGI(TAG, "reset_reason=%d, free_heap=%u, free_psram=%u",
@@ -42,8 +100,18 @@ esp_err_t app_start(void)
     ESP_ERROR_CHECK(pet_event_bus_init());
     ESP_ERROR_CHECK(pet_event_bus_subscribe(PET_EVT_BOOT, on_boot));
 
+#if CONFIG_PET_MODULE_CLIMATE_ENABLED
+    ESP_ERROR_CHECK(pet_event_bus_subscribe(PET_EVT_CLIMATE_READING, on_climate_reading));
+    ESP_ERROR_CHECK(pet_event_bus_subscribe(PET_EVT_CLIMATE_ALERT, on_climate_alert));
+#endif
+
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
     ESP_ERROR_CHECK(pet_growth_init());
+#endif
+
+#if CONFIG_PET_MODULE_CLIMATE_ENABLED
+    ESP_ERROR_CHECK(pet_climate_init(pet_bsp_climate_sensor()));
+    ESP_ERROR_CHECK(pet_climate_start());
 #endif
 
 #if CONFIG_PET_EXT_DEVICE_CONTROL

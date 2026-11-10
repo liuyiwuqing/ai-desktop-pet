@@ -95,7 +95,8 @@ P2 ──► P5/P6（意图）
 | Q9 | ~~MQTT Broker~~（已确认：Mosquitto 2.0.22） | 运维 | 与 `nexus-core` 一致；集群再评估 EMQX |
 | Q10 | ~~架构默认项~~（已确认：冻结 02/03 donor；board.json 生成 C/Kconfig；presentation 独立；管理台复用 nexus-core） | 目录与组件划分 | S1/S2 按此落地 |
 | Q11 | ~~S1/S2 骨架与组件化~~（已完成：S1 构建通过、S2 组件边界与主机测试；S3 后默认镜像 181,936 B，DIRAM 55,018 B，0 warning） | 后续功能开发前置 | 下一步进 S3 契约与配置 |
-| Q12 | ~~S3 契约与配置~~（已完成：5 个 JSON Schema、C/TS codegen、扩展 manifest 与开关、事件契约扩展；`check_contracts.py` 通过） | 功能开发前的契约基线 | 下一步进 S4 首个纵向切片（温湿度或成长） |
+| Q12 | ~~S3 契约与配置~~（已完成：5 个 JSON Schema、C/TS codegen、扩展 manifest 与开关、事件契约扩展；`check_contracts.py` 通过） | 功能开发前的契约基线 | 已完成 |
+| Q13 | ~~S4 温湿度纵向切片~~（代码完成：契约/HAL/BSP/storage/svc_climate/presentation + 5 组主机测试；默认镜像 242,052 B，DIRAM 69,458 B；fake 与关闭模块构建均通过） | 首个端到端闭环 | 实机采样、串口卡片、掉电存档与 24 h 稳定性待验证；LVGL 实屏随板级 BSP 落地 |
 
 ## 7. 明确不做
 
