@@ -1,6 +1,6 @@
 # 02 · 万能信息接收端模块
 
-状态：待评审；S5-A 设备侧纯逻辑与 S5-B Wi-Fi/MQTT/TLS 传输层已落地（2026-11-10）。依赖：`00-architecture.md`、`01-ai-agent.md`（表情联动）。
+状态：待评审；S5-A 设备侧纯逻辑、S5-B Wi-Fi/MQTT/TLS 传输层、S5-C1 inbox 收包接入、S5-C2 收件箱持久化已落地（2026-11-11）。依赖：`00-architecture.md`、`01-ai-agent.md`（表情联动）。
 
 ## 1. 范围
 
@@ -77,10 +77,10 @@ Schema：`config/schemas/message.schema.json`；示例：`config/examples/messag
 
 - `id` 全局唯一，服务端生成；`dedupeKey` 可选，用于跨重投去重。
 - `priority`：`critical|high|normal|low`；只有 `critical` 可越过 DND。
-- `body` ≤2 KB；整包 ≤8 KB；超限拒绝并返回 413。
-- `expiresAt` 过期不展示；设备本地也校验。
+- `body` ≤2 KB；整包 ≤8 KB（服务端 413 上限）；设备侧解析上限 4 KB（`PET_MESSAGE_JSON_MAX`），超限丢弃并记录日志。
+- `expiresAt` 过期不展示；设备本地也校验（时间未同步时跳过 TTL 判定）。
 - `display.durationMs` 5–30 s；`template` 必须在设备支持列表内，否则回退 `text_card`。
-- 未知字段忽略；`schemaVersion` 不支持时拒收并上报。
+- 未知字段与重复字段拒收（schema `additionalProperties:false`）；`schemaVersion` 不支持时拒收并上报。
 
 ### 3.3 回执
 
@@ -109,10 +109,10 @@ Schema：`config/schemas/message-ack.schema.json`；示例：`config/examples/me
 
 - 未读队列上限 8 条（默认值，P3 实机压测后调整）；按 `priority` 降序、`createdAt` 升序。
 - 队列满：丢弃最低优先级最旧消息；`critical` 不丢，除非同 ID 重复。
-- 持久化：NVS `msg_inbox`，带版本、长度、CRC；写入成功才 ACK `received`。
-- 去重环：最近 16 个 `id`/`dedupeKey`，掉电保持；重复消息只更新状态，不重复展示。
+- 持久化：NVS `msg_inbox`，双代 A/B 快照 + CRC32；快照落盘成功才 ACK `received`，失败保留 dirty 并由服务端重投补发。
+- 去重环：最近 16 个 `id`/`dedupeKey`，随快照掉电保持；重复消息只更新状态，不重复展示。
 - TTL：展示前检查 `expiresAt`；过期直接丢弃并 ACK `read`（避免服务端重投）。
-- 损坏：停止接收新消息并上报 `EVT_SYSTEM_FAULT`，不自动擦除；提供管理台/串口恢复命令。
+- 损坏：单代损坏回退另一代；两代都损坏时以空队列启动并告警，不自动擦除；后续快照会覆盖非活动代。
 - DND：`normal/low` 只入队不打扰；`high` 可亮屏不发声；`critical` 正常提醒。
 
 ## 5. 在线配置管理面板
@@ -249,7 +249,7 @@ IDLE → RECEIVED → QUEUED → RENDERING → DISPLAYED → READ
 | 风险 | 影响 | 缓解 |
 | --- | --- | --- |
 | Broker 运维与证书轮换 | 设备离线 | 自动化证书检查、双证书过渡、管理台告警 |
-| NVS 写入磨损 | 队列损坏 | 有界队列、批量写、CRC、双槽 |
+| NVS 写入磨损 | 队列损坏 | 有界队列、整代快照写、CRC、双代 A/B |
 | 消息风暴 | UI 卡顿/丢消息 | 限流、优先级、合并低价值消息 |
 | 第三方平台权限变化 | 来源失效 | 来源健康检查、错误可见、降级停用 |
 | 中文换行/字体 | 截断/乱码 | 子集字体、UTF-8 换行、缺字回退 |
@@ -285,3 +285,32 @@ IDLE → RECEIVED → QUEUED → RENDERING → DISPLAYED → READ
 - 构建：默认镜像 1,023,456 B，DIRAM 126,154 B（36.91%）；fake 镜像 245,072 B；关闭网络模块镜像 242,056 B，ELF 中无 `pet_net_*` 符号。
 
 未落地：inbox 载荷 JSON 解析与消息中心接入、ACK 发布、`msg_inbox` 持久化、证书轮换与服务端 ACL 配套、实机断网/重连与 24 h 验收。TLS 与 Wi-Fi/MQTT 任务使镜像与内部 RAM 明显上升，实机需重点观察 heap 最低水位。
+
+### S5-C1 inbox 收包接入（2026-11-11）
+
+已落地：
+
+- `pet/net.h` 公开主题枚举；`svc_net` 新增 `pet_net_set_rx_handler`、`pet_net_publish_topic`、`pet_net_is_time_synced`，收包回调携带 topic/payload/length/retain。
+- `net_esp.c`：GOT_IP 后先做 SNTP（`pool.ntp.org`，15 s 超时），同步成功或超时后再连 Broker，避免持久会话在未对时时投递 inbox；MQTT DATA 按 `current_data_offset`/`total_data_len` 重组，4 KB 上限，超长丢弃；retain 标志透传。
+- `svc_message_hub`：`message_codec.c` 严格 JSON 解析（4 KB 上限；必填字段缺失、未知/重复字段、非法转义、孤立 UTF-16 代理与 `\u0000` 均拒收；`payload` 只跳过不保存）；`pet_message_ack_format` 输出 received/displayed/read；`message_time.c` 新增 UTC 格式化。
+- `message_service.c`：8 槽队列优先分配 PSRAM（失败回退内部 RAM），互斥锁保护；提供 `pet_message_hub_ingest/ack/snapshot/get/depth`；入队成功后发布 `PET_EVT_MSG_RECEIVED` 与 `received` ACK；过期消息 ACK `read` 且不入队；重复与队列满不 ACK。
+- `app.c`：初始化消息中心，注入 ACK 发布器与 inbox 收包回调；时间未同步时以 `createdAt` 作为 ACK 时间。
+- 测试：新增 `test_message_codec`（完整/最小信封、转义与代理对、未知/重复字段、枚举/时长/时间/长度边界、ACK 格式化）；`test_message_time` 补充格式化与回环用例。
+- 构建：默认镜像 1,037,308 B，DIRAM 130,618 B（38.22%）；fake 镜像 254,544 B；关闭网络 242,176 B；主机测试全部通过。
+
+未落地：`msg_inbox` 持久化与启动恢复（C2）、`displayed/read` 的 UI 触发、retained config 下发、服务端 ACL/证书轮换、实机收包与 heap 水位验收。
+
+### S5-C2 收件箱持久化（2026-11-11）
+
+已落地：
+
+- 分区：NVS 扩至 64 KB（0x9000/0x10000），`otadata` 顺延到 0x19000/0x2000、`phy_init` 到 0x1B000/0x1000；`ota_0` 仍为 0x20000，OTA 槽位不变。
+- `message_store_codec.c`：固定小端快照格式，20 B header + 16×8 B 去重环 + count×2,429 B 记录；header 含 magic、layoutVersion、recordSize、count、dedupeNext、payloadLength 与 CRC32(IEEE)，CRC 覆盖 header 前 16 B 与载荷；解码校验 magic/版本/记录长度/计数/总长/CRC，并拒绝非法枚举与非 NUL 结尾字符串。
+- `message_store.c`：NVS `msg_inbox`，`snap0`/`snap1` 双代 + `active` 指针；先写非活动代，成功后再切换 active；启动读取失败回退另一代，两代都损坏时以空队列启动并告警；编码缓冲区优先 PSRAM。
+- `message_queue_restore`：恢复时逐条重新校验、跳过过期/损坏记录，载入去重环但不二次写入；恢复后仍能识别服务端重投。
+- `message_service.c`：启动时恢复快照；入队、状态变化与过期清理后持久化；`received` ACK 仅在快照落盘成功后发送，失败保留 dirty 等待重投补发；重复消息仍在队列时补发 `received`；`displayed/read` 即使落盘失败也发送，dirty 由后续变更重试。
+- `app.c`：MQTT 上线（此时 SNTP 已完成）后清理持久化消息中的过期项。
+- 测试：新增 `test_message_store`（空/多条快照回环、CRC/魔数/版本/记录长度/截断/容量错误、非法枚举）；`test_message_queue` 增加恢复与去重环用例。
+- 构建：默认镜像 1,041,828 B、DIRAM 130,618 B（38.22%）；fake 258,912 B；关闭网络 242,176 B；主机测试全部通过。
+
+未落地：实机掉电恢复与 NVS 磨损验收、24 h soak、`displayed/read` 的 UI 触发、retained config 下发、服务端 ACL/证书轮换。

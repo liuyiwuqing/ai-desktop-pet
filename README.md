@@ -1,6 +1,6 @@
 # 04 AI 超级桌面宠物（AI Desktop Pet）
 
-状态：**首个纵向切片阶段（S1–S3 已完成，S4 温湿度切片、S5-A 消息中心纯逻辑与 S5-B Wi-Fi/MQTT/TLS 传输层代码完成，实机待验证）**。已有可构建固件、组件边界、配置/消息/扩展 schema 与生成契约，以及温湿度采样到卡片快照、消息校验到优先级队列、Wi-Fi/MQTT/TLS 连接与重连的完整逻辑链路；所有功能方案先评审，确认后再写代码。目录与构建边界的评审结论见 [`docs/08-structure-review.md`](docs/08-structure-review.md)。
+状态：**首个纵向切片阶段（S1–S3 已完成，S4 温湿度切片、S5-A 消息中心纯逻辑、S5-B Wi-Fi/MQTT/TLS 传输层、S5-C1 inbox 收包接入与 S5-C2 收件箱持久化代码完成，实机待验证）**。已有可构建固件、组件边界、配置/消息/扩展 schema 与生成契约，以及温湿度采样到卡片快照、消息校验到优先级队列、Wi-Fi/MQTT/TLS 连接与重连、inbox 解析到 received ACK、双代快照掉电恢复的完整逻辑链路；所有功能方案先评审，确认后再写代码。目录与构建边界的评审结论见 [`docs/08-structure-review.md`](docs/08-structure-review.md)。
 
 ## 目标
 
@@ -50,7 +50,7 @@
 │   │   ├── pet_hal/              HAL 接口与 fake 实现
 │   │   ├── storage/              NVS 薄封装
 │   │   ├── svc_climate/          温湿度采集
-│   │   ├── svc_message_hub/      消息校验、优先级队列与去重
+│   │   ├── svc_message_hub/      消息校验、优先级队列、去重与 NVS 持久化
 │   │   ├── svc_net/              Wi-Fi + MQTT/TLS 传输层
 │   │   └── svc_growth/           成长模块骨架（Kconfig 开关控制）
 │   ├── boards/dodo-s3-lcd/       板级 board.json（引脚/能力唯一事实源）

@@ -7,14 +7,6 @@
 
 /* 网络配置与主题策略：纯逻辑，可在主机测试中直接编译。 */
 
-typedef enum {
-    PET_NET_TOPIC_INBOX = 0,
-    PET_NET_TOPIC_ACK,
-    PET_NET_TOPIC_STATUS,
-    PET_NET_TOPIC_CONFIG,
-    PET_NET_TOPIC_COUNT,
-} pet_net_topic_t;
-
 bool pet_net_device_id_valid(const char *device_id);
 pet_net_error_t pet_net_config_validate(const pet_net_config_t *config);
 bool pet_net_topic_build(pet_net_topic_t topic, const char *device_id,

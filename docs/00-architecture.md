@@ -230,9 +230,9 @@ S5-B 已落地的键（值为 NVS 字符串；Kconfig 仅作开发期回退，NV
 
 | 分区 | 偏移 | 大小 | 用途 |
 | --- | --- | --- | --- |
-| `nvs` | 0x9000 | 0x6000 | 24 KB NVS |
-| `otadata` | 0xF000 | 0x2000 | OTA 元数据 |
-| `phy_init` | 0x11000 | 0x1000 | PHY 校准 |
+| `nvs` | 0x9000 | 0x10000 | 64 KB NVS（含 `msg_inbox` 双代快照） |
+| `otadata` | 0x19000 | 0x2000 | OTA 元数据 |
+| `phy_init` | 0x1B000 | 0x1000 | PHY 校准 |
 | `ota_0` | 0x20000 | 0x400000 | 4 MB 应用槽 A |
 | `ota_1` | 0x420000 | 0x400000 | 4 MB 应用槽 B |
 | `storage` | 0x820000 | 0x200000 | 2 MB LittleFS |
@@ -241,7 +241,7 @@ S5-B 已落地的键（值为 NVS 字符串；Kconfig 仅作开发期回退，NV
 | `coredump` | 0xF20000 | 0x10000 | 崩溃转储 |
 | 保留 | 0xF30000 | 0xD0000 | 832 KB 后续扩展 |
 
-约束：OTA 镜像必须校验项目 ID/版本/签名；迁移与回滚单独设计，不能直接互刷 02/03。
+约束：OTA 镜像必须校验项目 ID/版本/签名；迁移与回滚单独设计，不能直接互刷 02/03。S5-C2 将 NVS 由 24 KB 扩至 64 KB 以容纳 `msg_inbox` 双代快照，`otadata`/`phy_init` 顺延，`ota_0` 起始地址保持 0x20000。
 
 Q4 已确认：模型使用独立 `model` 分区，不并入 `assets`。首版 WakeNet9 你好小智打包后约 284 KB（291,069 B），1 MB 分区保留约 3.5 倍余量；构建期校验 `srmodels.bin` ≤ 960 KB。ESP-SR 通过 `esp_srmodel_init("model")` 直接 mmap 加载，不进入 assets 索引。模型不随应用 OTA 更新：首次烧录写入，后续变更走独立数据写入或 USB 恢复。自定义唤醒词约 3.9 MB，不在首版范围；启用时必须调整分区表并 USB 重刷。
 

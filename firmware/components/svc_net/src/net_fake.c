@@ -12,6 +12,8 @@ static const char *TAG = "net_fake";
 
 static bool s_online;
 static uint16_t s_reconnect_count;
+static pet_net_rx_handler_t s_rx_handler;
+static void *s_rx_context;
 
 static void publish_state(pet_net_state_t state, pet_net_error_t error)
 {
@@ -63,6 +65,18 @@ static bool fake_is_online(void)
     return s_online;
 }
 
+static esp_err_t fake_set_rx_handler(pet_net_rx_handler_t handler, void *context)
+{
+    s_rx_handler = handler;
+    s_rx_context = context;
+    return ESP_OK;
+}
+
+static bool fake_is_time_synced(void)
+{
+    return s_online;
+}
+
 const pet_net_t *pet_fake_net_driver(void)
 {
     static const pet_net_t driver = {
@@ -70,7 +84,9 @@ const pet_net_t *pet_fake_net_driver(void)
         .start = fake_start,
         .stop = fake_stop,
         .publish = fake_publish,
+        .set_rx_handler = fake_set_rx_handler,
         .is_online = fake_is_online,
+        .is_time_synced = fake_is_time_synced,
     };
     return &driver;
 }

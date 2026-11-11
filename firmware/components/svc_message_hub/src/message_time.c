@@ -1,6 +1,7 @@
 #include "message_time.h"
 
 #include <stddef.h>
+#include <stdio.h>
 
 static bool is_digit(char c)
 {
@@ -44,6 +45,21 @@ static int64_t days_from_civil(int year, unsigned month, unsigned day)
     const unsigned doy = (153U * adjusted_month + 2U) / 5U + day - 1U;
     const unsigned doe = yoe * 365U + yoe / 4U - yoe / 100U + doy;
     return era * 146097 + (int64_t)doe - 719468;
+}
+
+/* Howard Hinnant 的 civil_from_days；days 为相对 1970-01-01 的天数。 */
+static void civil_from_days(int64_t days, int *year, unsigned *month, unsigned *day)
+{
+    days += 719468;
+    const int64_t era = (days >= 0 ? days : days - 146096) / 146097;
+    const unsigned doe = (unsigned)(days - era * 146097);
+    const unsigned yoe = (doe - doe / 1460U + doe / 36524U - doe / 146096U) / 365U;
+    const int y = (int)yoe + (int)era * 400;
+    const unsigned doy = doe - (365U * yoe + yoe / 4U - yoe / 100U);
+    const unsigned mp = (5U * doy + 2U) / 153U;
+    *day = doy - (153U * mp + 2U) / 5U + 1U;
+    *month = mp < 10U ? mp + 3U : mp - 9U;
+    *year = y + (*month <= 2U ? 1 : 0);
 }
 
 bool pet_message_parse_iso8601(const char *text, uint32_t *epoch_s)
@@ -115,4 +131,30 @@ bool pet_message_parse_iso8601(const char *text, uint32_t *epoch_s)
     }
     *epoch_s = (uint32_t)seconds;
     return true;
+}
+
+bool pet_message_format_iso8601(uint32_t epoch_s, char *out, size_t capacity)
+{
+    if (out == NULL || capacity < 21) {
+        return false;
+    }
+
+    const int64_t days = (int64_t)(epoch_s / 86400U);
+    uint32_t remainder = epoch_s % 86400U;
+    int year;
+    unsigned month;
+    unsigned day;
+    civil_from_days(days, &year, &month, &day);
+    if (year < 1970 || year > 9999) {
+        return false;
+    }
+
+    const unsigned hour = (unsigned)(remainder / 3600U);
+    remainder %= 3600U;
+    const unsigned minute = (unsigned)(remainder / 60U);
+    const unsigned second = (unsigned)(remainder % 60U);
+
+    const int written = snprintf(out, capacity, "%04d-%02u-%02uT%02u:%02u:%02uZ", year,
+                                 month, day, hour, minute, second);
+    return written == 20;
 }

@@ -86,7 +86,7 @@ xtensa-esp32s3-elf-nm build-net-fake/nexus_pet.elf | grep fake_net
 - `components/bsp_dodo_s3_lcd/`：DODO-S3-LCD 板级实现，当前含 RMT 读取 DHT11。
 - `components/storage/`：NVS 薄封装 `pet_storage_*`（blob 与字符串）。
 - `components/svc_climate/`：温湿度采样任务、滤波、告警、60 分钟缓冲与当日极值，受 `CONFIG_PET_MODULE_CLIMATE_ENABLED` 控制。
-- `components/svc_message_hub/`：消息 ISO-8601 解析、信封校验、8 条优先级队列、16 槽去重、TTL/DND/ACK 状态机；传输与 NVS 持久化在 S5-B/C 接入。
+- `components/svc_message_hub/`：消息 ISO-8601 解析、信封校验、8 条优先级队列、16 槽去重、TTL/DND/ACK 状态机，以及 NVS `msg_inbox` 双代快照持久化；渲染在 S5-D 接入。
 - `components/svc_net/`：网络策略（设备 ID/配置校验/主题构建）、服务生命周期与 ESP/fake 驱动，受 `CONFIG_PET_MODULE_NET_ENABLED` 与 `CONFIG_PET_NET_FAKE` 控制。
 - `components/svc_growth/`：成长模块骨架，受 `CONFIG_PET_MODULE_GROWTH_ENABLED` 控制。
 - `components/presentation/`：纯逻辑表现快照，当前含温湿度卡片。
@@ -99,7 +99,7 @@ xtensa-esp32s3-elf-nm build-net-fake/nexus_pet.elf | grep fake_net
 
 ## 分区
 
-`partitions/16m.csv`：`ota_0`/`ota_1` 各 4 MB，`storage` 2 MB，`assets` 4 MB，`model` 1 MB，剩余 832 KB 保留。
+`partitions/16m.csv`：`nvs` 64 KB（含 `msg_inbox` 双代快照），`ota_0`/`ota_1` 各 4 MB，`storage` 2 MB，`assets` 4 MB，`model` 1 MB，剩余 832 KB 保留。
 
 ## 边界
 

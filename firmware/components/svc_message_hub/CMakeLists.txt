@@ -3,8 +3,18 @@ idf_component_register(
         "src/message_time.c"
         "src/message_validate.c"
         "src/message_queue.c"
+        "src/message_codec.c"
+        "src/message_store_codec.c"
+        "src/message_store.c"
+        "src/message_service.c"
+    INCLUDE_DIRS
+        "include"
     PRIV_INCLUDE_DIRS
         "private_include"
     REQUIRES
         "contracts"
+        "core"
+        "esp_timer"
+        "heap"
+        "storage"
 )

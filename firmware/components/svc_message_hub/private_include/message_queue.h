@@ -19,6 +19,12 @@ typedef struct {
 void pet_message_queue_init(pet_message_queue_t *queue, pet_message_view_t *slots,
                             uint8_t capacity);
 
+/* 从持久化快照恢复：跳过无效/过期记录，载入去重环后按顺序插入；返回恢复条数。 */
+uint8_t pet_message_queue_restore(pet_message_queue_t *queue,
+                                  const pet_message_view_t *messages, uint8_t count,
+                                  const uint64_t dedupe[PET_MESSAGE_DEDUPE_SLOTS],
+                                  uint8_t dedupe_next, uint32_t now_epoch_s);
+
 /* 校验、去重、TTL 与入队；队满时按“最低优先级最旧”淘汰。 */
 pet_message_error_t pet_message_queue_push(pet_message_queue_t *queue,
                                            const pet_message_view_t *message,

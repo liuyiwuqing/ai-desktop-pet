@@ -17,6 +17,14 @@
 #define PET_NET_TOPIC_MAX 96
 
 typedef enum {
+    PET_NET_TOPIC_INBOX = 0,
+    PET_NET_TOPIC_ACK,
+    PET_NET_TOPIC_STATUS,
+    PET_NET_TOPIC_CONFIG,
+    PET_NET_TOPIC_COUNT,
+} pet_net_topic_t;
+
+typedef enum {
     PET_NET_STATE_IDLE = 0,
     PET_NET_STATE_CONNECTING,
     PET_NET_STATE_ONLINE,

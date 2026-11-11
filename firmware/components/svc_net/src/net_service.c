@@ -58,3 +58,35 @@ bool pet_net_is_online(void)
 {
     return s_driver != NULL && s_driver->is_online();
 }
+
+esp_err_t pet_net_set_rx_handler(pet_net_rx_handler_t handler, void *context)
+{
+    if (s_driver == NULL || s_driver->set_rx_handler == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return s_driver->set_rx_handler(handler, context);
+}
+
+esp_err_t pet_net_publish_topic(pet_net_topic_t topic, const char *payload,
+                                size_t length, bool retain)
+{
+    if (s_driver == NULL || s_config == NULL || payload == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!pet_net_is_online()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    char topic_name[PET_NET_TOPIC_MAX];
+    if (!pet_net_topic_build(topic, s_config->device_id, topic_name,
+                             sizeof(topic_name))) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    return s_driver->publish(topic_name, payload, length, retain);
+}
+
+bool pet_net_is_time_synced(void)
+{
+    return s_driver != NULL && s_driver->is_time_synced != NULL &&
+           s_driver->is_time_synced();
+}

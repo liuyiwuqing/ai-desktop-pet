@@ -8,6 +8,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_netif_sntp.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "mqtt_client.h"
@@ -20,6 +21,8 @@
 #define NET_MQTT_BUFFER_SIZE 4096
 #define NET_MQTT_TASK_STACK 8192
 #define NET_WIFI_BACKOFF_MAX_MS 30000
+#define NET_SNTP_SYNC_TIMEOUT_MS 15000
+#define NET_SNTP_SERVER "pool.ntp.org"
 
 static const char *TAG = "net_esp";
 
@@ -29,15 +32,27 @@ static const pet_net_config_t *s_config;
 static esp_netif_t *s_netif;
 static esp_mqtt_client_handle_t s_mqtt;
 static esp_timer_handle_t s_retry_timer;
+static esp_timer_handle_t s_sync_timer;
 static bool s_running;
 static bool s_mqtt_connected;
 static bool s_mqtt_started;
+static bool s_time_synced;
+static bool s_sntp_started;
 static bool s_handlers_registered;
 static uint16_t s_reconnect_count;
 static uint32_t s_retry_delay_ms;
 static char s_status_topic[PET_NET_TOPIC_MAX];
 static char s_inbox_topic[PET_NET_TOPIC_MAX];
 static char s_config_topic[PET_NET_TOPIC_MAX];
+
+static pet_net_rx_handler_t s_rx_handler;
+static void *s_rx_context;
+static uint8_t s_rx_buffer[NET_MQTT_BUFFER_SIZE];
+static char s_rx_topic[PET_NET_TOPIC_MAX];
+static size_t s_rx_length;
+static bool s_rx_dropping;
+
+static void start_mqtt(void);
 
 static void publish_state(pet_net_state_t state, pet_net_error_t error)
 {
@@ -105,6 +120,80 @@ static void schedule_wifi_retry(void)
     (void)esp_timer_start_once(s_retry_timer, (uint64_t)s_retry_delay_ms * 1000ULL);
 }
 
+static void start_mqtt(void)
+{
+    if (!s_running || s_mqtt == NULL || s_mqtt_started) {
+        return;
+    }
+    esp_err_t err = esp_mqtt_client_start(s_mqtt);
+    if (err == ESP_OK) {
+        s_mqtt_started = true;
+    } else {
+        ESP_LOGE(TAG, "mqtt start failed: %s", esp_err_to_name(err));
+        publish_state(PET_NET_STATE_OFFLINE, PET_NET_ERROR_MQTT);
+    }
+}
+
+static void sntp_sync_cb(struct timeval *tv)
+{
+    (void)tv;
+    s_time_synced = true;
+    if (s_sync_timer != NULL) {
+        (void)esp_timer_stop(s_sync_timer);
+    }
+    ESP_LOGI(TAG, "sntp time synced");
+    start_mqtt();
+}
+
+static void sntp_timeout_cb(void *arg)
+{
+    (void)arg;
+    if (!s_running || s_time_synced) {
+        return;
+    }
+    ESP_LOGW(TAG, "sntp not synced within %d ms, mqtt starts in degraded mode",
+             NET_SNTP_SYNC_TIMEOUT_MS);
+    start_mqtt();
+}
+
+static void start_time_sync(void)
+{
+    if (s_time_synced) {
+        start_mqtt();
+        return;
+    }
+
+    if (s_sync_timer == NULL) {
+        const esp_timer_create_args_t timer_args = {
+            .callback = sntp_timeout_cb,
+            .name = "net_sntp_wait",
+        };
+        if (esp_timer_create(&timer_args, &s_sync_timer) != ESP_OK) {
+            ESP_LOGW(TAG, "sntp timer create failed, mqtt starts in degraded mode");
+            start_mqtt();
+            return;
+        }
+    }
+    (void)esp_timer_stop(s_sync_timer);
+    (void)esp_timer_start_once(s_sync_timer,
+                               (uint64_t)NET_SNTP_SYNC_TIMEOUT_MS * 1000ULL);
+
+    if (s_sntp_started) {
+        return;
+    }
+
+    esp_sntp_config_t sntp_config = ESP_NETIF_SNTP_DEFAULT_CONFIG(NET_SNTP_SERVER);
+    sntp_config.sync_cb = sntp_sync_cb;
+    esp_err_t err = esp_netif_sntp_init(&sntp_config);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "sntp init failed: %s, mqtt starts in degraded mode",
+                 esp_err_to_name(err));
+        start_mqtt();
+        return;
+    }
+    s_sntp_started = true;
+}
+
 static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t event_id,
                                void *event_data)
 {
@@ -145,15 +234,8 @@ static void ip_event_handler(void *arg, esp_event_base_t base, int32_t event_id,
             return;
         }
         publish_state(PET_NET_STATE_CONNECTING, PET_NET_ERROR_NONE);
-        if (s_mqtt != NULL && !s_mqtt_started) {
-            esp_err_t err = esp_mqtt_client_start(s_mqtt);
-            if (err == ESP_OK) {
-                s_mqtt_started = true;
-            } else {
-                ESP_LOGE(TAG, "mqtt start failed: %s", esp_err_to_name(err));
-                publish_state(PET_NET_STATE_OFFLINE, PET_NET_ERROR_MQTT);
-            }
-        }
+        /* 消息 TTL/ACK 依赖系统时间：先对时，再连接 Broker。 */
+        start_time_sync();
         return;
     }
 
@@ -173,6 +255,64 @@ static pet_net_error_t mqtt_error_type(const esp_mqtt_event_handle_t event)
                                                                    : PET_NET_ERROR_WIFI;
     }
     return PET_NET_ERROR_MQTT;
+}
+
+static void mqtt_data_event(const esp_mqtt_event_handle_t event)
+{
+    if (event->data == NULL || event->data_len <= 0 || event->total_data_len <= 0) {
+        return;
+    }
+
+    if (event->total_data_len > (int)sizeof(s_rx_buffer)) {
+        ESP_LOGW(TAG, "mqtt payload too large: %d > %u", event->total_data_len,
+                 (unsigned)sizeof(s_rx_buffer));
+        s_rx_dropping = true;
+        return;
+    }
+
+    if (event->current_data_offset == 0) {
+        size_t topic_length = event->topic_len > 0 ? (size_t)event->topic_len : 0;
+        if (topic_length >= sizeof(s_rx_topic)) {
+            topic_length = sizeof(s_rx_topic) - 1;
+        }
+        if (event->topic != NULL && topic_length > 0) {
+            memcpy(s_rx_topic, event->topic, topic_length);
+        }
+        s_rx_topic[topic_length] = '\0';
+        s_rx_length = 0;
+        s_rx_dropping = false;
+    }
+
+    if (event->current_data_offset < 0 || event->data_len < 0) {
+        s_rx_dropping = true;
+        return;
+    }
+
+    if (s_rx_dropping) {
+        if (event->current_data_offset + event->data_len >= event->total_data_len) {
+            s_rx_dropping = false;
+        }
+        return;
+    }
+
+    size_t offset = (size_t)event->current_data_offset;
+    size_t chunk = (size_t)event->data_len;
+    if (offset + chunk > sizeof(s_rx_buffer)) {
+        s_rx_dropping = true;
+        return;
+    }
+    memcpy(s_rx_buffer + offset, event->data, chunk);
+    s_rx_length = offset + chunk;
+
+    if (s_rx_length < (size_t)event->total_data_len) {
+        return;
+    }
+
+    if (s_rx_handler != NULL && s_rx_topic[0] != '\0') {
+        s_rx_handler(s_rx_topic, (const char *)s_rx_buffer, s_rx_length, event->retain,
+                     s_rx_context);
+    }
+    s_rx_length = 0;
 }
 
 static void mqtt_event_handler(void *arg, esp_event_base_t base, int32_t event_id,
@@ -219,9 +359,7 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base, int32_t event_i
     }
 
     case MQTT_EVENT_DATA:
-        ESP_LOGD(TAG, "mqtt data topic=%.*s bytes=%d/%d offset=%d",
-                 event->topic_len, event->topic, event->data_len,
-                 event->total_data_len, event->current_data_offset);
+        mqtt_data_event(event);
         break;
 
     case MQTT_EVENT_SUBSCRIBED:
@@ -381,6 +519,7 @@ static esp_err_t esp_net_start(const pet_net_config_t *config)
     s_retry_delay_ms = 0;
     s_mqtt_connected = false;
     s_mqtt_started = false;
+    s_time_synced = false;
     s_running = true;
     publish_state(PET_NET_STATE_CONNECTING, PET_NET_ERROR_NONE);
 
@@ -404,6 +543,14 @@ static esp_err_t esp_net_stop(void)
     if (s_retry_timer != NULL) {
         (void)esp_timer_stop(s_retry_timer);
     }
+    if (s_sync_timer != NULL) {
+        (void)esp_timer_stop(s_sync_timer);
+    }
+    if (s_sntp_started) {
+        esp_netif_sntp_deinit();
+        s_sntp_started = false;
+    }
+    s_time_synced = false;
 
     if (s_mqtt != NULL) {
         if (s_mqtt_started) {
@@ -428,9 +575,21 @@ static esp_err_t esp_net_publish(const char *topic, const char *payload, size_t 
     return publish_qos1(topic, payload, length, retain);
 }
 
+static esp_err_t esp_net_set_rx_handler(pet_net_rx_handler_t handler, void *context)
+{
+    s_rx_handler = handler;
+    s_rx_context = context;
+    return ESP_OK;
+}
+
 static bool esp_net_is_online(void)
 {
     return s_running && s_mqtt_connected;
+}
+
+static bool esp_net_is_time_synced(void)
+{
+    return s_time_synced;
 }
 
 const pet_net_t *pet_net_esp_driver(void)
@@ -440,7 +599,9 @@ const pet_net_t *pet_net_esp_driver(void)
         .start = esp_net_start,
         .stop = esp_net_stop,
         .publish = esp_net_publish,
+        .set_rx_handler = esp_net_set_rx_handler,
         .is_online = esp_net_is_online,
+        .is_time_synced = esp_net_is_time_synced,
     };
     return &driver;
 }

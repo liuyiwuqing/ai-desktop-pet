@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "message_time.h"
 
@@ -25,6 +26,22 @@ static void check_invalid(const char *text)
     uint32_t epoch = 12345;
     CHECK(!pet_message_parse_iso8601(text, &epoch));
     CHECK(epoch == 12345);
+}
+
+static void check_format(uint32_t epoch, const char *expected)
+{
+    char text[21];
+    CHECK(pet_message_format_iso8601(epoch, text, sizeof(text)));
+    CHECK(strcmp(text, expected) == 0);
+}
+
+static void check_roundtrip(uint32_t epoch)
+{
+    char text[21];
+    uint32_t roundtrip = 0;
+    CHECK(pet_message_format_iso8601(epoch, text, sizeof(text)));
+    CHECK(pet_message_parse_iso8601(text, &roundtrip));
+    CHECK(roundtrip == epoch);
 }
 
 int main(void)
@@ -54,6 +71,21 @@ int main(void)
     check_invalid("2024-02-29T00:00:00Z ");
     check_invalid("2200-01-01T00:00:00Z");
     check_invalid("1969-12-31T23:59:59Z");
+
+    check_format(0, "1970-01-01T00:00:00Z");
+    check_format(1709164800, "2024-02-29T00:00:00Z");
+    check_format(1794276000, "2026-11-10T02:00:00Z");
+    check_format(4294967295U, "2106-02-07T06:28:15Z");
+
+    /* 解析器上限为 2105 年，回环只覆盖其支持区间。 */
+    check_roundtrip(0);
+    check_roundtrip(1709164800);
+    check_roundtrip(1794276000);
+    check_roundtrip(4290000000U);
+
+    char too_small[20];
+    CHECK(!pet_message_format_iso8601(0, too_small, sizeof(too_small)));
+    CHECK(!pet_message_format_iso8601(0, NULL, 21));
 
     if (s_failures == 0) {
         printf("host tests passed: message time\n");

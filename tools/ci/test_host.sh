@@ -76,6 +76,19 @@ build_and_run test_message_queue \
     "${repo_root}/firmware/components/svc_message_hub/src/message_queue.c" \
     "${repo_root}/firmware/tests/host/test_message_queue.c"
 
+build_and_run test_message_codec \
+    -I "${contracts_inc}" \
+    -I "${message_priv_inc}" \
+    "${repo_root}/firmware/components/svc_message_hub/src/message_time.c" \
+    "${repo_root}/firmware/components/svc_message_hub/src/message_codec.c" \
+    "${repo_root}/firmware/tests/host/test_message_codec.c"
+
+build_and_run test_message_store \
+    -I "${contracts_inc}" \
+    -I "${message_priv_inc}" \
+    "${repo_root}/firmware/components/svc_message_hub/src/message_store_codec.c" \
+    "${repo_root}/firmware/tests/host/test_message_store.c"
+
 build_and_run test_net_policy \
     -I "${contracts_inc}" \
     -I "${net_priv_inc}" \

@@ -2,6 +2,7 @@
 
 #include <inttypes.h>
 #include <string.h>
+#include <time.h>
 
 #include "sdkconfig.h"
 
@@ -25,6 +26,7 @@
 
 #if CONFIG_PET_MODULE_NET_ENABLED
 #include "pet/storage.h"
+#include "svc_message_hub/api.h"
 #include "svc_net/api.h"
 #endif
 
@@ -117,6 +119,8 @@ static bool load_net_config(pet_net_config_t *config)
     return true;
 }
 
+static uint32_t app_epoch_now(void);
+
 static void on_net_state(const pet_event_t *event)
 {
     pet_net_event_t payload;
@@ -126,12 +130,87 @@ static void on_net_state(const pet_event_t *event)
     memcpy(&payload, event->payload, sizeof(payload));
 
     if (payload.error == PET_NET_ERROR_NONE) {
+        if (payload.state == PET_NET_STATE_ONLINE) {
+            /* MQTT 上线说明 SNTP 已完成；此时才能判定持久化消息的 TTL。 */
+            pet_message_hub_purge_expired(app_epoch_now());
+        }
         ESP_LOGI(TAG, "net | %s | reconnects=%u", pet_net_state_name(payload.state),
                  payload.reconnect_count);
     } else {
         ESP_LOGW(TAG, "net | %s | error=%s | reconnects=%u",
                  pet_net_state_name(payload.state),
                  pet_net_error_name(payload.error), payload.reconnect_count);
+    }
+}
+
+static const char *message_error_name(pet_message_error_t error)
+{
+    switch (error) {
+    case PET_MESSAGE_OK:
+        return "ok";
+    case PET_MESSAGE_ERR_ARG:
+        return "arg";
+    case PET_MESSAGE_ERR_SCHEMA:
+        return "schema";
+    case PET_MESSAGE_ERR_ID:
+        return "id";
+    case PET_MESSAGE_ERR_SOURCE:
+        return "source";
+    case PET_MESSAGE_ERR_PRIORITY:
+        return "priority";
+    case PET_MESSAGE_ERR_TITLE:
+        return "title";
+    case PET_MESSAGE_ERR_BODY:
+        return "body";
+    case PET_MESSAGE_ERR_TIME:
+        return "time";
+    case PET_MESSAGE_ERR_DISPLAY:
+        return "display";
+    case PET_MESSAGE_ERR_EXPIRED:
+        return "expired";
+    case PET_MESSAGE_ERR_DUPLICATE:
+        return "duplicate";
+    case PET_MESSAGE_ERR_FULL:
+        return "full";
+    case PET_MESSAGE_ERR_STATE:
+        return "state";
+    default:
+        return "unknown";
+    }
+}
+
+/* 时间未同步时返回 0，消息中心据此跳过 TTL 并复用 createdAt 作为 ACK 时间。 */
+static uint32_t app_epoch_now(void)
+{
+    return pet_net_is_time_synced() ? (uint32_t)time(NULL) : 0;
+}
+
+static esp_err_t publish_ack(const char *payload, size_t length, void *context)
+{
+    (void)context;
+    return pet_net_publish_topic(PET_NET_TOPIC_ACK, payload, length, false);
+}
+
+static bool has_suffix(const char *text, const char *suffix)
+{
+    const size_t text_length = strlen(text);
+    const size_t suffix_length = strlen(suffix);
+    return text_length >= suffix_length &&
+           strcmp(text + text_length - suffix_length, suffix) == 0;
+}
+
+static void on_net_message(const char *topic, const char *payload, size_t length,
+                           bool retained, void *context)
+{
+    (void)retained;
+    (void)context;
+    if (topic == NULL || payload == NULL || !has_suffix(topic, "/inbox")) {
+        return;
+    }
+
+    const pet_message_error_t err = pet_message_hub_ingest(payload, length);
+    if (err != PET_MESSAGE_OK) {
+        ESP_LOGW(TAG, "inbox rejected: %s", message_error_name(err));
     }
 }
 #endif
@@ -219,9 +298,18 @@ esp_err_t app_start(void)
 
 #if CONFIG_PET_MODULE_NET_ENABLED
     ESP_ERROR_CHECK(pet_event_bus_subscribe(PET_EVT_NET_STATE, on_net_state));
+
+    esp_err_t msg_err = pet_message_hub_init(publish_ack, NULL, app_epoch_now);
+    if (msg_err != ESP_OK) {
+        ESP_LOGW(TAG, "message hub init failed: %s", esp_err_to_name(msg_err));
+    }
+
     pet_net_config_t net_config;
     if (load_net_config(&net_config)) {
         esp_err_t net_err = pet_net_init(&net_config);
+        if (net_err == ESP_OK) {
+            net_err = pet_net_set_rx_handler(on_net_message, NULL);
+        }
         if (net_err == ESP_OK) {
             net_err = pet_net_start();
         }

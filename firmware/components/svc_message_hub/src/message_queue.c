@@ -71,6 +71,36 @@ void pet_message_queue_init(pet_message_queue_t *queue, pet_message_view_t *slot
     queue->capacity = slots != NULL ? capacity : 0;
 }
 
+uint8_t pet_message_queue_restore(pet_message_queue_t *queue,
+                                  const pet_message_view_t *messages, uint8_t count,
+                                  const uint64_t dedupe[PET_MESSAGE_DEDUPE_SLOTS],
+                                  uint8_t dedupe_next, uint32_t now_epoch_s)
+{
+    if (queue == NULL || queue->slots == NULL || queue->capacity == 0 || messages == NULL ||
+        dedupe == NULL) {
+        return 0;
+    }
+
+    queue->count = 0;
+    memcpy(queue->dedupe, dedupe, sizeof(queue->dedupe));
+    queue->dedupe_next = (uint8_t)(dedupe_next % PET_MESSAGE_DEDUPE_SLOTS);
+
+    uint8_t restored = 0;
+    for (uint8_t i = 0; i < count && restored < queue->capacity; i++) {
+        const pet_message_error_t validation = pet_message_validate(&messages[i], now_epoch_s);
+        if (validation == PET_MESSAGE_ERR_EXPIRED) {
+            queue->expired_total++;
+            continue;
+        }
+        if (validation != PET_MESSAGE_OK) {
+            continue;
+        }
+        insert_sorted(queue, &messages[i]);
+        restored++;
+    }
+    return restored;
+}
+
 pet_message_error_t pet_message_queue_push(pet_message_queue_t *queue,
                                            const pet_message_view_t *message,
                                            uint32_t now_epoch_s)

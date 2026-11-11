@@ -99,6 +99,8 @@ P2 ──► P5/P6（意图）
 | Q13 | ~~S4 温湿度纵向切片~~（代码完成：契约/HAL/BSP/storage/svc_climate/presentation + 5 组主机测试；默认镜像 242,052 B，DIRAM 69,458 B；fake 与关闭模块构建均通过） | 首个端到端闭环 | 实机采样、串口卡片、掉电存档与 24 h 稳定性待验证；LVGL 实屏随板级 BSP 落地 |
 | Q14 | ~~S5-A 消息中心纯逻辑~~（已完成：`pet/message.h` 契约、ISO-8601 解析、信封校验、8 条优先级队列、16 槽去重、TTL/DND/ACK 状态机 + 3 组主机测试；默认镜像 242,052 B，DIRAM 69,650 B） | 传输与持久化前的逻辑基线 | Wi-Fi/MQTT/TLS、NVS `msg_inbox`、ACK 发布与渲染在 S5-B/C 落地；实机验收待硬件 |
 | Q15 | ~~S5-B Wi-Fi + MQTT/TLS 传输层~~（已完成：`pet/net.h` 契约、`pet_net_t` HAL、`svc_net` 策略/服务与 ESP/fake 驱动；TLS 8883、QoS 1、持久会话、LWT、自动重连、NVS 凭据；默认镜像 1,023,456 B，DIRAM 126,154 B；fake 与关闭网络构建通过） | 消息中心传输基线 | inbox 解析、ACK 发布与 `msg_inbox` 持久化在 S5-C 落地；实机断网重连与 heap 水位待硬件 |
+| Q16 | ~~S5-C1 inbox 收包接入~~（已完成：SNTP 对时门控、MQTT 分片重组、严格 JSON 解析、8 槽 PSRAM 队列、received ACK 与事件；默认镜像 1,037,308 B，DIRAM 130,618 B；主机/fake/关闭网络构建通过） | 端到端消息链路设备侧 | `msg_inbox` 持久化与启动恢复在 C2 落地；实机收包、断网重投与 heap 水位待硬件 |
+| Q17 | ~~S5-C2 收件箱持久化~~（已完成：NVS 扩至 64 KB、双代 A/B 快照 + CRC32、启动恢复、去重环落盘、received ACK 落盘门控；默认镜像 1,041,828 B，DIRAM 130,618 B；主机/fake/关闭网络构建通过） | 掉电不丢、重复不展示 | 实机掉电恢复、NVS 磨损与 24 h soak 待硬件 |
 
 ## 7. 明确不做
 
