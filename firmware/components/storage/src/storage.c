@@ -60,3 +60,43 @@ esp_err_t pet_storage_save(const char *namespace_name, const char *key,
     nvs_close(handle);
     return err;
 }
+
+esp_err_t pet_storage_load_str(const char *namespace_name, const char *key,
+                               char *out, size_t capacity)
+{
+    if (namespace_name == NULL || key == NULL || out == NULL || capacity == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(namespace_name, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    size_t length = capacity;
+    err = nvs_get_str(handle, key, out, &length);
+    nvs_close(handle);
+    return err;
+}
+
+esp_err_t pet_storage_save_str(const char *namespace_name, const char *key,
+                               const char *value)
+{
+    if (namespace_name == NULL || key == NULL || value == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(namespace_name, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = nvs_set_str(handle, key, value);
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    return err;
+}

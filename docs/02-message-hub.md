@@ -1,6 +1,6 @@
 # 02 · 万能信息接收端模块
 
-状态：待评审；S5-A 设备侧纯逻辑已落地（2026-11-10）。依赖：`00-architecture.md`、`01-ai-agent.md`（表情联动）。
+状态：待评审；S5-A 设备侧纯逻辑与 S5-B Wi-Fi/MQTT/TLS 传输层已落地（2026-11-10）。依赖：`00-architecture.md`、`01-ai-agent.md`（表情联动）。
 
 ## 1. 范围
 
@@ -270,3 +270,18 @@ IDLE → RECEIVED → QUEUED → RENDERING → DISPLAYED → READ
 内存约束：`pet_message_view_t` 为 2,448 B，8 条队列存储约 19.1 KB；S5-C 持久化与运行期队列应分配到 PSRAM，避免占用内部 heap 预算。
 
 未落地：Wi-Fi/MQTT/TLS 传输、NVS `msg_inbox` 持久化、ACK 发布、消息渲染与 UI 接入、实机断网/重连验收。
+
+### S5-B Wi-Fi + MQTT/TLS 传输层（2026-11-10）
+
+已落地：
+
+- `contracts/include/pet/net.h`：网络状态/错误枚举、`pet_net_config_t`（SSID、Broker URI、设备 ID、用户名/令牌、可选 PEM CA、keepalive、重连间隔）与 8 B 状态事件；事件总线新增 `PET_EVT_NET_STATE` / `PET_EVENT_SOURCE_NET`。
+- `pet_hal/include/pet/hal/net.h`：`pet_net_t` 驱动接口（`start`/`stop`/`publish`/`is_online`），提供 ESP 与 fake 两个实现。
+- `svc_net`：纯逻辑策略（设备 ID、配置边界、`nexus/v1/devices/{id}/inbox|ack|status|config` 主题构建）+ 服务层与驱动选择。
+- 真实驱动 `net_esp.c`：Wi-Fi station（`WIFI_STORAGE_RAM`，断线指数退避 2–30 s）、esp-mqtt 3.1.1 over TLS 8883、QoS 1、`clean_session=false`、keepalive 60 s、LWT（retained `{"online":false}`）、自动重连；GOT_IP 后连接 Broker，上线后发布 retained status 并订阅 inbox/config。
+- fake 驱动（`CONFIG_PET_NET_FAKE`）：无硬件时复用同一状态机发布 CONNECTING/ONLINE，便于桌面验证。
+- 凭据：从 NVS `net`/`nexus` 读取，Kconfig 仅作开发期回退；未配置 SSID/URI 时只告警，不阻断启动。
+- 主机测试 `test_net_policy`：设备 ID、配置边界、四种主题与缓冲区不足。
+- 构建：默认镜像 1,023,456 B，DIRAM 126,154 B（36.91%）；fake 镜像 245,072 B；关闭网络模块镜像 242,056 B，ELF 中无 `pet_net_*` 符号。
+
+未落地：inbox 载荷 JSON 解析与消息中心接入、ACK 发布、`msg_inbox` 持久化、证书轮换与服务端 ACL 配套、实机断网/重连与 24 h 验收。TLS 与 Wi-Fi/MQTT 任务使镜像与内部 RAM 明显上升，实机需重点观察 heap 最低水位。

@@ -98,6 +98,7 @@ P2 ──► P5/P6（意图）
 | Q12 | ~~S3 契约与配置~~（已完成：5 个 JSON Schema、C/TS codegen、扩展 manifest 与开关、事件契约扩展；`check_contracts.py` 通过） | 功能开发前的契约基线 | 已完成 |
 | Q13 | ~~S4 温湿度纵向切片~~（代码完成：契约/HAL/BSP/storage/svc_climate/presentation + 5 组主机测试；默认镜像 242,052 B，DIRAM 69,458 B；fake 与关闭模块构建均通过） | 首个端到端闭环 | 实机采样、串口卡片、掉电存档与 24 h 稳定性待验证；LVGL 实屏随板级 BSP 落地 |
 | Q14 | ~~S5-A 消息中心纯逻辑~~（已完成：`pet/message.h` 契约、ISO-8601 解析、信封校验、8 条优先级队列、16 槽去重、TTL/DND/ACK 状态机 + 3 组主机测试；默认镜像 242,052 B，DIRAM 69,650 B） | 传输与持久化前的逻辑基线 | Wi-Fi/MQTT/TLS、NVS `msg_inbox`、ACK 发布与渲染在 S5-B/C 落地；实机验收待硬件 |
+| Q15 | ~~S5-B Wi-Fi + MQTT/TLS 传输层~~（已完成：`pet/net.h` 契约、`pet_net_t` HAL、`svc_net` 策略/服务与 ESP/fake 驱动；TLS 8883、QoS 1、持久会话、LWT、自动重连、NVS 凭据；默认镜像 1,023,456 B，DIRAM 126,154 B；fake 与关闭网络构建通过） | 消息中心传输基线 | inbox 解析、ACK 发布与 `msg_inbox` 持久化在 S5-C 落地；实机断网重连与 heap 水位待硬件 |
 
 ## 7. 明确不做
 

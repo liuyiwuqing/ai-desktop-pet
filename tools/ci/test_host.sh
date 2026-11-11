@@ -8,6 +8,7 @@ hal_inc="${repo_root}/firmware/components/pet_hal/include"
 climate_priv_inc="${repo_root}/firmware/components/svc_climate/private_include"
 presentation_inc="${repo_root}/firmware/components/presentation/include"
 message_priv_inc="${repo_root}/firmware/components/svc_message_hub/private_include"
+net_priv_inc="${repo_root}/firmware/components/svc_net/private_include"
 
 mkdir -p "${out_dir}"
 
@@ -74,6 +75,12 @@ build_and_run test_message_queue \
     "${repo_root}/firmware/components/svc_message_hub/src/message_validate.c" \
     "${repo_root}/firmware/components/svc_message_hub/src/message_queue.c" \
     "${repo_root}/firmware/tests/host/test_message_queue.c"
+
+build_and_run test_net_policy \
+    -I "${contracts_inc}" \
+    -I "${net_priv_inc}" \
+    "${repo_root}/firmware/components/svc_net/src/net_policy.c" \
+    "${repo_root}/firmware/tests/host/test_net_policy.c"
 
 for ext_dir in "${repo_root}"/extensions/*/; do
     [[ -f "${ext_dir}/extension.json" ]] || continue

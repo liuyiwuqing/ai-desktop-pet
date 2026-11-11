@@ -23,6 +23,11 @@
 #include "svc_climate/api.h"
 #endif
 
+#if CONFIG_PET_MODULE_NET_ENABLED
+#include "pet/storage.h"
+#include "svc_net/api.h"
+#endif
+
 #if CONFIG_PET_EXT_DEVICE_CONTROL
 #include "pet_ext/device_control.h"
 #endif
@@ -32,6 +37,104 @@
 #endif
 
 static const char *TAG = "app";
+
+#if CONFIG_PET_MODULE_NET_ENABLED
+#if CONFIG_PET_NET_FAKE
+#define NET_FALLBACK_SSID "fake-ssid"
+#define NET_FALLBACK_WIFI_PASSWORD ""
+#define NET_FALLBACK_BROKER_URI "mqtts://fake.local:8883"
+#define NET_FALLBACK_MQTT_USERNAME ""
+#define NET_FALLBACK_MQTT_PASSWORD ""
+#else
+#define NET_FALLBACK_SSID CONFIG_PET_NET_WIFI_SSID
+#define NET_FALLBACK_WIFI_PASSWORD CONFIG_PET_NET_WIFI_PASSWORD
+#define NET_FALLBACK_BROKER_URI CONFIG_PET_NET_BROKER_URI
+#define NET_FALLBACK_MQTT_USERNAME CONFIG_PET_NET_MQTT_USERNAME
+#define NET_FALLBACK_MQTT_PASSWORD CONFIG_PET_NET_MQTT_PASSWORD
+#endif
+
+/* NVS 凭据由配网写入；这里的静态缓冲区贯穿整个运行期。 */
+static char s_wifi_ssid[PET_NET_SSID_MAX + 1];
+static char s_wifi_password[PET_NET_PASSWORD_MAX + 1];
+static char s_broker_uri[PET_NET_URI_MAX + 1];
+static char s_device_id[PET_NET_DEVICE_ID_MAX + 1];
+static char s_mqtt_username[PET_NET_USERNAME_MAX + 1];
+static char s_mqtt_password[PET_NET_TOKEN_MAX + 1];
+static char s_ca_cert_pem[PET_NET_CA_PEM_MAX + 1];
+
+static void load_text(const char *namespace_name, const char *key, char *out,
+                      size_t capacity, const char *fallback)
+{
+    esp_err_t err = pet_storage_load_str(namespace_name, key, out, capacity);
+    if (err == ESP_OK && out[0] != '\0') {
+        return;
+    }
+    if (fallback != NULL) {
+        strlcpy(out, fallback, capacity);
+    } else {
+        out[0] = '\0';
+    }
+}
+
+static bool load_net_config(pet_net_config_t *config)
+{
+    esp_err_t err = pet_storage_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs init failed: %s", esp_err_to_name(err));
+        return false;
+    }
+
+    load_text("net", "wifi_ssid", s_wifi_ssid, sizeof(s_wifi_ssid),
+              NET_FALLBACK_SSID);
+    load_text("net", "wifi_pass", s_wifi_password, sizeof(s_wifi_password),
+              NET_FALLBACK_WIFI_PASSWORD);
+    load_text("nexus", "mqtt_uri", s_broker_uri, sizeof(s_broker_uri),
+              NET_FALLBACK_BROKER_URI);
+    load_text("nexus", "device_id", s_device_id, sizeof(s_device_id),
+              CONFIG_PET_NET_DEVICE_ID);
+    load_text("nexus", "mqtt_user", s_mqtt_username, sizeof(s_mqtt_username),
+              NET_FALLBACK_MQTT_USERNAME);
+    load_text("nexus", "mqtt_pass", s_mqtt_password, sizeof(s_mqtt_password),
+              NET_FALLBACK_MQTT_PASSWORD);
+    load_text("nexus", "mqtt_ca", s_ca_cert_pem, sizeof(s_ca_cert_pem), NULL);
+
+    memset(config, 0, sizeof(*config));
+    config->wifi_ssid = s_wifi_ssid;
+    config->wifi_password = s_wifi_password;
+    config->broker_uri = s_broker_uri;
+    config->device_id = s_device_id;
+    config->mqtt_username = s_mqtt_username;
+    config->mqtt_password = s_mqtt_password;
+    config->ca_cert_pem = s_ca_cert_pem[0] != '\0' ? s_ca_cert_pem : NULL;
+    config->keepalive_s = CONFIG_PET_NET_KEEPALIVE_S;
+    config->reconnect_timeout_ms = CONFIG_PET_NET_RECONNECT_MS;
+
+    if (s_wifi_ssid[0] == '\0' || s_broker_uri[0] == '\0') {
+        ESP_LOGW(TAG, "network not provisioned: set NVS net/wifi_ssid and "
+                      "nexus/mqtt_uri (device=%s)", s_device_id);
+        return false;
+    }
+    return true;
+}
+
+static void on_net_state(const pet_event_t *event)
+{
+    pet_net_event_t payload;
+    if (event->payload_len < sizeof(payload)) {
+        return;
+    }
+    memcpy(&payload, event->payload, sizeof(payload));
+
+    if (payload.error == PET_NET_ERROR_NONE) {
+        ESP_LOGI(TAG, "net | %s | reconnects=%u", pet_net_state_name(payload.state),
+                 payload.reconnect_count);
+    } else {
+        ESP_LOGW(TAG, "net | %s | error=%s | reconnects=%u",
+                 pet_net_state_name(payload.state),
+                 pet_net_error_name(payload.error), payload.reconnect_count);
+    }
+}
+#endif
 
 static void on_boot(const pet_event_t *event)
 {
@@ -112,6 +215,20 @@ esp_err_t app_start(void)
 #if CONFIG_PET_MODULE_CLIMATE_ENABLED
     ESP_ERROR_CHECK(pet_climate_init(pet_bsp_climate_sensor()));
     ESP_ERROR_CHECK(pet_climate_start());
+#endif
+
+#if CONFIG_PET_MODULE_NET_ENABLED
+    ESP_ERROR_CHECK(pet_event_bus_subscribe(PET_EVT_NET_STATE, on_net_state));
+    pet_net_config_t net_config;
+    if (load_net_config(&net_config)) {
+        esp_err_t net_err = pet_net_init(&net_config);
+        if (net_err == ESP_OK) {
+            net_err = pet_net_start();
+        }
+        if (net_err != ESP_OK) {
+            ESP_LOGW(TAG, "network start failed: %s", esp_err_to_name(net_err));
+        }
+    }
 #endif
 
 #if CONFIG_PET_EXT_DEVICE_CONTROL

@@ -48,6 +48,7 @@
 | --- | --- | --- |
 | `ai_agent` | 唤醒、录音、ASR/LLM/TTS 会话、上下文、意图产出、状态事件 | 消息投递、成长数值、具体设备执行、表情绘制 |
 | `message_hub` | 消息接入、校验、去重、优先级队列、渲染调度、ACK | 第三方平台协议细节、UI 绘制 |
+| `net` | Wi-Fi station、MQTT over TLS、主题发布/订阅、重连与 LWT | 消息业务解析、渲染、存档 |
 | `climate` | 温湿度采样、滤波、校准、异常检测、告警事件 | 图表绘制、成长数值修改 |
 | `growth` | 成长数值、互动结算、状态推导、存档 | 表情绘制、语音播放 |
 | `device_control`（扩展） | 能力注册、意图路由、风险确认、适配器调用 | 任意命令执行、绕过白名单 |
@@ -73,6 +74,7 @@ typedef enum {
     EVT_MSG_READ,              // payload: message_ack_t
     EVT_CLIMATE_READING,       // payload: climate_reading_t
     EVT_CLIMATE_ALERT,         // payload: climate_alert_t
+    EVT_NET_STATE_CHANGED,     // payload: pet_net_event_t
     EVT_GROWTH_CHANGED,        // payload: growth_snapshot_t
     EVT_GROWTH_STATE_CHANGED,  // payload: pet_mood_t
     EVT_INTENT_READY,          // payload: intent_t
@@ -211,6 +213,16 @@ typedef struct {
 | `msg_inbox` | 未读消息与去重环 | 有界队列 + CRC |
 | `net` | Wi-Fi 与 SNTP | 每次连接校验 |
 | `nexus` | 设备身份与 MQTT 配置 | 只由配网写入 |
+
+S5-B 已落地的键（值为 NVS 字符串；Kconfig 仅作开发期回退，NVS 优先）：
+
+| 命名空间 | 键 | 内容 |
+| --- | --- | --- |
+| `net` | `wifi_ssid` / `wifi_pass` | Wi-Fi SSID 与密码 |
+| `nexus` | `device_id` | MQTT clientId 与主题中的 `{deviceId}` |
+| `nexus` | `mqtt_uri` | Broker URI，仅接受 `mqtts://`（8883） |
+| `nexus` | `mqtt_user` / `mqtt_pass` | MQTT 用户名与令牌 |
+| `nexus` | `mqtt_ca` | 可选 PEM CA；缺省使用 ESP-IDF 证书包 |
 
 ### 分区建议
 

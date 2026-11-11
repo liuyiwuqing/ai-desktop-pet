@@ -39,6 +39,77 @@ config PET_CLIMATE_SAMPLE_PERIOD_MS
     help
       Sampling period for the climate task. DHT11 requires at least 2 s.
 
+config PET_MODULE_NET_ENABLED
+    bool "Enable network transport"
+    default y
+    help
+      Wi-Fi station + MQTT over TLS transport (components/svc_net). Disable to
+      verify the composition root builds without networking.
+
+config PET_NET_FAKE
+    bool "Use fake network transport"
+    depends on PET_MODULE_NET_ENABLED
+    default n
+    help
+      Use a deterministic in-memory transport instead of Wi-Fi/MQTT. Intended
+      for desk testing and CI builds without hardware or a broker.
+
+config PET_NET_WIFI_SSID
+    string "Wi-Fi SSID (development fallback)"
+    depends on PET_MODULE_NET_ENABLED && !PET_NET_FAKE
+    default ""
+    help
+      Used only when NVS namespace "net" has no "wifi_ssid" entry. Leave empty
+      to skip networking until the device is provisioned.
+
+config PET_NET_WIFI_PASSWORD
+    string "Wi-Fi password (development fallback)"
+    depends on PET_MODULE_NET_ENABLED && !PET_NET_FAKE
+    default ""
+    help
+      Used only when NVS namespace "net" has no "wifi_pass" entry.
+
+config PET_NET_BROKER_URI
+    string "MQTT broker URI (development fallback)"
+    depends on PET_MODULE_NET_ENABLED && !PET_NET_FAKE
+    default ""
+    help
+      mqtts:// URI, for example mqtts://192.168.1.10:8883. Used only when NVS
+      namespace "nexus" has no "mqtt_uri" entry.
+
+config PET_NET_DEVICE_ID
+    string "Device ID"
+    depends on PET_MODULE_NET_ENABLED
+    default "pet-dev-01"
+    help
+      MQTT client ID and topic segment. NVS namespace "nexus" key "device_id"
+      takes precedence.
+
+config PET_NET_MQTT_USERNAME
+    string "MQTT username (development fallback)"
+    depends on PET_MODULE_NET_ENABLED && !PET_NET_FAKE
+    default ""
+
+config PET_NET_MQTT_PASSWORD
+    string "MQTT password (development fallback)"
+    depends on PET_MODULE_NET_ENABLED && !PET_NET_FAKE
+    default ""
+
+config PET_NET_KEEPALIVE_S
+    int "MQTT keepalive (s)"
+    depends on PET_MODULE_NET_ENABLED
+    range 10 3600
+    default 60
+
+config PET_NET_RECONNECT_MS
+    int "Reconnect base timeout (ms)"
+    depends on PET_MODULE_NET_ENABLED
+    range 500 60000
+    default 2000
+    help
+      Base delay for Wi-Fi retries and the esp-mqtt reconnect timeout.
+      Wi-Fi retries back off exponentially up to 30 s.
+
 endmenu
 
 menu "PET extensions"

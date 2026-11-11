@@ -1,0 +1,76 @@
+#include <string.h>
+
+#include "esp_log.h"
+#include "esp_timer.h"
+
+#include "pet/event_bus.h"
+#include "pet/hal/net.h"
+
+/* 假传输：无 Wi-Fi/MQTT 依赖，用于无硬件构建与 CI。 */
+
+static const char *TAG = "net_fake";
+
+static bool s_online;
+static uint16_t s_reconnect_count;
+
+static void publish_state(pet_net_state_t state, pet_net_error_t error)
+{
+    pet_event_t event;
+    pet_event_prepare(&event, PET_EVT_NET_STATE, PET_EVENT_SOURCE_NET,
+                      PET_EVENT_PRIORITY_NORMAL);
+
+    pet_net_event_t payload = {
+        .state = state,
+        .error = error,
+        .reconnect_count = s_reconnect_count,
+    };
+    memcpy(event.payload, &payload, sizeof(payload));
+    event.payload_len = sizeof(payload);
+    event.timestamp_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
+    (void)pet_event_bus_publish(&event);
+}
+
+static esp_err_t fake_start(const pet_net_config_t *config)
+{
+    (void)config;
+    publish_state(PET_NET_STATE_CONNECTING, PET_NET_ERROR_NONE);
+    s_online = true;
+    publish_state(PET_NET_STATE_ONLINE, PET_NET_ERROR_NONE);
+    ESP_LOGI(TAG, "fake transport online");
+    return ESP_OK;
+}
+
+static esp_err_t fake_stop(void)
+{
+    s_online = false;
+    publish_state(PET_NET_STATE_IDLE, PET_NET_ERROR_NONE);
+    return ESP_OK;
+}
+
+static esp_err_t fake_publish(const char *topic, const char *payload, size_t length, bool retain)
+{
+    if (!s_online) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    ESP_LOGI(TAG, "publish topic=%s bytes=%u retain=%d", topic, (unsigned)length,
+             retain ? 1 : 0);
+    (void)payload;
+    return ESP_OK;
+}
+
+static bool fake_is_online(void)
+{
+    return s_online;
+}
+
+const pet_net_t *pet_fake_net_driver(void)
+{
+    static const pet_net_t driver = {
+        .id = "fake",
+        .start = fake_start,
+        .stop = fake_stop,
+        .publish = fake_publish,
+        .is_online = fake_is_online,
+    };
+    return &driver;
+}

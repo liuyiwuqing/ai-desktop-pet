@@ -13,6 +13,7 @@ idf_component_register(
         "presentation"
         "svc_growth"
         "svc_climate"
+        "svc_net"
         "bsp_dodo_s3_lcd"
         "device_control"
         "servo"

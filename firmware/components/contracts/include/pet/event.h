@@ -18,6 +18,7 @@ typedef enum {
     PET_EVT_MSG_RECEIVED,
     PET_EVT_MSG_DISPLAYED,
     PET_EVT_MSG_READ,
+    PET_EVT_NET_STATE,
     PET_EVT_COUNT,
 } pet_event_id_t;
 
@@ -39,6 +40,7 @@ typedef enum {
     PET_EVENT_SOURCE_GROWTH,
     PET_EVENT_SOURCE_UI,
     PET_EVENT_SOURCE_EXTENSION,
+    PET_EVENT_SOURCE_NET,
     PET_EVENT_SOURCE_COUNT,
 } pet_event_source_t;
 
