@@ -61,6 +61,8 @@ CORE 类型/前端构建和完整 Maven verify/JAR 退出 0：69 条中 64 通�
 
 源码指纹先拒绝当前 `DeliveryService`，确认与 `af916aa` 的完整差异及其他五项哈希后更新这一项；补“已取消状态不会被有效 ACK 恢复”的实际 Java→C→Java 回环通过，消息 Schema 未改。SQL/传输在该回环中仍为明确替身，真实事务与迁移证据来自前述 PostgreSQL 专项。最终完整 CORE build 退出 0：75 条中 70 通过、5 条条件跳过，0 失败/错误；JAR 的三份静态资源与本轮前端逐字节哈希一致。CORE `109b83f` 已推送并核对远端，04 配套同项提交；远程 CI 单独记录在任务台账。没有迁移真实库、启用清理、发送真实消息、部署或操作设备。旧离线包保留既有快照。
 
+CORE `109b83f` / 04 `0dec4b6` 均已推送并核对远端；对应 [Docker CI 43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) 全步骤 success、[固件 CI 43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job success，后者 full 主机/协议/DSP/LVGL 成功。两项 workflow 不运行上述 253 项浏览器专项，证据边界保持。
+
 ## CONSOLE-02 · 当前实现与完整规划的差距
 
 以下按当前源码核对。九个主导航在 CORE `frontend/src/App.vue`；页面通过同仓控制器调用现有业务，功能实现和验收覆盖分别说明。这里整理当前可验收范围，不删改 02 的原始完整需求，也不把缺项重新命名为“已完成”。
