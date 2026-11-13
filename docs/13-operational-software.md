@@ -82,3 +82,5 @@ python tools/crash_dump.py decode --core /private/path/core.bin --elf /path/nexu
 CORE 版本仍为 `0.1.0-SNAPSHOT`，最终 JAR 为 26,285,010 B，SHA256 为 `1ca37bb0e684b27fe7a0f60ed0207accdd7e8d6e849a88afdd1e4ef51af8468e`。这些哈希只识别本轮实际输出；full 使用编译测试公钥与 `.invalid` 地址，不能作为生产发布。
 
 本轮未迁移/清理真实库、修改运行中 ACL、部署、签发证书、烧录或执行设备动作。真实云端、硬件崩溃采集/成功解码、回滚/掉电、声学和 24 h/7 d 验收仍未执行；屏幕/BOOT 的后续软件实现见 [14](14-recovery-and-device-names.md)，物理显示/按键仍待验收。第三批长期记忆、跨端成长等后续能力未纳入本页交付范围。
+
+2026-11-13 远程 CI 补充：Git 所有权修复后的运行已完成 full 目标编译，主机检查发现 `message_store_codec.c` 使用非 ISO C17 的 `strnlen`。以标准 C 有界扫描替换；现有存储编码/解码/版本夹具在受限 POSIX 声明环境通过。未改存储格式；远程主机入口是否全通过以后续运行结果为准。

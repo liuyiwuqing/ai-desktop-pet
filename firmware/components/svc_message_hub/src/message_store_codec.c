@@ -47,7 +47,10 @@ static void write_fixed_string(uint8_t *dst, size_t field_size, const char *text
     if (text == NULL) {
         return;
     }
-    const size_t length = strnlen(text, field_size - 1u);
+    size_t length = 0;
+    while (length < field_size - 1u && text[length] != '\0') {
+        ++length;
+    }
     memcpy(dst, text, length);
 }
 
