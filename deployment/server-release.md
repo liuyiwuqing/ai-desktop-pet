@@ -52,6 +52,8 @@ python3 tools/server_release.py probe --env-file /etc/nexus/core.env --url https
 
 后续仍需逐项验证设备 ACL、MQTT 消息/回执、真实供应商协议及工具采用、公开评论源核验/删除、重启恢复和长期稳定性。记忆检索可能按既定政策排队清理失效副本，不属于本只读探测。物理设备、语音/声学、生产数据库迁移及 systemd 实际托管的验收不能由此包替代。
 
-从完整源码工作区可重复运行 `python3 tools/ci/test_server_release.py` 验证 CLI 边界。可选的 `python3 tools/ci/test_server_linux.py --bundle build/nexus-server.zip --evidence /new/path/linux-smoke.json` 使用 Docker、OpenSSL 和已有镜像 `eclipse-temurin:21-jre-jammy`、`postgres:17-alpine`、`eclipse-mosquitto:2.0.22`、`caddy:2.10.2-alpine`，只在新临时目录生成测试凭据。它运行包内实际 JAR、TLS Broker、数据库和代理，检查启动/重启、V1–V10、鉴权和管理台配套资源；随后删除本轮容器、网络及临时数据。证据记录实际镜像 digest，不代表 systemd 托管、生产 TLS 或真实供应商验收。
+从完整源码工作区可重复运行 `python3 tools/ci/test_server_release.py` 验证 CLI 边界。可选的 `python3 tools/ci/test_server_linux.py --bundle build/nexus-server.zip --evidence /new/path/linux-smoke.json` 使用 Docker、OpenSSL 和已有镜像 `eclipse-temurin:21-jre-jammy`、`postgres:17-alpine`、`eclipse-mosquitto:2.0.22`、`caddy:2.10.2-alpine`，只在新临时目录生成测试凭据。它运行包内实际 JAR、TLS Broker、数据库和代理，按包内 JAR 的迁移清单检查数据库、首次启动/重启、鉴权和管理台资源；随后删除本轮容器、网络及临时数据。证据记录实际镜像 digest，不代表 systemd 托管、生产 TLS 或真实供应商验收。
+
+支持轮换的 format=2 包可增加 `--auth-rotation`：在 Linux 私有 tmpfs 卷中，以实际非 root UID 运行包内 CLI 原子替换凭据，检查 admin 过渡/到期/撤销、范围隔离、异常文件拒绝和不重启恢复，再验证主动重启。此模式额外拉取 `python:3.13-alpine` 并记录 digest；清理临时卷。它不启用 Memory MCP、不触及真实凭据，详细边界见 [20](../docs/20-credential-rotation.md#linux-私有文件重载验证)。
 
 受保护凭据文件模式、current/previous 过渡和客户端导出见 [凭据轮换](../docs/20-credential-rotation.md)。预检和 probe 从 `NEXUS_AUTH_TOKEN_FILE` 读取管理员当前值，桥接预检验证独立客户端 token 仍有效；不回退旧环境变量，不输出秘密。配置文件只保留在 `/etc/nexus/`，发布 ZIP 不带真实凭据。

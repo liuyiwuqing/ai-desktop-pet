@@ -7,11 +7,13 @@ import io
 import json
 from pathlib import Path
 import re
+import secrets
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.request
+import urllib.error
 import uuid
 import zipfile
 
@@ -30,14 +32,18 @@ def command(*args, timeout=45):
     return result.stdout.strip()
 
 
-def run(bundle, java_image):
+def run(bundle, java_image, auth_rotation=False):
     raw = bundle.read_bytes()
     containers = []
+    volumes = []
     network = 'pet-server-smoke-' + uuid.uuid4().hex[:12]
     def cleanup_containers():
         failed = False
         for container in reversed(containers):
             result = subprocess.run(['docker', 'rm', '-f', container], capture_output=True, timeout=30)
+            failed = failed or result.returncode != 0
+        for volume in volumes:
+            result = subprocess.run(['docker', 'volume', 'rm', volume], capture_output=True, timeout=30)
             failed = failed or result.returncode != 0
         if failed:
             raise SmokeFailure('container_cleanup_failed')
@@ -66,7 +72,7 @@ def run(bundle, java_image):
 
             postgres_env = env_file('postgres.env', {'POSTGRES_DB': 'nexus', 'POSTGRES_USER': 'nexus',
                                                    'POSTGRES_PASSWORD': local['NEXUS_DB_PASSWORD']})
-            core_env = env_file('core.env', {
+            core_values = {
                 'NEXUS_ADMIN_TOKEN': local['NEXUS_ADMIN_TOKEN'],
                 'NEXUS_DB_URL': 'jdbc:postgresql://database:5432/nexus', 'NEXUS_DB_USER': 'nexus',
                 'NEXUS_DB_PASSWORD': local['NEXUS_DB_PASSWORD'], 'NEXUS_BIND_ADDRESS': '127.0.0.1',
@@ -74,7 +80,8 @@ def run(bundle, java_image):
                 'NEXUS_MQTT_PASSWORD': local['NEXUS_MQTT_PASSWORD'], 'NEXUS_MQTT_CA_CERT': '/test-ca.crt',
                 'NEXUS_MQTT_ALLOW_INSECURE': 'false', 'NEXUS_HALO_ENABLED': 'false',
                 'NEXUS_AI_ENABLED': 'false', 'NEXUS_MEMORY_ENABLED': 'false',
-                'NEXUS_MEMORY_MCP_ENABLED': 'false', 'NEXUS_BRIDGE_ENABLED': 'false', 'NEXUS_RETENTION_ENABLED': 'false'})
+                'NEXUS_MEMORY_MCP_ENABLED': 'false', 'NEXUS_BRIDGE_ENABLED': 'false', 'NEXUS_RETENTION_ENABLED': 'false'}
+            core_env = env_file('core.env', core_values)
             cli = stage / 'desktop-pet/tools/server_release.py'
             ready = json.loads(command(sys.executable, cli, 'preflight', '--env-file', core_env))
             assert ready['ok'] and not any(ready['features'].values())
@@ -83,6 +90,28 @@ def run(bundle, java_image):
                 container = command('docker', 'run', '-d', *args)
                 containers.append(container)
                 return container
+
+            auth_mounts = []
+            runtime_env = core_env
+            helper = None
+            python_image = 'python:3.13-alpine'
+            if auth_rotation:
+                if not (core / 'tools/credential_store.py').is_file():
+                    raise SmokeFailure('bundle_has_no_credential_rotation_cli')
+                volume = network + '-auth'
+                command('docker', 'volume', 'create', '--driver', 'local', '--opt', 'type=tmpfs', '--opt', 'device=tmpfs',
+                        '--opt', 'o=size=1m,uid=65534,gid=65534,mode=0700', volume)
+                volumes.append(volume)
+                command('docker', 'pull', python_image, timeout=180)
+                helper_env = env_file('auth-helper.env', {'NEXUS_ADMIN_TOKEN': local['NEXUS_ADMIN_TOKEN'],
+                    'NEXUS_MEMORY_MCP_TOKEN': secrets.token_urlsafe(48)})
+                helper = start('--network', 'none', '--read-only', '--tmpfs', '/tmp', '--user', '65534:65534',
+                    '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--env-file', helper_env,
+                    '-v', volume + ':/auth', '-v', str(core / 'tools/credential_store.py') + ':/tools/credential_store.py:ro',
+                    python_image, 'python3', '-c', 'import time;time.sleep(900)')
+                command('docker', 'exec', helper, 'python3', '/tools/credential_store.py', 'init', '--file', '/auth/tokens.json')
+                runtime_env = env_file('core-auth.env', {**core_values, 'NEXUS_AUTH_TOKEN_FILE': '/auth/tokens.json'})
+                auth_mounts = ['-v', volume + ':/auth:ro']
 
             database = start('--network', network, '--network-alias', 'database', '--env-file', postgres_env,
                              '--tmpfs', '/var/lib/postgresql/data:rw,size=256m', 'postgres:17-alpine')
@@ -102,9 +131,10 @@ def run(bundle, java_image):
             jar.chmod(0o644)
             runtime = start('--network', network, '--read-only', '--tmpfs', '/tmp:rw,size=32m',
                             '--user', '65534:65534', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
-                            '--memory', '768m', '--env-file', core_env, '-p', '127.0.0.1::9080',
+                            '--memory', '768m', '--env-file', runtime_env, '-p', '127.0.0.1::9080',
                             '-v', str(jar) + ':/app/nexus-core.jar:ro',
                             '-v', str(core / 'data/mosquitto/certs/ca.crt') + ':/test-ca.crt:ro',
+                            *auth_mounts,
                             java_image, 'java', '-jar', '/app/nexus-core.jar')
             port = command('docker', 'port', runtime, '9080/tcp').rsplit(':', 1)[1]
             url = 'http://127.0.0.1:' + port
@@ -130,6 +160,74 @@ def run(bundle, java_image):
             edge = proxy()
             initial = wait_ready()
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            rotation_evidence = {'tested': False}
+            if auth_rotation:
+                def credentials():
+                    # Generated disposable tokens stay in this process; never put them in argv or evidence.
+                    return json.loads(command('docker', 'exec', helper, 'python3', '-c',
+                        "from pathlib import Path;print(Path('/auth/tokens.json').read_text())"))
+
+                def credential_cli(*args):
+                    return json.loads(command('docker', 'exec', helper, 'python3', '/tools/credential_store.py',
+                        *args, '--file', '/auth/tokens.json'))
+
+                def auth_status(token):
+                    request = urllib.request.Request(url + '/api/v1/status', headers={'Authorization': 'Bearer ' + token})
+                    try:
+                        with opener.open(request, timeout=8) as response:
+                            return response.status, json.loads(response.read(65536))
+                    except urllib.error.HTTPError as response:
+                        return response.code, json.loads(response.read(65536))
+
+                def expect_status(token, status, label):
+                    actual, body = auth_status(token)
+                    if actual != status:
+                        raise SmokeFailure('linux_auth_' + label)
+                    return body
+
+                before = json.loads(command('docker', 'inspect', runtime))[0]
+                old = credentials()
+                old_token = old['admin']['current']['token']
+                expect_status(old_token, 200, 'initial')
+                credential_cli('rotate', '--scope', 'admin', '--expected-revision', str(old['revision']), '--grace-seconds', '120')
+                overlap = credentials(); current_token = overlap['admin']['current']['token']
+                expect_status(old_token, 200, 'overlap_old');expect_status(current_token, 200, 'overlap_current')
+                expect_status(overlap['memory']['current']['token'], 401, 'scope_isolation')
+                credential_cli('revoke', '--scope', 'admin', '--expected-revision', str(overlap['revision']),
+                    '--id', overlap['admin']['previous']['id'])
+                expect_status(old_token, 401, 'revoked');expect_status(current_token, 200, 'after_revoke')
+                revoked = credentials()
+                credential_cli('rotate', '--scope', 'admin', '--expected-revision', str(revoked['revision']), '--grace-seconds', '1')
+                expiring = credentials(); next_token = expiring['admin']['current']['token']
+                expect_status(next_token, 200, 'expiry_current')
+                deadline = time.monotonic() + 4
+                while auth_status(current_token)[0] == 200 and time.monotonic() < deadline:
+                    time.sleep(.1)
+                expect_status(current_token, 401, 'expired');expect_status(next_token, 200, 'after_expiry')
+                command('docker', 'exec', helper, 'python3', '-c',
+                    "from pathlib import Path;import os;p=Path('/auth/tokens.json');b=p.with_name('valid.json');"
+                    "b.write_bytes(p.read_bytes());b.chmod(0o600);t=p.with_name('invalid.json');t.write_text('{}');t.chmod(0o600);os.replace(t,p)")
+                broken = expect_status(next_token, 503, 'malformed_file')
+                if broken.get('error') != 'authentication_configuration_unavailable':
+                    raise SmokeFailure('linux_auth_error_body')
+                expect_status(old_token, 503, 'no_environment_fallback')
+                command('docker', 'exec', helper, 'python3', '-c',
+                    "import os;os.replace('/auth/valid.json','/auth/tokens.json')")
+                expect_status(next_token, 200, 'repaired_file')
+                command('docker', 'exec', helper, 'python3', '-c', "import os;os.chmod('/auth/tokens.json',0o644)")
+                expect_status(next_token, 503, 'unsafe_permissions')
+                command('docker', 'exec', helper, 'python3', '-c', "import os;os.chmod('/auth/tokens.json',0o600)")
+                expect_status(next_token, 200, 'repaired_permissions')
+                after = json.loads(command('docker', 'inspect', runtime))[0]
+                if before['State']['StartedAt'] != after['State']['StartedAt'] or before['RestartCount'] != after['RestartCount']:
+                    raise SmokeFailure('linux_auth_unexpected_restart')
+                # The host probe cannot read the private Linux volume. Its temporary env file
+                # carries only the current token, while the unchanged runtime uses file mode.
+                core_env = env_file('probe-current.env', {**core_values, 'NEXUS_ADMIN_TOKEN': next_token})
+                rotation_evidence = {'tested': True, 'scope': 'admin', 'linuxAtomicReplacement': True,
+                    'overlap': True, 'expiry': True, 'revocation': True, 'scopeIsolation': True,
+                    'malformedAndUnsafeFileRejected': True, 'repairWithoutRestart': True,
+                    'runtimeRestartedDuringRotation': False, 'memoryMcpRotationTested': False}
             with opener.open(url + '/', timeout=8) as response:
                 html = response.read(65537)
                 assert response.status == 200 and len(html) <= 65536
@@ -163,7 +261,7 @@ def run(bundle, java_image):
             java_version = command('docker', 'exec', runtime, 'java', '--version').splitlines()[0]
             assert re.search(r'\b21[. ]', java_version)
             images = {}
-            for name in (java_image, 'postgres:17-alpine', 'eclipse-mosquitto:2.0.22', 'caddy:2.10.2-alpine'):
+            for name in (java_image, 'postgres:17-alpine', 'eclipse-mosquitto:2.0.22', 'caddy:2.10.2-alpine', *((python_image,) if auth_rotation else ())):
                 metadata = json.loads(command('docker', 'image', 'inspect', name))[0]
                 assert metadata['Os'] == 'linux'
                 images[name] = {'id': metadata['Id'], 'digests': metadata.get('RepoDigests', [])}
@@ -172,6 +270,7 @@ def run(bundle, java_image):
                     'javaVersion': java_version,
                     'initialStatus': initial, 'restartedStatus': restarted, 'migrations': migrations,
                     'consoleAssetsVerified': len(assets), 'images': images,
+                    'credentialRotation': rotation_evidence,
                     'systemdTested': False, 'productionTlsTested': False, 'realProvidersTested': False}
     finally:
         result = subprocess.run(['docker', 'network', 'rm', network], capture_output=True, timeout=30)
@@ -184,11 +283,12 @@ def main():
     parser.add_argument('--bundle', type=Path, required=True)
     parser.add_argument('--java-image', default='eclipse-temurin:21-jre-jammy')
     parser.add_argument('--evidence', type=Path)
+    parser.add_argument('--auth-rotation', action='store_true', help='Exercise protected file reload in an isolated Linux volume')
     args = parser.parse_args()
     if args.evidence and args.evidence.exists():
         parser.error('evidence output must be new')
     try:
-        result = run(args.bundle, args.java_image)
+        result = run(args.bundle, args.java_image, args.auth_rotation)
         output = json.dumps(result, indent=2, sort_keys=True) + '\n'
         if args.evidence:
             with args.evidence.open('x') as file:

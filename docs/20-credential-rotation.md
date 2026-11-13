@@ -69,6 +69,16 @@
 | 实际桥接 + TLS/stdio | 6 项通过；新客户端文件在同一 TLS/stdio 会话内生效，未重连、未重放，保留既有断线恢复/退出/日志隔离检查；CORE HTTP 在此项为边界夹具 |
 | 发布 CLI | 10 项通过，含文件模式 preflight/probe、过渡期客户端匹配、format=2 与旧 format=1；原基线 ZIP 重新 verify，SHA256 未变 |
 
-本轮没有轮换真实凭据、更新真实 env、部署 systemd/生产 TLS、迁移真实数据库或操作真实设备。POSIX 文件重载在 macOS 测试，目标 Linux 的实际用户/目录权限与 systemd 托管仍需部署验收。固件未改，不以既有构建冒充新增设备能力。
+本轮没有轮换真实凭据、更新真实 env、部署 systemd/生产 TLS、迁移真实数据库或操作真实设备。POSIX 文件重载在 macOS 测试；后续 Linux 容器验证见下节，目标主机实际用户/目录和 systemd 托管仍需部署验收。固件未改，不以既有构建冒充新增设备能力。
 
-配套 format=2 发布包已生成并校验，实际 JAR 的 Linux 环境模式启动/重启、V1–V11 与管理台资源核对通过，见 [部署记录](../deployment/README.md)。该 Linux 检查未执行动态文件轮换；不能替代目标用户权限、systemd 或生产环境验收。
+配套 format=2 发布包已生成并校验，实际 JAR 的 Linux 环境模式启动/重启、V1–V11 与管理台资源核对通过，见 [部署记录](../deployment/README.md)。初次环境模式检查未执行动态文件轮换；后续补齐记录如下。
+
+## Linux 私有文件重载验证
+
+`python3 tools/ci/test_server_linux.py --bundle build/server-release-20261113/nexus-server-0.1.0-SNAPSHOT-9559429.zip --auth-rotation --evidence build/server-release-20261113/linux-auth-rotation-9559429.json` 退出 0。同一不可变包 SHA256 保持 `7c7670704dac7c1066275c449e95d4194b1db1599943f7748c2f3062a55f03b5`。
+
+实际 Linux Java 21、PostgreSQL、TLS Mosquitto、Caddy，CORE 使用 `65534:65534`、只读根文件系统；凭据在临时 Linux tmpfs 卷，目录 0700/文件 0600，服务只读挂载。另一同 UID、无网络的 Python 容器运行包内凭据 CLI，真实原子替换文件。
+
+公开 HTTP 验证：双令牌均可用、旧令牌显式撤销/到期后 401、memory 范围不能访问管理 API、损坏文件及 0644 权限返回固定 503且不回退环境变量、修复后立即恢复。Docker 启动时间和 RestartCount 在轮换前后相同；之后另行主动重启，当前令牌仍可用。首次启动/重启、V1–V11 与管理台资源同时通过。容器、网络、卷和临时凭据均在成功返回前清理。
+
+证据只含状态、功能标志、包哈希和镜像 digest，不包含令牌。此 Linux 检查覆盖 admin 文件重载及范围隔离；没有在 Linux 启用 Memory MCP 或执行 stdio 轮换，后两者仍采用上文 macOS/TLS 检查证据。目标 systemd、生产凭据和设备不在本次范围。

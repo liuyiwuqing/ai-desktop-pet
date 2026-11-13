@@ -69,3 +69,5 @@ CORE 故障时先停服务，保留日志和数据库，不执行 `down -v`/Flyw
 新包 `build/server-release-20261113/nexus-server-0.1.0-SNAPSHOT-9559429.zip` 绑定 CORE `9559429` / 04 `ccd3afa`（创建时两仓已提交，petDirty=false），format=2，共 18 份交付文件，SHA256 `7c7670704dac7c1066275c449e95d4194b1db1599943f7748c2f3062a55f03b5`。包含 OTA、凭据文件模式及其 CLI；旧基线 ZIP 保留且哈希不变。
 
 该包实际 JAR 在独立 Linux Java 21/PostgreSQL/Mosquitto/Caddy 容器首次启动、重启、鉴权、依赖就绪与静态资源核对通过，V1–V11 实际迁移与 JAR 清单一致；证据在同目录 `linux-smoke-9559429.json`。原测试硬编码 V1–V10 曾于迁移历史断言失败；现按包内 JAR 的真实迁移资源清单核对，使用同一不可变包重跑退出 0。无 systemd、生产 TLS、真实数据/供应商或实机结论；临时容器和网络已清理。
+
+DEL-03 在相同包上使用 `--auth-rotation` 验证实际 Linux 私有卷和 UID 65534 下的 admin 凭据原子替换；过渡、到期、撤销、固定 503、权限拒绝及修复后不重启恢复通过，随后主动重启仍能鉴权。证据 `linux-auth-rotation-9559429.json`；额外 Python 容器无网络，临时卷/容器/网络已清理。Memory MCP 的 Linux 动态轮换未启用，目标 systemd/生产用户目录仍待验收，见 [20](../docs/20-credential-rotation.md)。

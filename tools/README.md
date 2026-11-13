@@ -5,7 +5,7 @@
 ## 已落地
 
 - `ci/test_growth_sync_contract.py`：实际成长引擎/JSON → MQTT/PostgreSQL/CORE HTTP；`ci/test_growth_sync_ui.sh`：真实 Vue/浏览器的只读成长状态与移动宽度回归。边界见 [21](../docs/21-growth-sync.md)。
-- `server_release.py create/verify/preflight/probe`：生成 CORE 源码/JAR/部署模板离线包、SHA256 完整性校验、私有配置/目标主机预检和只读鉴权状态探测；不安装、启动或迁移数据库。`ci/test_server_release.py` 验证 CLI 边界，`ci/test_server_linux.py` 使用包内实际 JAR 在临时 Linux 容器验证启动/重启及管理台资源。见 [交付说明](../deployment/server-release.md)。
+- `server_release.py create/verify/preflight/probe`：生成 CORE 源码/JAR/部署模板离线包、SHA256 完整性校验、私有配置/目标主机预检和只读鉴权状态探测；不安装、启动或迁移数据库。`ci/test_server_release.py` 验证 CLI 边界；`ci/test_server_linux.py` 使用包内实际 JAR 验证 Linux 启动/重启/资源，`--auth-rotation` 额外验证私有文件重载。见 [交付说明](../deployment/server-release.md)。
 - `schema_codegen.py`：读取 `config/schemas/`，生成 `firmware/.../config_generated.h` 与 `integration/contracts/generated/pet-contracts.ts`；`--check` 用于 CI 检查过期。
 - `ci/build_firmware.sh`：依赖图检查 → 契约校验 → 主机测试 → `idf.py build` → `idf.py size` → 小智协议/codec、WSS 与模型前端边界主机测试。
 - `ci/check_deps.py`：组件依赖图无环。
