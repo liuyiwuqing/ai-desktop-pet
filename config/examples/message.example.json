@@ -1,23 +1,16 @@
 {
   "schemaVersion": 1,
-  "id": "msg_01JABCDEF",
-  "source": "halo.comment",
-  "type": "comment",
-  "priority": "normal",
-  "title": "新评论",
-  "body": "这篇文章很有帮助，想请教一下……",
+  "type": "inbox.message",
+  "eventId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+  "deviceId": "dodo-01",
+  "sentAt": 1794362400,
+  "expiresAt": 1794448800,
   "payload": {
-    "postTitle": "ESP32 入门",
-    "author": "读者"
-  },
-  "createdAt": "2026-11-10T10:00:00+08:00",
-  "expiresAt": "2026-11-11T10:00:00+08:00",
-  "dedupeKey": "halo:comment:123456",
-  "display": {
-    "template": "comment_card",
-    "durationMs": 8000,
-    "sound": "chime",
-    "icon": "comment"
-  },
-  "requireAck": true
+    "messageId": "11111111-2222-4333-8444-555555555555",
+    "source": "halo",
+    "eventType": "comment.created",
+    "title": "博客有新评论",
+    "summary": "访客：很喜欢这个桌宠项目。",
+    "priority": "normal"
+  }
 }

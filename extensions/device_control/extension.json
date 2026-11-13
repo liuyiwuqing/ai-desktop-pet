@@ -3,8 +3,8 @@
   "id": "device_control",
   "version": "0.1.0",
   "contractVersion": 1,
-  "capabilities": ["device.discover", "app.open", "media.play_pause"],
-  "risk": "l2_destructive",
+  "capabilities": ["device.discover", "system.info", "project.status", "app.open"],
+  "risk": "l1_reversible",
   "defaultEnabled": false,
-  "description": "手机/电脑控制扩展：白名单能力注册、风险分级与适配器调用。"
+  "description": "设备控制扩展：能力发现、系统和项目状态、经本地确认的白名单应用启动。"
 }

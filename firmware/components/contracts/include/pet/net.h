@@ -4,10 +4,11 @@
 #include <stdint.h>
 
 #include "pet/event.h"
+#include "pet/nexus.h"
 
 /* 网络传输契约：Wi-Fi/MQTT 的配置与状态，不包含具体驱动实现。 */
 
-#define PET_NET_DEVICE_ID_MAX 31
+#define PET_NET_DEVICE_ID_MAX PET_NEXUS_DEVICE_ID_MAX
 #define PET_NET_URI_MAX 127
 #define PET_NET_SSID_MAX 32
 #define PET_NET_PASSWORD_MAX 64
@@ -21,6 +22,8 @@ typedef enum {
     PET_NET_TOPIC_ACK,
     PET_NET_TOPIC_STATUS,
     PET_NET_TOPIC_CONFIG,
+    PET_NET_TOPIC_CONFIG_ACK,
+    PET_NET_TOPIC_TELEMETRY,
     PET_NET_TOPIC_COUNT,
 } pet_net_topic_t;
 

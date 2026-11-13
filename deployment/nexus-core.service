@@ -1,0 +1,25 @@
+[Unit]
+Description=NEXUS CORE desktop pet service
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=nexus
+Group=nexus
+WorkingDirectory=/opt/nexus/core
+EnvironmentFile=/etc/nexus/core.env
+ExecStart=/usr/bin/java -jar /opt/nexus/core/nexus-core.jar
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

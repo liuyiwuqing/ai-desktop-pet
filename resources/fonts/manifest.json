@@ -1,0 +1,13 @@
+{
+  "font": "Noto Sans SC Regular",
+  "license": "OFL-1.1",
+  "source": "https://github.com/lvgl/lvgl/blob/v9.5.0/tests/src/test_files/fonts/noto/NotoSansSC-Regular.ttf",
+  "sourceSha256": "ae82f4e2a55e1316a55bcc1d05e9555ce08d8bda07e893b486896b626fd852ff",
+  "converter": "lv_font_conv@1.5.3",
+  "glyphs": 6882,
+  "bpp": 2,
+  "files": {
+    "pet_noto_sc_16.bin": "4005ed4dc7210461483a3eb48a22cf5011040c0c844d99c0ca184cf982d2a587",
+    "pet_noto_sc_24.bin": "d265e0ecad4ce2157dce3fd41335efc78ab4da04194bb68f600794c1089bbf8d"
+  }
+}

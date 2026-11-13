@@ -753,3 +753,182 @@ int pet_message_ack_format(char *out, size_t capacity, const char *message_id,
     }
     return written;
 }
+
+/* DeviceText.fit 输出 UTF-8 且移除 ISO control；按字节限制，不把汉字数当字节数。 */
+static bool nexus_text_valid(const char *text)
+{
+    const unsigned char *p = (const unsigned char *)text;
+    while (*p != 0) {
+        uint32_t cp = *p++;
+        unsigned rest = 0;
+        uint32_t minimum = 0;
+        if (cp >= 0xC2 && cp <= 0xDF) {
+            cp &= 0x1F;
+            rest = 1;
+            minimum = 0x80;
+        } else if (cp >= 0xE0 && cp <= 0xEF) {
+            cp &= 0x0F;
+            rest = 2;
+            minimum = 0x800;
+        } else if (cp >= 0xF0 && cp <= 0xF4) {
+            cp &= 0x07;
+            rest = 3;
+            minimum = 0x10000;
+        } else if (cp >= 0x80) {
+            return false;
+        }
+        for (unsigned i = 0; i < rest; ++i) {
+            if ((*p & 0xC0) != 0x80)
+                return false;
+            cp = (cp << 6) | (*p++ & 0x3F);
+        }
+        if (cp < minimum || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ||
+            cp < 0x20 || (cp >= 0x7F && cp <= 0x9F))
+            return false;
+    }
+    return true;
+}
+
+static pet_message_error_t parse_nexus_payload(cursor_t *cursor, pet_message_view_t *out)
+{
+    if (!consume(cursor, '{'))
+        return PET_MESSAGE_ERR_SCHEMA;
+    field_mask_t fields = {0};
+    for (;;) {
+        char key[16];
+        if (parse_string(cursor, key, sizeof(key)) != STRING_OK || !consume(cursor, ':'))
+            return PET_MESSAGE_ERR_SCHEMA;
+        if (strcmp(key, "messageId") == 0) {
+            if (!mark_field(&fields, 1u << 0) ||
+                parse_string(cursor, out->id, sizeof(out->id)) != STRING_OK ||
+                !pet_nexus_uuid_valid(out->id))
+                return PET_MESSAGE_ERR_ID;
+        } else if (strcmp(key, "source") == 0) {
+            if (!mark_field(&fields, 1u << 1) ||
+                parse_string(cursor, out->source, 33) != STRING_OK ||
+                !pet_nexus_token_valid(out->source, 32))
+                return PET_MESSAGE_ERR_SOURCE;
+        } else if (strcmp(key, "eventType") == 0) {
+            char type[65];
+            if (!mark_field(&fields, 1u << 2) ||
+                parse_string(cursor, type, sizeof(type)) != STRING_OK ||
+                !pet_nexus_token_valid(type, 64))
+                return PET_MESSAGE_ERR_SCHEMA;
+            if (strncmp(type, "comment.", 8) == 0)
+                out->template_id = PET_MESSAGE_TEMPLATE_COMMENT_CARD;
+            else if (strncmp(type, "alert.", 6) == 0)
+                out->template_id = PET_MESSAGE_TEMPLATE_ALERT_CARD;
+            else if (strncmp(type, "growth.", 7) == 0)
+                out->template_id = PET_MESSAGE_TEMPLATE_GROWTH_CARD;
+            else if (strncmp(type, "system.", 7) == 0)
+                out->template_id = PET_MESSAGE_TEMPLATE_SYSTEM_CARD;
+        } else if (strcmp(key, "title") == 0) {
+            if (!mark_field(&fields, 1u << 3) ||
+                parse_string(cursor, out->title, 97) != STRING_OK ||
+                !nexus_text_valid(out->title))
+                return PET_MESSAGE_ERR_TITLE;
+        } else if (strcmp(key, "summary") == 0) {
+            if (!mark_field(&fields, 1u << 4) ||
+                parse_string(cursor, out->body, 181) != STRING_OK ||
+                !nexus_text_valid(out->body))
+                return PET_MESSAGE_ERR_BODY;
+        } else if (strcmp(key, "priority") == 0) {
+            char priority[16];
+            if (!mark_field(&fields, 1u << 5) ||
+                parse_string(cursor, priority, sizeof(priority)) != STRING_OK ||
+                parse_priority(priority, &out->priority) != PET_MESSAGE_OK)
+                return PET_MESSAGE_ERR_PRIORITY;
+        } else {
+            return PET_MESSAGE_ERR_SCHEMA;
+        }
+        if (consume(cursor, '}'))
+            break;
+        if (!consume(cursor, ','))
+            return PET_MESSAGE_ERR_SCHEMA;
+    }
+    return fields.seen == 0x3Fu ? PET_MESSAGE_OK : PET_MESSAGE_ERR_SCHEMA;
+}
+
+pet_message_error_t pet_message_parse_nexus(const char *json, size_t length,
+                                            const char *expected_device,
+                                            pet_message_view_t *out)
+{
+    if (json == NULL || out == NULL || length == 0 || length > PET_NEXUS_PACKET_MAX ||
+        !pet_nexus_device_id_valid(expected_device))
+        return PET_MESSAGE_ERR_ARG;
+    memset(out, 0, sizeof(*out));
+    out->duration_ms = 8000;
+    out->require_ack = true;
+    cursor_t cursor = {.cur = json, .end = json + length};
+    field_mask_t fields = {0};
+    if (!consume(&cursor, '{'))
+        return PET_MESSAGE_ERR_SCHEMA;
+    for (;;) {
+        char key[16];
+        if (parse_string(&cursor, key, sizeof(key)) != STRING_OK || !consume(&cursor, ':'))
+            return PET_MESSAGE_ERR_SCHEMA;
+        if (strcmp(key, "schemaVersion") == 0) {
+            uint32_t version;
+            if (!mark_field(&fields, 1u << 0) || !parse_uint(&cursor, &version) || version != 1)
+                return PET_MESSAGE_ERR_SCHEMA;
+            out->schema_version = (uint16_t)version;
+        } else if (strcmp(key, "type") == 0) {
+            char type[16];
+            if (!mark_field(&fields, 1u << 1) ||
+                parse_string(&cursor, type, sizeof(type)) != STRING_OK ||
+                strcmp(type, "inbox.message") != 0)
+                return PET_MESSAGE_ERR_SCHEMA;
+        } else if (strcmp(key, "eventId") == 0) {
+            if (!mark_field(&fields, 1u << 2) ||
+                parse_string(&cursor, out->delivery.event_id, sizeof(out->delivery.event_id)) != STRING_OK ||
+                !pet_nexus_uuid_valid(out->delivery.event_id))
+                return PET_MESSAGE_ERR_ID;
+        } else if (strcmp(key, "deviceId") == 0) {
+            if (!mark_field(&fields, 1u << 3) ||
+                parse_string(&cursor, out->delivery.device_id, sizeof(out->delivery.device_id)) != STRING_OK ||
+                strcmp(out->delivery.device_id, expected_device) != 0)
+                return PET_MESSAGE_ERR_ID;
+        } else if (strcmp(key, "sentAt") == 0) {
+            if (!mark_field(&fields, 1u << 4) ||
+                !parse_uint(&cursor, &out->created_at_epoch_s) || out->created_at_epoch_s == 0)
+                return PET_MESSAGE_ERR_TIME;
+        } else if (strcmp(key, "expiresAt") == 0) {
+            if (!mark_field(&fields, 1u << 5) ||
+                !parse_uint(&cursor, &out->expires_at_epoch_s))
+                return PET_MESSAGE_ERR_TIME;
+        } else if (strcmp(key, "payload") == 0) {
+            if (!mark_field(&fields, 1u << 6))
+                return PET_MESSAGE_ERR_SCHEMA;
+            const pet_message_error_t err = parse_nexus_payload(&cursor, out);
+            if (err != PET_MESSAGE_OK)
+                return err;
+        } else {
+            return PET_MESSAGE_ERR_SCHEMA;
+        }
+        if (consume(&cursor, '}'))
+            break;
+        if (!consume(&cursor, ','))
+            return PET_MESSAGE_ERR_SCHEMA;
+    }
+    skip_ws(&cursor);
+    if (fields.seen != 0x7Fu || cursor.cur != cursor.end)
+        return PET_MESSAGE_ERR_SCHEMA;
+    return out->expires_at_epoch_s > out->created_at_epoch_s ? PET_MESSAGE_OK
+                                                            : PET_MESSAGE_ERR_TIME;
+}
+
+int pet_message_nexus_ack_format(char *out, size_t capacity, const char *message_id,
+                                 const pet_message_delivery_t *delivery,
+                                 pet_message_ack_state_t state, bool expired)
+{
+    const char *status = ack_state_name(state);
+    if (out == NULL || capacity == 0 || delivery == NULL || status == NULL ||
+        !pet_nexus_uuid_valid(message_id) || !pet_nexus_uuid_valid(delivery->event_id) ||
+        !pet_nexus_device_id_valid(delivery->device_id))
+        return -1;
+    const int length = snprintf(out, capacity,
+        "{\"schemaVersion\":1,\"deviceId\":\"%s\",\"eventId\":\"%s\",\"messageId\":\"%s\","
+        "\"status\":\"%s\"%s}", delivery->device_id, delivery->event_id, message_id,
+        expired ? "rejected" : status, expired ? ",\"reason\":\"expired\"" : "");
+    return length < 0 || (size_t)length >= capacity ? -1 : length;
+}

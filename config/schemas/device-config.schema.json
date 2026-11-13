@@ -15,9 +15,12 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 32,
-      "default": "Asia/Shanghai"
+      "default": "Asia/Shanghai",
+      "pattern": "^(Asia/Shanghai|UTC|Etc/UTC|UTC[+-][0-9]{2}:[0-9]{2})$",
+      "description": "固定时区：Asia/Shanghai、UTC、Etc/UTC 或 UTC+HH:MM/UTC-HH:MM；偏移 -12:00 至 +14:00，不处理夏令时。"
     },
     "language": {
+      "description": "v1 reserves en-US; current PET04 firmware supports zh-CN and rejects unsupported runtime locales.",
       "type": "string",
       "enum": ["zh-CN", "en-US"],
       "default": "zh-CN"
@@ -26,7 +29,7 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 100,
-      "default": 60
+      "default": 25
     },
     "brightness": {
       "type": "integer",
@@ -34,11 +37,21 @@
       "maximum": 100,
       "default": 80
     },
+    "muted": {
+      "type": "boolean",
+      "default": false,
+      "description": "独立语音静音，重启后保留；不受定时免打扰结束影响。"
+    },
     "dnd": {
       "type": "object",
       "additionalProperties": false,
       "required": ["enabled", "startMinute", "endMinute", "allowCritical"],
       "properties": {
+        "manual": {
+          "type": "boolean",
+          "default": false,
+          "description": "手动免打扰，独立于定时规则。"
+        },
         "enabled": {
           "type": "boolean",
           "default": false

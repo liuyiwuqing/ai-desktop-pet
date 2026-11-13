@@ -68,6 +68,16 @@ typedef struct {
     uint32_t failure_count;
 } pet_climate_snapshot_t;
 
+#define PET_CLIMATE_CHART_POINTS 60u
+typedef struct {
+    int16_t temperature_centi,humidity_centi;
+    bool valid;
+} pet_climate_chart_point_t;
+typedef struct {
+    uint32_t generated_ms;
+    pet_climate_chart_point_t points[PET_CLIMATE_CHART_POINTS]; /* 左旧右新，每点一分钟均值。 */
+} pet_climate_chart_t;
+
 /* 事件 payload 固定内联，结构体必须放得下。 */
 _Static_assert(sizeof(pet_climate_reading_t) <= PET_EVENT_PAYLOAD_MAX,
                "climate reading must fit in pet_event_t payload");

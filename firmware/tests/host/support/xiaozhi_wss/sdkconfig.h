@@ -1,0 +1,3 @@
+#pragma once
+#define CONFIG_PET_AI_XIAOZHI_ON_BOOT 1
+#define CONFIG_PET_AI_VOLUME_PCT 25

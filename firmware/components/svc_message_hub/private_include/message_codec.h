@@ -9,7 +9,7 @@
 
 #define PET_MESSAGE_JSON_MAX 4096
 
-/* 解析 inbox 信封；payload 只校验为对象，不保留内容。 */
+/* 旧契约仅供历史样例验证；线上入口使用 nexus-core v1。 */
 pet_message_error_t pet_message_parse(const char *json, size_t length,
                                       pet_message_view_t *out);
 
@@ -17,3 +17,10 @@ pet_message_error_t pet_message_parse(const char *json, size_t length,
 int pet_message_ack_format(char *out, size_t capacity, const char *message_id,
                            pet_message_ack_state_t state, uint32_t at_epoch_s,
                            uint8_t queue_depth);
+
+pet_message_error_t pet_message_parse_nexus(const char *json, size_t length,
+                                            const char *expected_device,
+                                            pet_message_view_t *out);
+int pet_message_nexus_ack_format(char *out, size_t capacity, const char *message_id,
+                                 const pet_message_delivery_t *delivery,
+                                 pet_message_ack_state_t state, bool expired);

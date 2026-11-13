@@ -1,6 +1,6 @@
 # resources
 
-运行时资源。资源通过 `assets` 分区打包，不整包加载到内存。唤醒模型不放本目录，由独立 `model` 分区承载。
+运行时资源。目标方案为 `assets` 分区打包；S5-D 首版 16/24 px 字体暂嵌入应用，由 LVGL 从只读二进制载入（分配走 ESP-IDF malloc，大块走 PSRAM），尚未实现 assets 镜像管线。唤醒模型不放本目录，由独立 `model` 分区承载。
 
 ## 目录
 
@@ -9,6 +9,10 @@
 - `animations/`：状态精灵表与动作帧序列。
 - `audio/`：提示音、警报音、音效；TTS 不落盘到本目录。
 - `i18n/`：中英文文案，UTF-8，键名与代码一致。
+
+G4 首版角色由 `firmware/components/ui_lvgl/src/pet_avatar.c` 中原创几何图元绘制，画布 208×78；无外部图片、逐帧图像解码或新增图像依赖。呼吸/表情姿态由纯 C `presentation/pet_motion` 生成。`images/`、`animations/` 的精灵资源管线仍是后续目标；桌面预览使用主机 LVGL 输出，存放在忽略的 `firmware/build-ui-preview/`。
+
+G6 在同一画布增加冷/热/干/湿图元和普通状态动作，不覆盖睡眠、生病等主表现；仍无需新增图片、字体或外部资源依赖。预览脚本同时导出这四种环境。
 
 ## 规则
 

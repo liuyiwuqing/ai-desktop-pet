@@ -161,6 +161,15 @@ int main(void)
     test_calibration_and_clamp();
     test_history();
     test_history_wrap();
+    pet_climate_history_t history={0};pet_climate_chart_t chart;
+    pet_climate_reading_t point={.temperature_c=22,.humidity_pct=50,.timestamp_ms=60000,.valid=true};
+    pet_climate_history_push(&history,&point);
+    point.temperature_c=24;point.timestamp_ms=90000;pet_climate_history_push(&history,&point);
+    pet_climate_history_chart(&history,119999,&chart);
+    assert(chart.points[59].valid && chart.points[59].temperature_centi==2300);
+    assert(!chart.points[58].valid);
+    pet_climate_history_chart(&history,4000000,&chart);
+    assert(!chart.points[59].valid);
     printf("test_climate_pipeline: ok\n");
     return 0;
 }

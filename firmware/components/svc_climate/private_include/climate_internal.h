@@ -131,3 +131,5 @@ bool pet_climate_state_encode(const pet_climate_state_blob_t *state, void *out,
 bool pet_climate_state_decode(const void *data, size_t size, pet_climate_state_blob_t *out);
 
 uint32_t pet_climate_crc32(const void *data, size_t size);
+
+void pet_climate_history_chart(const pet_climate_history_t *history,uint32_t now_ms,pet_climate_chart_t *out);

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pet.local/contracts/nexus-v1/MessageRejection.schema.json",
+  "title": "MessageRejection",
+  "description": "服务端支持的拒绝回执；固件当前持久发送 expired，临时失败保留服务端重试。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "deviceId",
+    "eventId",
+    "messageId",
+    "status",
+    "reason"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "deviceId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,40}$"
+    },
+    "eventId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "messageId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "const": "rejected"
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "busy",
+        "storage_error",
+        "time_unavailable",
+        "expired",
+        "invalid"
+      ]
+    }
+  }
+}

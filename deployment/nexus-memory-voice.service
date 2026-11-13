@@ -1,0 +1,26 @@
+[Unit]
+Description=NEXUS public memory voice MCP bridge
+Wants=network-online.target nexus-core.service
+After=network-online.target nexus-core.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=nexus-mcp
+Group=nexus-mcp
+WorkingDirectory=/opt/nexus/desktop-pet
+EnvironmentFile=/etc/nexus/memory-voice.env
+ExecStart=/usr/bin/python3 /opt/nexus/desktop-pet/tools/memory_voice.py run --directory /opt/nexus/memory-voice --stdio /opt/nexus/core-tools/memory_mcp_stdio.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

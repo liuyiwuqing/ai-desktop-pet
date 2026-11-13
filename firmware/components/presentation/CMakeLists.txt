@@ -1,8 +1,13 @@
 idf_component_register(
     SRCS
         "src/climate_card.c"
+        "src/message_presenter.c"
+        "src/recovery_presenter.c"
+        "src/pet_motion.c"
     INCLUDE_DIRS
         "include"
     REQUIRES
         "contracts"
+    PRIV_REQUIRES
+        "svc_message_hub"
 )

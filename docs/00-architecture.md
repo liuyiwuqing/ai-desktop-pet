@@ -1,6 +1,6 @@
 # 00 · 总体架构
 
-状态：待评审。目录分层、分区预算与契约问题见 [08 结构评审](08-structure-review.md)，确认后再定稿本文。适用范围：`04-ai-desktop-pet` 全部固件、独立 AI 网关、与 `nexus-core` 的集成契约及扩展包。
+状态：当前软件架构（2026-11-13）。分层、消息/配置、语音、扩展与维护软件已实现，本地验证见 [11](11-product-software-closure.md)、[13](13-operational-software.md)、[15](15-memory-lifecycle.md)、[16](16-voice-memory-tools.md)与[17](17-voice-bridge-regression.md)；真实云端、部署及硬件验收待做。[08 结构评审](08-structure-review.md)保留历史决策。适用范围：`04-ai-desktop-pet` 固件、与 `nexus-core` 的集成契约、控制网关及扩展包；自建 AI 网关仍为预留。
 
 ## 1. 目标与非目标
 
@@ -117,7 +117,7 @@ typedef struct {
 } pet_module_t;
 ```
 
-`app` 按依赖顺序启动：`storage → hal → core → presentation → climate → growth → message_hub → ai_agent → ui`。任一必需模块失败进入安全模式：保留屏幕与基础输入，关闭网络与扩展，显示故障码。
+`app` 先启动事件总线、配置存储/工作任务和物理维护控制台，再按编译开关组合成长、传感器、网络、扩展、AI 与 UI。各服务报告初始化错误，不把可选服务失败等同于整机可用。显式启用恢复预设后，连续三次早期 panic/watchdog 重启进入维护启动，在业务服务之前返回；UI 开启时只额外尝试一次恢复屏幕/BOOT，显示再次崩溃后退回 USB 维护。两次长按及松手门控见 [14](14-recovery-and-device-names.md)，健康判定与诊断见 [13](13-operational-software.md)。该保护不替代启动必需模块的错误处理。
 
 ## 5. 核心契约
 
@@ -197,24 +197,24 @@ typedef struct {
 
 ### 三层配置
 
-| 层 | 位置 | 内容 | 是否入库 |
+| 层 | 位置 | 内容 | 是否提交 Git |
 | --- | --- | --- | --- |
 | 编译期 | `firmware/boards/<board>/board.json`（引脚/能力唯一事实源，构建生成 C 头与 Kconfig）、`config/profiles/*.json` | 板型、引脚、功能开关、默认参数 | 是（无凭据） |
 | 运行期 | NVS `pet_cfg` | 用户设置、DND、音量、亮度、校准 | 否 |
-| 凭据 | NVS `nexus` / 服务端私有 env | Wi-Fi、设备令牌、证书、API Key | 绝不入库 |
+| 凭据 | NVS `pet_provision/bundle_v1` / 服务端私有 env | 设备侧 Wi-Fi、MQTT/WSS/控制凭据；服务端保管供应商密钥 | 否，且不导出/不写日志 |
 
 ### NVS 命名空间
 
 | 命名空间 | 内容 | 版本策略 |
 | --- | --- | --- |
-| `pet_cfg` | 用户配置 | `cfg_version` + JSON schema |
-| `pet_growth` | 成长存档 | 双槽 + CRC + `save_version` |
+| `pet_cfg` | `settings_v1` 用户配置 | version/revision/CRC/规范 JSON，提交后回读 |
+| `pet_growth` | 成长存档 | 双槽 v4 104 B + CRC + 16 B 提交记录，兼容读 v1–v3 |
 | `pet_climate` | 当日极值与温湿度校准偏移 | 28 B blob：magic + version + length + CRC32，5 分钟或跨天保存 |
 | `msg_inbox` | 未读消息与去重环 | 有界队列 + CRC |
-| `net` | Wi-Fi 与 SNTP | 每次连接校验 |
-| `nexus` | 设备身份与 MQTT 配置 | 只由配网写入 |
+| `pet_provision` | `bundle_v1` 完整凭据包 | 原子提交/回读，已有设备身份不能更换 |
+| `net` / `nexus` / `xiaozhi` / `control` | 旧凭据命名空间兼容 | 只有新包不存在时回退，不从旧键拼接损坏的新包 |
 
-S5-B 已落地的键（值为 NVS 字符串；Kconfig 仅作开发期回退，NVS 优先）：
+S5-B 的旧 NVS 字符串键如下；当前物理配网写完整 `pet_provision/bundle_v1`，分组与字段见 [config](../config/README.md)。Kconfig 仅作开发期回退：
 
 | 命名空间 | 键 | 内容 |
 | --- | --- | --- |
@@ -237,13 +237,13 @@ S5-B 已落地的键（值为 NVS 字符串；Kconfig 仅作开发期回退，NV
 | `ota_1` | 0x420000 | 0x400000 | 4 MB 应用槽 B |
 | `storage` | 0x820000 | 0x200000 | 2 MB LittleFS |
 | `assets` | 0xA20000 | 0x400000 | 4 MB 表情/字体/音效 |
-| `model` | 0xE20000 | 0x100000 | 1 MB WakeNet 模型（SPIFFS） |
+| `model` | 0xE20000 | 0x100000 | 1 MB WakeNet/VAD 原始模型包（data/spiffs） |
 | `coredump` | 0xF20000 | 0x10000 | 崩溃转储 |
 | 保留 | 0xF30000 | 0xD0000 | 832 KB 后续扩展 |
 
 约束：OTA 镜像必须校验项目 ID/版本/签名；迁移与回滚单独设计，不能直接互刷 02/03。S5-C2 将 NVS 由 24 KB 扩至 64 KB 以容纳 `msg_inbox` 双代快照，`otadata`/`phy_init` 顺延，`ota_0` 起始地址保持 0x20000。
 
-Q4 已确认：模型使用独立 `model` 分区，不并入 `assets`。首版 WakeNet9 你好小智打包后约 284 KB（291,069 B），1 MB 分区保留约 3.5 倍余量；构建期校验 `srmodels.bin` ≤ 960 KB。ESP-SR 通过 `esp_srmodel_init("model")` 直接 mmap 加载，不进入 assets 索引。模型不随应用 OTA 更新：首次烧录写入，后续变更走独立数据写入或 USB 恢复。自定义唤醒词约 3.9 MB，不在首版范围；启用时必须调整分区表并 USB 重刷。
+Q4 已确认：模型使用独立 `model` 分区，不并入 `assets`。当前固定 WakeNet9“小爱同学”与 `vadnet1_medium`，构建期校验 `srmodels.bin` ≤ 960 KiB，双模型实包大小与 SHA256 见 `01-ai-agent.md` A8。ESP-SR 通过 `esp_srmodel_init("model")` 直接 mmap 加载，不挂载为文件系统、不进入 assets 索引。应用 OTA 只接受相同模型哈希；变更模型须使用配套 USB 包，当前不提供模型 OTA。自定义唤醒词约 3.9 MB，不在首版范围；启用时必须调整分区表并 USB 重刷。
 
 ## 7. 任务与内存预算
 
@@ -270,44 +270,32 @@ Q4 已确认：模型使用独立 `model` 分区，不并入 `assets`。首版 W
 ## 8. 部署拓扑
 
 ```text
-消息面
-┌──────────────┐  MQTT/TLS 8883   ┌────────────────┐   HTTPS    ┌───────────────────┐
-│ 04 固件      │◄────────────────►│ MQTT Broker    │◄──────────►│ nexus-core        │
-│              │                  │ Mosquitto      │            │ 消息/配置/管理台  │
-└──────┬───────┘                  └────────────────┘            └────┬──────┬───────┘
-       │                                                             │      │
-       │ I2S/SPI/GPIO                                                │      ▼
-       ▼                                                             │  第三方 Webhook / Halo
- ST7789 / INMP441 / MAX98357A / DHT11 / 扩展执行器                   │
-                                                                     ▼
-                                                            ┌───────────────────┐
-                                                            │ mac-bridge (本机) │
-                                                            │ 白名单 + 确认     │
-                                                            └───────────────────┘
+消息/配置：ESP32 ◄── MQTT/TLS ──► Mosquitto ◄── MQTT/TLS ──► nexus-core
+                                                              ▲
+                                                     HTTPS 管理台/Webhook/Halo
 
-AI 会话面
-┌──────────────┐   WSS 音频 + HTTPS 控制   ┌──────────────────────┐   HTTPS    ┌────────────────────┐
-│ 04 固件      │◄─────────────────────────►│ ai-gateway（独立）   │◄──────────►│ ASR/LLM/TTS 供应商 │
-│              │   短期会话令牌            │ 会话编排/供应商适配  │            └────────────────────┘
-└──────┬───────┘                           └──────────────────────┘
-       │ HTTPS 设备认证 → 换取短期令牌
-       ▼
-┌───────────────────┐
-│ nexus-core        │  设备身份校验 + 令牌签发（JWKS/内省供网关校验）
-└───────────────────┘
+语音对话：ESP32 ◄── WSS：Opus、转写、MCP ──► 小智服务 ──► ASR/LLM/TTS
+
+可选控制：ESP32 ── HTTPS ──► control_gateway ── 回环 HTTP ──► mac-bridge
+                              （目标 Mac）                    （同一 Mac）
+
+本地硬件：ESP32 ── I2S/SPI/GPIO ──► 屏幕、麦克风、功放、温湿度及执行器
 ```
 
-服务端按能力拆成两个部署单元（Q3 方案 C）：
+当前部署职责：
 
 | 服务 | 归属 | 负责 | 不负责 |
 | --- | --- | --- | --- |
 | 消息中心 | `nexus-core`（现有） | 第三方 Webhook/Halo 接入、消息去重与保留、设备注册与 MQTT 主题 ACL、配置下发、管理台 | 音频流、ASR/LLM/TTS |
-| AI 网关 | `04/server/ai-gateway`（独立） | ASR/LLM/TTS 会话编排、供应商适配与密钥、上下文策略、打断 | 消息队列、设备管理、管理台 |
+| 语音供应商 | 小智服务（设备直接连接） | ASR/LLM/TTS、供应商侧人格与工具调用 | CORE 消息队列与设备管理 |
+| 可选记忆工具 | CORE MCP、标准库 stdio 适配器与供应商桥接 | 公开评论的受限检索与源状态复核，独立令牌 | 音频流、私聊存档、管理员 API |
+| 可选控制网关 | `04/server/control_gateway.py` 与同机 `mac-bridge` | 设备作用域、白名单、确认、去重与审计 | 基础语音服务 |
+| 自建 AI 网关 | `04/server/ai-gateway` 预留 | 后续独立供应商适配 | 当前没有可部署实现 |
 
-- 固件通过 MQTT/TLS 收发消息与配置，通过 WSS/HTTPS 建立 AI 会话；两条链路互不代理。
-- 设备身份由 `nexus-core` 校验并签发短期 AI 会话令牌；`ai-gateway` 只校验令牌，不共享数据库、不直连设备管理数据。
-- 已确认（A3）：AI 网关首版复用 `03` 的小智 WebSocket 服务作为实现；固件只依赖 `ai_session` 契约，替换供应商或自建实现不改 UI/成长/消息模块。
-- 第三方 Webhook 只进 `nexus-core`，不直连 AI 网关；与 `nexus-core` 的契约和部署配置放在 `integration/`。
+- 固件通过 MQTT/TLS 收发消息与配置，使用单独的小智 WSS 凭据建立语音会话；CORE 不代理音频，也未实现 AI 短期令牌签发或 JWKS。早期令牌交换方案尚未采用。
+- 语音的本地上下文、隐私门控与 MCP 工具由设备运行，供应商侧人格与真实云端验收见 [12](12-cloud-interop.md)。基础语音日常不依赖开发 Mac。
+- 公开记忆是默认关闭的服务器工具链，可随 CORE 部署在常在线 Linux；令牌不下发设备，接口见 [16](16-voice-memory-tools.md)，固定桥接、受控进程与 TLS 回归见 [17](17-voice-bridge-regression.md)。
+- 第三方 Webhook/Halo 只接 CORE。Mac Bridge 为可选控制能力；它在线与否不改变基础语音链路。
 
 ## 9. 技术栈总表
 
@@ -315,18 +303,18 @@ AI 会话面
 | --- | --- | --- |
 | 固件 | ESP-IDF 6.1 + C17 | 复用 02/03 与 ESP-SR、I2S、MQTT 生态 |
 | UI | LVGL 9.x | 240×320 屏、动画、中文子集、PSRAM 可行 |
-| 语音前端 | ESP-SR WakeNet + AEC + VAD | 片上唤醒与回声消除，降低云端依赖 |
-| 音频编码 | Opus 16 kHz 单声道 / PCM 回退 | 带宽与音质平衡；TTS 输出 24 kHz PCM |
+| 语音前端 | ESP-SR WakeNet/VAD、可选 DSP/参考输入 | 当前保持半双工；声学 AEC/全双工未验收 |
+| 音频编码 | WSS Opus：上行 16 kHz、下行 24 kHz 单声道 | 设备内部 PCM，协议不提供网络 PCM 回退 |
 | 设备消息 | MQTT 3.1.1 over TLS，QoS 1 | 持久会话、离线队列、成熟运维 |
 | 消息 Broker | Mosquitto 2.0.22 | 与 `nexus-core` 一致；单设备足够，集群再评估 EMQX |
-| 设备 HTTP | HTTPS + Bearer/HMAC | 配网、测试、第三方 webhook |
+| HTTP 接口 | CORE、Webhook 与可选控制网关各自鉴权 | 配网用物理串口，设备不提供通用 HTTP 管理服务 |
 | 消息中心 | Java 21 / Spring Boot / PostgreSQL / Flyway | 复用 nexus-core，事务、审计与设备管理成熟 |
-| AI 网关 | 独立服务；首版复用 03 小智 WebSocket 实现 | 音频会话独立扩缩容；供应商密钥集中管理 |
+| AI 会话 | 设备直接连接小智 WSS | 自建 AI 网关预留，当前不经过 CORE |
 | 管理台 | Vue 3 + Vite | 复用现有管理台，归 nexus-core |
 | 本机桥 | Python 3 + 标准库 + SQLite | 复用 mac-bridge，依赖少 |
 | 测试 | Python unittest + 主机 C 测试 + HIL | 与现有工程一致 |
 
-被放弃的首版方案：Arduino/MicroPython（生态与性能不匹配）、全本地推理（S3 算力不足）、HTTP 轮询（延迟与功耗差）、消息中心独立拆分（归 `nexus-core`；仅 AI 网关按 Q3=C 独立）。
+被放弃的首版方案：Arduino/MicroPython（生态与性能不匹配）、全本地推理（S3 算力不足）、设备 HTTP 轮询（延迟与功耗差）、另建消息服务（已有 `nexus-core`）。
 
 ## 10. 扩展机制
 
@@ -334,18 +322,18 @@ AI 会话面
 - `extension.json` 由 `config/schemas/extension.schema.json` 约束：`id`、SemVer `version`、`contractVersion`、`capabilities`、最高 `risk`、`defaultEnabled=false`、`description`。核心契约版本在 `firmware/components/contracts/include/pet/extension.h`。
 - 编译期开关：`CONFIG_PET_EXT_DEVICE_CONTROL`、`CONFIG_PET_EXT_SERVO`，默认关闭；组合根只调用已开启扩展的 `*_init()`。
 - 校验入口：`tools/ci/check_contracts.py` 校验 manifest、契约版本、目录结构与 Kconfig 开关；`tools/ci/test_host.sh` 运行每个扩展的清单契约测试。
-- 运行期能力注册：`capability_registry` 保存能力名、参数 schema、风险级别、适配器 ID（S6 落地）。
-- 核心模块不 `#include` 扩展头；扩展通过 `EVT_INTENT_READY` 订阅意图，通过 `EVT_ACTUATOR_RESULT` 回报结果。
-- 新增扩展不得修改 `ai_agent` 的状态机；只消费意图、产出结果。
+- 运行期工具由组合根 `app_tools.c` 组装成 `pet_intent_tool_t` 表，显式提供名称、说明、输入 schema、副作用标记和执行回调；`svc_intent` 严格解析参数并处理重复请求。
+- 核心语音模块不依赖扩展头；组合根调用扩展公开服务 API，并把受保护的状态/结果返回 MCP。没有任意文本或 shell 执行入口。
+- 新增扩展通过工具表和公开 API 接入，不修改 `ai_agent` 会话状态机。
 
 ## 11. 安全与隐私
 
 - 设备身份：每设备独立令牌/证书，主题 ACL 隔离；禁止共用 CORE 管理员账号。
 - 传输：MQTT TLS、HTTPS/WSS；证书校验，不复用 02/03 的明文配置。
-- 消息：payload 上限 8 KB；签名/HMAC；时间戳容差 5 分钟；重放保护。
+- 消息：设备 JSON 输入上限 4096 B，严格校验信封、设备/投递身份与有效期；依赖 TLS 和 Broker ACL，不声称 MQTT 消息另有 HMAC。Webhook 的鉴权按 CORE 对应入口执行。
 - 设备控制：L0 只读、L1 可逆、L2 破坏性；L2 必须二次确认并绑定请求。
-- 隐私：麦克风在 DND/静音时硬件或软件门控；日志不写原始音频、私信、令牌、Wi-Fi 密码；会话转写默认只存服务端短期；消息全文保留 7 天、元数据保留 30 天。
-- 记忆：只把公开、可复核的内容写入 OpenViking；不写凭据与 NVS 二进制。
+- 隐私：DND/静音在软件层阻止新音频/上下文外发，物理停止延迟仍待实测；日志不写原始音频、私信、令牌、Wi-Fi 密码。设备对话上下文有界且不持久化；云端副本由供应商策略管理。CORE 消息 7/30 天保留功能默认关闭，启用、备份及预览流程见 [13](13-operational-software.md)。
+- 记忆：显式保存公开、可复核的评论；检索逐条核对源公开状态和正文哈希，撤回/非公开/改文后停止检索并持久化排队删除。已保存副本依据源状态管理，本地正文仍遵守 7 天规则；账本只留来源/哈希/状态，见 [15](15-memory-lifecycle.md)。
 
 ## 12. 验证策略
 
@@ -361,9 +349,9 @@ AI 会话面
 ## 13. 待确认项
 
 1. 已确认（A5）：S1 板级基线为 `03` DODO-S3-LCD，背光 GPIO42 PWM；其他板型后续以独立 board profile 接入。
-2. 分区表已确认 Q4（`model` 1 MB、`assets` 4 MB）；安全启动与 Flash 加密已确认（A4）：开发不启用、量产启用；待确认 OTA 身份校验细节与 USB 恢复流程。
-3. 已确认（A1/A2）：AI 供应商沿用 `03` 小智服务；唤醒词用内置 `wn9_nihaoxiaozhi_tts`（你好小智），可替换为其他内置词；TTS 音色沿用供应商默认。待确认 TTS 商用授权。
-4. 已确认（Q3=C/A3）：消息中心复用 `nexus-core`，AI 网关独立在 `server/ai-gateway`；首版复用 `03` 小智 WebSocket 服务，对外以 `ai_session` 契约隔离。
+2. 分区表已确认 Q4（`model` 1 MB、`assets` 4 MB）；安全启动与 Flash 加密决策为开发不启用、量产启用，实际烧写尚未执行。签名/身份、配套 USB 包与回滚软件已实现，物理恢复待验收，见 [10](10-maintenance-recovery.md)。
+3. 已确认（A1/A2，唤醒词于 2026-11-12 更新）：AI 供应商沿用 `03` 小智服务；唤醒词用内置 `wn9_xiaoaitongxue`（小爱同学）；TTS 音色沿用供应商默认。待确认 TTS 商用授权。
+4. 消息中心复用 `nexus-core`；当前设备直连小智，自建 `server/ai-gateway` 仍预留，详见上方当前拓扑。
 5. 舵机数量、供电与安装结构。
 6. 已确认（B3）：中文字体用 Noto Sans SC 子集（SIL OFL），16/24 px，授权文本随资源入库。
 7. 已确认（B1/B2）：Broker 用 Mosquitto 2.0.22；消息全文保留 7 天、元数据 30 天；设备未读队列默认 8 条。

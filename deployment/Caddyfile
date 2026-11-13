@@ -1,0 +1,17 @@
+# 同机反向代理；CORE 始终只监听回环地址。域名由部署者提供。
+{$NEXUS_CONSOLE_DOMAIN} {
+	request_body {
+		max_size 32768
+	}
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+	reverse_proxy {$NEXUS_CONSOLE_UPSTREAM:127.0.0.1:8088} {
+		lb_retries 0
+		transport http {
+			dial_timeout 3s
+			response_header_timeout 15s
+		}
+	}
+}

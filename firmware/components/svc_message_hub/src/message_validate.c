@@ -20,6 +20,8 @@ static size_t bounded_length(const char *text, size_t capacity)
 
 bool pet_message_id_valid(const char *id)
 {
+    if (pet_nexus_uuid_valid(id))
+        return true;
     if (id == NULL || strncmp(id, "msg_", 4) != 0) {
         return false;
     }
@@ -161,7 +163,17 @@ pet_message_error_t pet_message_validate(const pet_message_view_t *message, uint
     if (!pet_message_id_valid(message->id)) {
         return PET_MESSAGE_ERR_ID;
     }
-    if (!pet_message_source_valid(message->source)) {
+    const bool nexus = message->delivery.event_id[0] != '\0';
+    if (nexus) {
+        if (!pet_nexus_uuid_valid(message->id) ||
+            !pet_nexus_uuid_valid(message->delivery.event_id) ||
+            !pet_nexus_device_id_valid(message->delivery.device_id))
+            return PET_MESSAGE_ERR_ID;
+    } else if (message->delivery.device_id[0] != '\0' || pet_nexus_uuid_valid(message->id)) {
+        return PET_MESSAGE_ERR_ID;
+    }
+    if (nexus ? !pet_nexus_token_valid(message->source, 32)
+              : !pet_message_source_valid(message->source)) {
         return PET_MESSAGE_ERR_SOURCE;
     }
     if ((unsigned)message->priority >= (unsigned)PET_MESSAGE_PRIORITY_COUNT) {

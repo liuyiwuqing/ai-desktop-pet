@@ -18,6 +18,9 @@ typedef struct {
     esp_err_t (*start)(const pet_net_config_t *config);
     esp_err_t (*stop)(void);
     esp_err_t (*publish)(const char *topic, const char *payload, size_t length, bool retain);
+    /* 从非 MQTT 任务调用；只有匹配的 QoS 1 PUBACK 才返回 ESP_OK。 */
+    esp_err_t (*publish_confirmed)(const char *topic, const char *payload, size_t length,
+                                   bool retain, uint32_t timeout_ms);
     esp_err_t (*set_rx_handler)(pet_net_rx_handler_t handler, void *context);
     bool (*is_online)(void);
     bool (*is_time_synced)(void);

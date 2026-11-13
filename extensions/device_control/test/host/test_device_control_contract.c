@@ -22,12 +22,17 @@ int main(void)
     CHECK(manifest->id != NULL && strcmp(manifest->id, "device_control") == 0);
     CHECK(manifest->version_major == 0 && manifest->version_minor == 1);
     CHECK(manifest->contract_version == PET_EXT_CONTRACT_VERSION);
-    CHECK(manifest->risk == PET_EXT_RISK_L2_DESTRUCTIVE);
+    CHECK(manifest->risk == PET_EXT_RISK_L1_REVERSIBLE);
+    CHECK(manifest->capability_count == 4);
     CHECK(pet_ext_manifest_is_valid(manifest));
 
     const char *capability = NULL;
     CHECK(pet_ext_manifest_token(manifest, 0, &capability));
     CHECK(capability != NULL && strcmp(capability, "device.discover") == 0);
+    CHECK(pet_ext_manifest_token(manifest, 1, &capability));
+    CHECK(capability != NULL && strcmp(capability, "system.info") == 0);
+    CHECK(pet_ext_manifest_token(manifest, 2, &capability));
+    CHECK(capability != NULL && strcmp(capability, "project.status") == 0);
     CHECK(!pet_ext_manifest_token(manifest, manifest->capability_count, &capability));
     CHECK(!pet_ext_manifest_is_valid(NULL));
 

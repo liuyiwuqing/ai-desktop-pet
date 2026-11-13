@@ -1,0 +1,8 @@
+#pragma once
+typedef void *esp_transport_handle_t;
+typedef enum {
+    WS_TRANSPORT_OPCODES_CONT = 0, WS_TRANSPORT_OPCODES_TEXT = 1,
+    WS_TRANSPORT_OPCODES_BINARY = 2, WS_TRANSPORT_OPCODES_CLOSE = 8,
+    WS_TRANSPORT_OPCODES_PING = 9, WS_TRANSPORT_OPCODES_PONG = 10,
+    WS_TRANSPORT_OPCODES_FIN = 128,
+} ws_transport_opcodes_t;

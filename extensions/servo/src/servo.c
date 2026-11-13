@@ -32,7 +32,7 @@ static const char *TAG = "ext_servo";
 
 void pet_ext_servo_init(void)
 {
-    ESP_LOGI(TAG, "servo extension started (contract v%d)", PET_EXT_CONTRACT_VERSION);
+    ESP_LOGI(TAG,"servo extension registered; composition root owns startup");
 }
 #endif
 #endif

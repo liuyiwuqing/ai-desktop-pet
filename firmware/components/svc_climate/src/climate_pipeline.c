@@ -310,3 +310,22 @@ void pet_climate_history_summary(const pet_climate_history_t *history, uint32_t 
         out->trend_rh_per_10min = (float)(newest->humidity_centi - trend_hum_start) / 100.0f;
     }
 }
+
+void pet_climate_history_chart(const pet_climate_history_t *h,uint32_t now,pet_climate_chart_t *out)
+{
+    if (!h||!out) return;
+    memset(out,0,sizeof(*out));out->generated_ms=now;
+    int32_t temp[60]={0},humidity[60]={0};uint16_t counts[60]={0};
+    uint32_t minute=now/60000;
+    for (unsigned i=0;i<h->count;++i) {
+        const pet_climate_history_point_t *p=&h->points[i];
+        if (p->timestamp_ms>now) continue;
+        uint32_t age=minute-p->timestamp_ms/60000;
+        if (age>=60) continue;
+        unsigned bucket=59-age;
+        temp[bucket]+=p->temperature_centi;humidity[bucket]+=p->humidity_centi;++counts[bucket];
+    }
+    for (unsigned i=0;i<60;++i) if (counts[i]) {
+        out->points[i]=(pet_climate_chart_point_t){(int16_t)(temp[i]/counts[i]),(int16_t)(humidity[i]/counts[i]),true};
+    }
+}

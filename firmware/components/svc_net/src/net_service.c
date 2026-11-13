@@ -90,3 +90,17 @@ bool pet_net_is_time_synced(void)
     return s_driver != NULL && s_driver->is_time_synced != NULL &&
            s_driver->is_time_synced();
 }
+
+esp_err_t pet_net_publish_confirmed(pet_net_topic_t topic, const char *payload, size_t length,
+                                    bool retain, uint32_t timeout_ms)
+{
+    if (s_driver == NULL || s_config == NULL || s_driver->publish_confirmed == NULL ||
+        !pet_net_is_online())
+        return ESP_ERR_INVALID_STATE;
+    if (payload == NULL || length == 0 || timeout_ms == 0 || timeout_ms > 30000)
+        return ESP_ERR_INVALID_ARG;
+    char topic_name[PET_NET_TOPIC_MAX];
+    if (!pet_net_topic_build(topic, s_config->device_id, topic_name, sizeof(topic_name)))
+        return ESP_ERR_INVALID_ARG;
+    return s_driver->publish_confirmed(topic_name, payload, length, retain, timeout_ms);
+}

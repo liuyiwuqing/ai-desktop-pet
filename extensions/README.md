@@ -22,9 +22,9 @@ extensions/<name>/
 ## 契约
 
 - `extension.json` 由 `config/schemas/extension.schema.json` 校验；核心契约版本在 `firmware/components/contracts/include/pet/extension.h`，两者不一致时 `check_contracts.py` 失败。
-- 扩展只通过 `EVT_INTENT_READY` 接收意图，通过结果事件回报；核心模块不 `#include` 扩展头。
+- 组合根注册结构化 MCP 路由并注入平台端口；调用扩展公开 API，结果通过快照回送。AI 会话引擎与消息服务不依赖扩展内部实现。
 - 编译期开关：`CONFIG_PET_EXT_DEVICE_CONTROL`、`CONFIG_PET_EXT_SERVO`，默认关闭；关闭时组合根不引用扩展，二进制不出现 `*_init` 符号。
-- 新增扩展需要：manifest、唯一公开头、组件 CMake、主机清单测试、Kconfig 开关，且不修改 `ai_agent` 状态机或消息信封。
+- 新增扩展需要：manifest、职责清晰的公开 API、组件 CMake、主机清单测试、Kconfig 开关，且不修改 `ai_agent` 状态机或消息信封。
 
 ## 校验
 

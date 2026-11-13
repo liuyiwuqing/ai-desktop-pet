@@ -31,6 +31,8 @@ static pet_climate_history_t s_history;
 static pet_climate_alert_state_t s_alert;
 static pet_climate_state_blob_t s_state;
 static pet_climate_snapshot_t s_snapshot;
+static pet_climate_chart_t s_chart;
+static bool retry_requested;
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static TaskHandle_t s_task;
 static bool s_sensor_ready;
@@ -100,7 +102,10 @@ static void update_snapshot(const pet_climate_reading_t *reading, uint32_t times
     pet_climate_history_summary_t summary;
     pet_climate_history_summary(&s_history, timestamp_ms, &summary);
 
+    pet_climate_chart_t chart;
+    pet_climate_history_chart(&s_history,timestamp_ms,&chart);
     taskENTER_CRITICAL(&s_lock);
+    s_chart=chart;
     const uint32_t age_ms = s_pipeline.has_valid && timestamp_ms >= s_pipeline.last_valid_ms
                                 ? timestamp_ms - s_pipeline.last_valid_ms
                                 : 0;
@@ -196,7 +201,13 @@ static void climate_task(void *arg)
         publish_reading(&reading);
 
         const uint32_t delay_ms = s_fault ? PET_CLIMATE_FAULT_RETRY_MS : period_ms;
-        vTaskDelay(pdMS_TO_TICKS(delay_ms));
+        /* 先满足 DHT 的物理最短间隔；重试请求只缩短故障退避。 */
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        for (uint32_t waited=2000;waited<delay_ms;waited+=100) {
+            taskENTER_CRITICAL(&s_lock);bool retry=retry_requested;retry_requested=false;taskEXIT_CRITICAL(&s_lock);
+            if (retry) break;
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
     }
 }
 
@@ -284,6 +295,11 @@ esp_err_t pet_climate_get_snapshot(pet_climate_snapshot_t *out)
     taskENTER_CRITICAL(&s_lock);
     *out = s_snapshot;
     taskEXIT_CRITICAL(&s_lock);
+    if (out->reading.valid) {
+        out->age_ms=now_ms()-out->reading.timestamp_ms;
+        if (out->status==PET_CLIMATE_STATUS_OK&&out->age_ms>PET_CLIMATE_STALE_AFTER_MS)
+            out->status=PET_CLIMATE_STATUS_STALE;
+    }
     return ESP_OK;
 }
 
@@ -305,4 +321,15 @@ esp_err_t pet_climate_set_calibration(float temperature_offset_c, float humidity
     return save_state();
 }
 
+esp_err_t pet_climate_get_chart(pet_climate_chart_t *out)
+{
+    if (!out) return ESP_ERR_INVALID_ARG;
+    if (!s_sensor) return ESP_ERR_INVALID_STATE;
+    taskENTER_CRITICAL(&s_lock);*out=s_chart;taskEXIT_CRITICAL(&s_lock);return ESP_OK;
+}
+esp_err_t pet_climate_retry(void)
+{
+    if (!s_task) return ESP_ERR_INVALID_STATE;
+    taskENTER_CRITICAL(&s_lock);retry_requested=true;taskEXIT_CRITICAL(&s_lock);return ESP_OK;
+}
 #endif

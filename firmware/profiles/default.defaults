@@ -1,0 +1,2 @@
+# Product baseline: UI, growth, climate and networking; voice stays opt-in.
+CONFIG_APP_REPRODUCIBLE_BUILD=y

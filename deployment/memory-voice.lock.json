@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/78/mcp-calculator",
+  "commit": "c537f71d61fd73b47d6c8955b5df6d3721acf4e4",
+  "sourceUrl": "https://raw.githubusercontent.com/78/mcp-calculator/c537f71d61fd73b47d6c8955b5df6d3721acf4e4/mcp_pipe.py",
+  "sourceSha256": "31af96a0bd83062251bafe31c22cc01dc02a6b687c5775c5f70e3cf552372df8",
+  "runtimeSha256": "f155374d153e2d94577fe5b05b45f9839c555f44402699574ae450ecae742002",
+  "packages": {"websockets": "15.0.1", "python-dotenv": "1.2.1"}
+}

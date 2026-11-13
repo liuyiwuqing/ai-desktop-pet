@@ -2,12 +2,15 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 
 static const char *const s_topic_names[PET_NET_TOPIC_COUNT] = {
     [PET_NET_TOPIC_INBOX] = "inbox",
-    [PET_NET_TOPIC_ACK] = "ack",
-    [PET_NET_TOPIC_STATUS] = "status",
+    [PET_NET_TOPIC_ACK] = "acks",
+    [PET_NET_TOPIC_STATUS] = "state",
     [PET_NET_TOPIC_CONFIG] = "config",
+    [PET_NET_TOPIC_CONFIG_ACK] = "config_acks",
+    [PET_NET_TOPIC_TELEMETRY] = "telemetry",
 };
 
 static const char *const s_state_names[PET_NET_STATE_COUNT] = {
@@ -57,30 +60,7 @@ static bool optional_text_valid(const char *text, size_t max_length)
 
 bool pet_net_device_id_valid(const char *device_id)
 {
-    if (device_id == NULL) {
-        return false;
-    }
-
-    size_t length = bounded_length(device_id, PET_NET_DEVICE_ID_MAX + 1);
-    if (length == 0 || length > PET_NET_DEVICE_ID_MAX) {
-        return false;
-    }
-
-    for (size_t i = 0; i < length; i++) {
-        char value = device_id[i];
-        bool alnum = (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') ||
-                     (value >= '0' && value <= '9');
-        if (i == 0) {
-            if (!alnum) {
-                return false;
-            }
-            continue;
-        }
-        if (!alnum && value != '-' && value != '_' && value != '.') {
-            return false;
-        }
-    }
-    return true;
+    return pet_nexus_device_id_valid(device_id);
 }
 
 pet_net_error_t pet_net_config_validate(const pet_net_config_t *config)
@@ -155,13 +135,25 @@ bool pet_net_topic_build(pet_net_topic_t topic, const char *device_id,
         return false;
     }
 
-    int written = snprintf(out, capacity, "nexus/v1/devices/%s/%s",
+    int written = snprintf(out, capacity, PET_NEXUS_TOPIC_PREFIX "%s/%s",
                            device_id, s_topic_names[topic]);
     if (written < 0 || (size_t)written >= capacity) {
         out[0] = '\0';
         return false;
     }
     return true;
+}
+
+int pet_net_presence_format(char *out, size_t capacity, const char *device_id,
+                            bool online, uint32_t observed_at)
+{
+    if (out == NULL || capacity == 0 || !pet_net_device_id_valid(device_id) ||
+        (online && observed_at == 0))
+        return -1;
+    const int length = snprintf(out, capacity,
+        "{\"schemaVersion\":1,\"deviceId\":\"%s\",\"online\":%s,\"observedAt\":%" PRIu32 "}",
+        device_id, online ? "true" : "false", observed_at);
+    return length < 0 || (size_t)length >= capacity ? -1 : length;
 }
 
 const char *pet_net_state_name(pet_net_state_t state)

@@ -5,11 +5,12 @@
 #include <string.h>
 
 #include "pet/event.h"
+#include "pet/nexus.h"
 
 /* 消息中心跨模块契约：纯 C，不依赖 ESP-IDF，可在主机测试中直接编译。 */
 
 #define PET_MESSAGE_SCHEMA_VERSION 1
-#define PET_MESSAGE_ID_MAX 44       /* msg_ + 最多 40 个字母数字 */
+#define PET_MESSAGE_ID_MAX 44       /* 容纳 UUID；保留旧 msg_ ID 的存档布局 */
 #define PET_MESSAGE_SOURCE_MAX 64
 #define PET_MESSAGE_TITLE_MAX 120
 #define PET_MESSAGE_BODY_MAX 2048
@@ -63,7 +64,13 @@ typedef enum {
     PET_MESSAGE_ERR_DUPLICATE,
     PET_MESSAGE_ERR_FULL,
     PET_MESSAGE_ERR_STATE,
+    PET_MESSAGE_ERR_DELIVERY,
 } pet_message_error_t;
+
+typedef struct {
+    char event_id[PET_NEXUS_UUID_LENGTH + 1];
+    char device_id[PET_NEXUS_DEVICE_ID_MAX + 1];
+} pet_message_delivery_t;
 
 /* 队列与快照共用的消息视图；正文为设备侧唯一副本，UI 只读快照。 */
 typedef struct {
@@ -81,6 +88,7 @@ typedef struct {
     char dedupe_key[PET_MESSAGE_DEDUPE_KEY_MAX + 1];
     char title[PET_MESSAGE_TITLE_MAX + 1];
     char body[PET_MESSAGE_BODY_MAX + 1];
+    pet_message_delivery_t delivery; /* 全空仅表示升级前的本地消息，不产生新协议回执。 */
 } pet_message_view_t;
 
 /* 事件只带 ID 与状态，正文通过消息中心快照读取，避免 64 B payload 截断。 */

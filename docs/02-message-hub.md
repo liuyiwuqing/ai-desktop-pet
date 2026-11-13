@@ -1,6 +1,6 @@
 # 02 · 万能信息接收端模块
 
-状态：待评审；S5-A 设备侧纯逻辑、S5-B Wi-Fi/MQTT/TLS 传输层、S5-C1 inbox 收包接入、S5-C2 收件箱持久化已落地（2026-11-11）。依赖：`00-architecture.md`、`01-ai-agent.md`（表情联动）。
+状态：待评审；S5-A 设备侧纯逻辑、S5-B Wi-Fi/MQTT/TLS 传输层、S5-C1 inbox 收包接入、S5-C2 收件箱持久化、S5-D 首版消息界面与 BOOT 已读、S5-E 持久回执、S5-F nexus-core v1 协议适配已落地（2026-11-11）；源码契约回环通过，真实 Broker 与实机验收待进行。依赖：`00-architecture.md`、`01-ai-agent.md`（表情联动）。
 
 ## 1. 范围
 
@@ -37,81 +37,75 @@
 
 ### 3.1 MQTT 主题
 
-| 主题 | 方向 | QoS | 说明 |
+| 主题 | 方向 | QoS / retain | 说明 |
 | --- | --- | --- | --- |
-| `nexus/v1/devices/{deviceId}/inbox` | 服务端 → 设备 | 1 | 消息投递 |
-| `nexus/v1/devices/{deviceId}/ack` | 设备 → 服务端 | 1 | received/displayed/read |
-| `nexus/v1/devices/{deviceId}/status` | 设备 → 服务端 | 1 | 在线、固件、队列、传感器摘要；LWT |
-| `nexus/v1/devices/{deviceId}/config` | 服务端 → 设备 | 1 | 保留消息，DND/音量/模板开关 |
+| `nexus/v1/devices/{deviceId}/inbox` | 服务端 → 设备 | 1 / false | `inbox.message` 信封 |
+| `nexus/v1/devices/{deviceId}/acks` | 设备 → 服务端 | 1 / false | received/displayed/read 或 rejected |
+| `nexus/v1/devices/{deviceId}/state` | 设备 → 服务端 | 1 / true | schemaVersion/deviceId/online/observedAt；LWT |
+| `nexus/v1/devices/{deviceId}/config` | 服务端 → 设备 | 规划 | 现有服务端尚未提供配置下发契约，设备未应用 |
 
-主题 ACL：设备只能读写自己的 `{deviceId}` 子树；禁止共用 CORE 管理员账号。
+`deviceId` 使用服务端的 `[a-zA-Z0-9_-]{1,40}`。收件时校验完整主题、信封目标设备与非 retained 属性；设备只能读写自己的主题，Broker ACL 仍是部署侧的独立防线。
 
 ### 3.2 消息信封
 
-Schema：`config/schemas/message.schema.json`；示例：`config/examples/message.example.json`。
+当前线协议以 [`integration/contracts/nexus-v1/`](../integration/contracts/nexus-v1/) 为准，`config/schemas` 与示例是 CI 校验一致的镜像。旧 `msg_…` 信封保存在 `legacy-device-v1`，不再接收为线上消息。
 
 ```json
 {
   "schemaVersion": 1,
-  "id": "msg_01JABCDEF",
-  "source": "halo.comment",
-  "type": "comment",
-  "priority": "normal",
-  "title": "新评论",
-  "body": "这篇文章很有帮助，想请教一下……",
-  "payload": { "postTitle": "ESP32 入门", "author": "读者" },
-  "createdAt": "2026-11-10T10:00:00+08:00",
-  "expiresAt": "2026-11-11T10:00:00+08:00",
-  "dedupeKey": "halo:comment:123456",
-  "display": {
-    "template": "comment_card",
-    "durationMs": 8000,
-    "sound": "chime",
-    "icon": "comment"
-  },
-  "requireAck": true
+  "type": "inbox.message",
+  "eventId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+  "deviceId": "dodo-01",
+  "sentAt": 1794362400,
+  "expiresAt": 1794448800,
+  "payload": {
+    "messageId": "11111111-2222-4333-8444-555555555555",
+    "source": "halo",
+    "eventType": "comment.created",
+    "title": "博客有新评论",
+    "summary": "访客：很喜欢这个桌宠项目。",
+    "priority": "normal"
+  }
 }
 ```
 
-字段约束：
+- `payload.messageId` 与 `eventId` 保持服务端小写标准 UUID；不截断、散列或替换成 `msg_…`。
+- `sentAt/expiresAt` 为 UTC epoch 秒，设备范围为正 uint32，且 `expiresAt > sentAt`。时间未同步时暂不接受新投递，等待服务端重试。
+- JSON 总长不超过 1024 UTF-8 字节；`title` 不超过 96 字节，`summary` 不超过 180 字节。服务端 `DeviceText.fit` 在 UTF-8 边界裁剪，并将控制字符替换为空格。
+- `priority` 为 `low/normal/high/critical`；UI 按 `eventType` 的 `comment./alert./growth./system.` 前缀映射模板，其他类型使用文本卡片。首版持续 8 秒、无声音；DND 策略保持不变。
+- 未知字段、重复字段、非法 UTF-8、无效身份、版本和时间范围均拒收；失败不会产生成功回执。
 
-- `id` 全局唯一，服务端生成；`dedupeKey` 可选，用于跨重投去重。
-- `priority`：`critical|high|normal|low`；只有 `critical` 可越过 DND。
-- `body` ≤2 KB；整包 ≤8 KB（服务端 413 上限）；设备侧解析上限 4 KB（`PET_MESSAGE_JSON_MAX`），超限丢弃并记录日志。
-- `expiresAt` 过期不展示；设备本地也校验（时间未同步时跳过 TTL 判定）。
-- `display.durationMs` 5–30 s；`template` 必须在设备支持列表内，否则回退 `text_card`。
-- 未知字段与重复字段拒收（schema `additionalProperties:false`）；`schemaVersion` 不支持时拒收并上报。
-
-### 3.3 回执
-
-Schema：`config/schemas/message-ack.schema.json`；示例：`config/examples/message-ack.example.json`。
+### 3.3 回执与在线状态
 
 ```json
-{ "schemaVersion": 1, "messageId": "msg_01JABCDEF", "state": "received", "at": "2026-11-10T10:00:01+08:00", "queueDepth": 0 }
+{"schemaVersion": 1, "deviceId": "dodo-01", "eventId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", "messageId": "11111111-2222-4333-8444-555555555555", "status": "read"}
 ```
 
-| 状态 | 触发 | 语义 |
+| status | 触发 | 语义 |
 | --- | --- | --- |
-| `received` | 消息写入 NVS 成功 | 设备已持久接收，可安全重投 |
+| `received` | 收件箱与待发回执原子落盘成功 | 设备已接管消息；服务端停止重投 |
 | `displayed` | 完整帧渲染完成并上屏 | 用户可见，不代表已读 |
-| `read` | 消息可见时 BOOT 短按/触摸确认 | 用户已读 |
+| `read` | 可见消息经 BOOT 短按确认 | 用户已读；离线时先落盘 |
+| `rejected` + `reason=expired` | TTL 到期 | 过期，不冒充用户已读 |
 
-`displayed` 失败不得发送；渲染超时/失败只保留 `received`，服务端可重试。
+同一投递的消息、事件、设备身份贯穿持久化与回执。后台只在 PUBACK 后更新待发记录；`received/displayed` 确认后移除回执，已确认的终态作为有界记录保留，重投时可再次回复 read/expired。PUBACK 只确认 Broker 接收，源码契约测试也不能证明真实数据库已经入库。
+
+状态报文含 `schemaVersion=1`、`deviceId`、`online`、`observedAt`。对时后上线及每 30 秒发布 retained 在线快照；未对时不发送伪造的在线时间。LWT 使用 offline/observedAt=0，正常停机先有界等待 offline 确认。固件、队列和传感器摘要属于后续协议扩展。
 
 ### 3.4 服务端保留与隐私
 
 - 全文（标题、正文、原始 payload）保留 7 天；消息 ID、来源、设备、优先级、状态、时间等元数据保留 30 天。
-- 到期由每日清理任务删除；审计日志只记录消息 ID 与操作，不含正文。
-- 管理台默认只导出元数据；导出正文需显式勾选并写审计。
-- 设备未 ACK 的消息在保留窗口内可重投；超出窗口按失败处理并记录。
+- CORE 已实现按接收时间计算的保留任务，默认关闭；备份和只读预览后显式启用，默认 UTC 04:00 执行，每批最多清除 200 条正文及删除 200 条元数据。清理审计只记录 actor、时间与计数，不含正文，见 [13](13-operational-software.md)。
+- 导出统计及正文导出授权仍属规划；当前不声称管理台已有完整导出能力。
+- 设备未 ACK 的消息在投递有效期内可重投；正文清理将未完成投递标记为 expired。外部模型/OpenViking 副本不由本地清理删除。
 
 ## 4. 设备侧队列与去重
 
-- 未读队列上限 8 条（默认值，P3 实机压测后调整）；按 `priority` 降序、`createdAt` 升序。
-- 队列满：丢弃最低优先级最旧消息；`critical` 不丢，除非同 ID 重复。
-- 持久化：NVS `msg_inbox`，双代 A/B 快照 + CRC32；快照落盘成功才 ACK `received`，失败保留 dirty 并由服务端重投补发。
-- 去重环：最近 16 个 `id`/`dedupeKey`，随快照掉电保持；重复消息只更新状态，不重复展示。
-- TTL：展示前检查 `expiresAt`；过期直接丢弃并 ACK `read`（避免服务端重投）。
+- 未读队列上限 8 条；按 `priority` 降序、首次 `sentAt` 升序。
+- 新协议收件箱满时拒收新投递，由服务端重试；不挤掉已经 ACK received 的消息。优先级仍决定已接受消息的展示顺序。
+- 持久化：NVS `msg_inbox`，双代 A/B v3 快照 + CRC32；收件与回执一起落盘才接受，失败保留此前状态。
+- 去重环保留最近 16 个 ID 指纹；队列与回执记录另按完整 ID/投递身份校验。回执区最多 16 条，已确认终态可淘汰，未确认回执不能被覆盖；去重与终态重放均为有界保留。
+- TTL：展示前检查 `expiresAt`；清理消息与 rejected/expired 回执原子提交，回执区满则保留快照重试。旧本地消息不产生新协议回执。
 - 损坏：单代损坏回退另一代；两代都损坏时以空队列启动并告警，不自动擦除；后续快照会覆盖非活动代。
 - DND：`normal/low` 只入队不打扰；`high` 可亮屏不发声；`critical` 正常提醒。
 
@@ -314,3 +308,60 @@ IDLE → RECEIVED → QUEUED → RENDERING → DISPLAYED → READ
 - 构建：默认镜像 1,041,828 B、DIRAM 130,618 B（38.22%）；fake 258,912 B；关闭网络 242,176 B；主机测试全部通过。
 
 未落地：实机掉电恢复与 NVS 磨损验收、24 h soak、`displayed/read` 的 UI 触发、retained config 下发、服务端 ACL/证书轮换。
+
+
+### S5-D 消息界面与已读闭环（2026-11-11）
+
+已实现：
+
+- `presentation/message_presenter`：纯 C 展示状态机。优先级队列、DND、critical 抢占、100 ms 刷新门控、纯文本回退、失败重试、TTL/队列移除检查、自动弹窗超时隐藏并保留未读；空闲 BOOT 可重新打开未读，手动查看不受弹窗时限约束。
+- `ui_lvgl`：LVGL 9.5.0，240×320 竖屏，中文标题与正文、来源、类别、滚动进度、空态和确认失败反馈。五种模板暂共用基础文本布局，payload 中作者/文章/成长数值不在此切片；音频提醒与表情待语音底座。
+- 显示/按键 HAL 与 DODO BSP：ST7789 SPI3、RGB565 分条刷新、GPIO42 PWM、GPIO0 输入。整帧传输完成且背光开启才推进 displayed。DMA 超时保留 BSP 自有缓冲区，完成前不覆盖；渲染失败熄屏并保留消息。
+- BOOT 30 ms 消抖、800 ms 以上长按忽略、启动按住忽略；按下绑定画面代次，期间发生抢占/过期/黑屏则松开不确认新消息。仅接入已确认的 BOOT 引脚，触摸输入未启用。
+- Noto Sans SC 16/24 px、2 bpp，6882 字符子集；字体生成脚本、来源哈希、产物哈希与 OFL 授权入库。非法 UTF-8、控制字符和缺字以方框显示，不输出消息正文到日志。
+- MQTT DATA 回调通过 2 槽 PSRAM 收件交接队列转到独立任务，避免在 MQTT API 锁内写 NVS，并避免与 UI 队列锁形成反向锁等待。消息中心回执出口改为 MQTT QoS 1 enqueue；传输未接受 displayed/read 时不推进队列状态，已读失败保留消息供重试。重复投递补发队列当前状态，不倒退到 received。
+- 补齐持久化边界：NVS 初始化失败不自动擦除；持久化不可用不发送 received，也不允许 UI 跳过持久化确认。网络配置在组合根中使用贯穿运行期的存储。
+- `board.json` 成为显示、BOOT 和 DHT11 默认引脚来源；生成头和 Kconfig 由构建校验一致性。
+
+验证入口：`tools/ci/test_host.sh`（展示状态机、真实 service/store/codec/storage + OS/Flash/网络边界模拟）、`tools/ci/test_ui_host.sh`（真实 LVGL 主机渲染）、`tools/ci/build_firmware.sh`。主机渲染覆盖中文、最大正文、滚动、缺字、空态与错误反馈；无需设备或 Broker，不向外发消息。
+
+本轮结果（2026-11-11）：全部主机测试、真实 LVGL 渲染、展示状态机与消息服务的 ASan/UBSan 检查通过；契约、板级生成物和组件依赖检查通过。默认、关闭 UI、fake 网络/传感器、关闭网络四种固件构建均成功，编译无 warning/error。默认 `.bin` 为 2,822,416 B，静态 DIRAM 142,218 B（41.61%），4 MiB 应用分区余量 33%；三个变体依次为 1,041,552 B、2,016,416 B、241,680 B。字体产物 SHA-256 与 `manifest.json` 一致；构建容量不代表运行时堆峰值。
+
+仍待：实机屏幕/按键/掉电/重连/内存与 24 h 验收；retained config、status 队列摘要、触摸、语音优先、提示音/表情和模板 payload。已读进入 MQTT outbox 后瞬间掉电的服务端收敛，需要后续持久回执与端到端测试；当前不将 enqueue 成功表述为服务端已收到。
+
+
+### S5-E 持久回执与重启补发（2026-11-11）
+
+- 收件箱、去重环与最多 16 条待发回执原子提交到同一 v2 快照。收到/显示/已读状态只有落盘成功才对调用方生效；离线已读可保存，落盘失败保留原状态，回执已满时拒绝新增状态并保留已有记录。
+- 同 ID 合并至最新状态，重投不倒退；重复且状态不变不重写 Flash。TTL 清理一并持久保存 read 回执，启动恢复不提前丢掉过期记录。
+- 独立补发任务每秒运行，单条 PUBACK 等待 3 s；按 MQTT packet ID 匹配确认，只确认发送队列入队不算成功。MQTT outbox 上限 4 KB；超时、离线、清理落盘失败均保留待发记录。网络等待期间不持消息锁，旧 displayed 确认不会删掉期间升级的 read。
+- v2 包含完整 v1 收件箱和固定长度回执，以外层 CRC32 校验；可读旧 v1，下一次变更写 v2。旧固件不能解码 v2，降级需另行备份与迁移。每代上限 20,412 B。
+- 保存前只清理非活动快照键，随后写新代并切换 active，避免 NVS 内部保留旧 blob 导致三份峰值；损坏回退后保护实际恢复的有效代，active 切换失败不改变当前代。分区不变，无实机擦写。
+
+验证：全部主机测试通过，覆盖回执积压、掉电前后两个进程恢复、PUBACK 超时、确认后落盘失败、状态并发升级、快照容量与损坏回退；服务/存储编解码 ASan/UBSan 通过。ESP-IDF NVS 生成工具验证 64 KB 容得下两份最大快照、容不下三份，因此必须控制更新峰值。默认、关闭 UI、fake 网络/传感器、关闭网络四种构建通过；默认 `.bin` 2,824,080 B、静态 DIRAM 143,210 B（41.90%），应用分区余量 33%；三个变体分别 1,043,472 B、2,017,536 B、241,680 B。
+
+PUBACK 语义依据 [ESP-MQTT 官方文档](https://docs.espressif.com/projects/esp-mqtt/en/latest/esp32/)。主机网络边界模拟只能验证补发状态机，不证明真实 MQTT、NVS 时序、磨损或物理掉电正确。
+
+S5-E 当时的联调前置为 nexus-core 协议不兼容；S5-F 已完成适配，见下节。以上为历史切片记录，不代表当前仍使用旧信封。
+
+
+### S5-F nexus-core v1 协议适配（2026-11-11）
+
+- 保存服务端 v1 的版本化 Schema、样例和源码 SHA，更新 config 镜像与生成 TS；旧信封独立保留。线上固定 `/inbox`、`/acks`、`/state` 与 UUID/eventId/deviceId，不修改服务端实现。
+- 有界解析 1024 B 报文，校验目标设备、精确主题、非 retained、完整字段与 UTF-8 字节限制。未对时、队列满、存储失败均不接受为 received；服务端继续重试。满队列不再挤掉已接管消息。
+- v3 快照保留完整投递身份、待发状态与有界终态记录。v1/v2 旧消息仍可读，旧回执独立留档；重启、服务端重投和更换设备身份不会把旧投递伪装成新身份。TTL 清理使用 rejected/expired。
+- 在线状态使用 observedAt，连接后及每 30 秒更新；LWT 与正常停机发送合法 offline。配置下发和额外状态摘要没有在服务端契约之外自行扩展。
+
+验证结果：主机测试通过，新增身份/主题/retained/时间/过期/满队列用例；真实冻结的 v1/v2 二进制升级、故障回退、离线已读与已确认终态跨进程重启通过。解析器、存储编解码与服务故障链路的 ASan/UBSan 检查通过。
+
+源码契约回环使用当前 Java DeliveryWorker/DeviceText 生成 593 B 含中文与转义的报文，经真实 C 服务持久化并生成 received/displayed/read/重投回执，再由当前 Java DeliveryService 接受；拒绝原因、在线/LWT 状态与 Schema 一致。Java 编译需 JDK 21；宿主默认 JAVA_HOME 指向旧版本，验证时临时选择 JDK 21，未修改全局环境。服务端源码有既存 deprecated API 提示。
+
+ESP-IDF 官方 NVS 生成工具确认：两份 23,116 B 最大快照加当前最大凭据字符串和 28 B 温湿度存档可放入 64 KB；三份会抛 InsufficientSizeError，非活动代清理仍不可省略。该容量检查不证明动态 Flash 时序或磨损。
+
+四种固件构建通过：默认 `.bin` **2,824,592 B**，静态 DIRAM **144,778 B（42.36%）**，应用分区剩余 **33%**；关闭 UI **1,044,016 B**，fake 网络/传感器 **2,017,648 B**，关闭网络 **241,680 B**。未新增编译器 warning；ESP-IDF 既有 Kconfig NOTE 仍存在。
+
+本切片未烧录、未部署、未连接真实 Broker/数据库。硬件屏幕/BOOT、TLS/ACL、服务端事务、断网掉电恢复、堆水位与 24 h 稳定性仍待验收；配置下发、更多状态摘要及 AI 语音另行推进。
+
+## 2026-11-12 消息呈现与管理接口
+
+补齐按类型的图标/评论引用/系统样式、提示音、显示成功后发声、普通通知避让语音与 critical 抢占；静音/DND 仍优先。配置缩小 queueDepth 不删除已接收消息。远程配置与 telemetry 使用 [device-management-v1](../integration/contracts/device-management-v1/README.md)，不改 NEXUS 原 inbox/acks/state；服务端和 Broker ACL 未部署。

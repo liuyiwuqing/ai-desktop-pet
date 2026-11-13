@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pet.local/schemas/message.schema.json",
+  "title": "MessageEnvelope",
+  "description": "服务端投递到设备的消息信封（MQTT nexus/v1/devices/{deviceId}/inbox）。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "source",
+    "type",
+    "priority",
+    "title",
+    "body",
+    "payload",
+    "createdAt",
+    "expiresAt",
+    "display",
+    "requireAck"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^msg_[A-Za-z0-9]{6,40}$"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9-]+)*$"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["comment", "alert", "growth", "system", "text"]
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["critical", "high", "normal", "low"]
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "body": {
+      "type": "string",
+      "maxLength": 2048
+    },
+    "payload": {
+      "type": "object"
+    },
+    "createdAt": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "expiresAt": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "dedupeKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "display": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["template", "durationMs", "sound"],
+      "properties": {
+        "template": {
+          "type": "string",
+          "enum": ["text_card", "comment_card", "alert_card", "growth_card", "system_card"]
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 5000,
+          "maximum": 30000
+        },
+        "sound": {
+          "type": "string",
+          "enum": ["chime", "alert", "none"]
+        },
+        "icon": {
+          "type": "string",
+          "maxLength": 32
+        }
+      }
+    },
+    "requireAck": {
+      "type": "boolean"
+    }
+  }
+}

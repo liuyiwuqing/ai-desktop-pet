@@ -1,5 +1,7 @@
 # 08 · 目录结构与生产级架构评审
 
+本页为历史评审与分阶段决策记录，以下“待落地”“未接入”及资源数值保留各自时点含义。当前架构以 [00](00-architecture.md)为准，交付与验证以 [11](11-product-software-closure.md)、[13](13-operational-software.md)为准。早期 CORE 短期 AI 令牌方案未实现；当前语音直连小智，自建网关预留。新的连续崩溃保护采用 USB 维护启动，不亮屏。
+
 状态：评审中（2026-11-10）。S1 可构建骨架已完成（`idf.py build` 通过，0 warning）；S2 组件化已完成（`contracts`/`core`/`svc_growth` 组件、模块开关、依赖图检查、主机测试）；S3 契约与配置已完成（5 个 JSON Schema、C/TS codegen、扩展 manifest 与开关、事件契约扩展）；S4 温湿度纵向切片代码已完成（`pet_hal`/`bsp_dodo_s3_lcd`/`storage`/`svc_climate`/`presentation` 与 5 组主机测试，实机验收待硬件）。已确认 Q1（独立 Git 仓库）、Q2（冻结 `02`，`03` 作 donor）、Q3（方案 C：消息中心归 `nexus-core`，AI 网关独立）、Q4（独立 `model` 分区 1 MB）、Q5（`board.json` 生成 C/Kconfig）、Q6（`presentation` 独立）、Q8（管理台复用 `nexus-core`），以及 A/B 组决策。评审对象：工作区根目录、`04-ai-desktop-pet` 骨架，以及被复用的 `02-desktop-pet`、`03-xiaozhi-voice`、`nexus-core`、`mac-bridge`。
 
 结论：分层方向正确。S1 已把“不可构建”变为可构建骨架，S2 已建立由构建系统强制的组件边界，S3 已把配置、消息与扩展契约变成可校验的单一事实源；剩余问题集中在测试门禁、资源管线与发布流程，进入功能开发前仍需补齐 P0-3、P0-4、P0-5 的落地项和高风险项。
@@ -121,7 +123,7 @@ firmware/
 **已确认（2026-11-10，Q4）**：采用独立 `model` 分区，不并入 `assets`。
 
 - 分区：`model` 从 `0xE20000` 起 1 MB；`assets` 扩到 4 MB（`0xA20000`–`0xE20000`）；`coredump` 移到 `0xF20000`；保留 832 KB。
-- 依据：当前 `CONFIG_SR_WN_WN9_NIHAOXIAOZHI_TTS=y` 的 `srmodels.bin` 实测 291,069 B，1 MB 有约 3.5 倍余量。
+- 初始评审依据：2026-11-10 的“你好小智”单模型包实测 291,069 B。2026-11-12 已切换“小爱同学”与模型 VAD，当前双模型包/分区检查见 `01-ai-agent.md` A8，不沿用单模型的余量结论。
 - 加载：ESP-SR 使用 `esp_srmodel_init("model")` 直接 mmap，不经过 `assets` 索引；模型不随应用 OTA 更新。
 - 边界：自定义唤醒词约 3.9 MB，首版不支持；启用需破坏性重分区并 USB 重刷。
 
@@ -211,7 +213,7 @@ firmware/
 - 资源管线：`assets-src/` 存设计源文件，`tools/assets.py` 生成 LVGL 二进制与 `manifest.json`，构建时校验尺寸/格式/授权，产物进 `assets` 分区。
 - 明确支持语言与字体子集，不复制 `03` 的 45 个 locale。
 
-**已完成（2026-11-10，S4，部分）**：`presentation` 组件已落地 `pet_climate_card_render()`，输入快照、输出纯文本卡片，主机可测；`ui_lvgl` 尚未创建，首版由 `app` 把卡片写入串口日志，LVGL 实屏随板级 BSP 落地。
+**已完成（2026-11-10，S4，部分）**：`presentation` 组件已落地 `pet_climate_card_render()`，输入快照、输出纯文本卡片，主机可测；S5-D 已创建 `ui_lvgl` 并接入消息卡片与 BOOT；温湿度卡片仍通过串口输出，后续复用其快照上屏。
 
 **验收**：删除 `ui_lvgl` 后业务模块仍可编译与主机测试；同一状态在主机快照测试中产出稳定表现；资源体积在预算内。
 
@@ -526,8 +528,16 @@ SemVer、签名 OTA、A/B 回滚、factory 恢复、依赖锁、SBOM、许可证
 | S2 组件化（已完成 2026-11-10） | `contracts`/`core`/`svc_growth` 组件、模块开关、依赖图检查、主机测试；其余组件随实现落地 | 关闭模块可构建；依赖图无环；主机测试可跑 |
 | S3 契约与配置（已完成 2026-11-10） | 5 个 JSON Schema、C/TS codegen、扩展 manifest 与 Kconfig 开关、事件契约扩展；配置/消息/扩展校验入口 `tools/ci/check_contracts.py` | 配置与消息 schema 校验通过；扩展开关生效（关闭无符号、启用出现 `pet_ext_*_init`） |
 | S4 首个纵向切片（代码完成 2026-11-10，实机待验证） | 温湿度切片：`pet/climate.h` 契约、`pet_hal` 接口与解码、`bsp_dodo_s3_lcd` RMT 读取、`storage` NVS 封装、`svc_climate` 滤波/告警/极值、`presentation` 卡片、5 组主机测试 | 主机：默认/fake/关闭模块三种构建通过；实机：采样、串口卡片、掉电存档待验收 |
-| S5 网络能力（S5-A/S5-B/S5-C1/S5-C2 代码完成 2026-11-11，渲染与实机验收待做） | 消息中心、AI 会话、TLS、重连、离线队列；S5-A 已落地消息契约、信封校验、优先级队列、去重、TTL、DND 与 ACK 状态机；S5-B 已落地 Wi-Fi station + MQTT 3.1.1 over TLS 8883、QoS 1、持久会话、LWT、自动重连、NVS 凭据与 fake 驱动；S5-C1 已落地 SNTP 对时门控、收包回调与分片重组、严格 JSON 解析、PSRAM 队列与 received ACK；S5-C2 已落地 NVS 64 KB 分区、双代 A/B 快照 + CRC32、启动恢复与 received ACK 落盘门控 | 断网/重连/重复消息/ACK 通过；延迟与内存达标；S5-A/B/C1/C2 主机测试与默认/fake/关闭网络三种构建通过，实机待验证 |
-| S6 扩展能力 | 设备控制、舵机，默认关闭 | 关闭可构建；启用后白名单、确认、急停通过 |
+| S5 网络能力（S5-A/B/C1/C2、S5-D 首版消息界面、S5-E 持久回执、S5-F 协议适配代码完成 2026-11-11，真实联调与实机验收待做） | 消息中心、AI 会话、TLS、重连、离线队列；S5-A 已落地消息契约、信封校验、优先级队列、去重、TTL、DND 与 ACK 状态机；S5-B 已落地 Wi-Fi station + MQTT 3.1.1 over TLS 8883、QoS 1、持久会话、LWT、自动重连、NVS 凭据与 fake 驱动；S5-C1 已落地 SNTP 对时门控、收包回调与分片重组、严格 JSON 解析、PSRAM 队列与 received ACK；S5-C2 已落地 NVS 64 KB 分区、双代 A/B 快照 + CRC32、启动恢复与 received ACK 落盘门控；S5-D 接入 ST7789/LVGL、中文消息卡片、BOOT 确认与故障回执保护；S5-E 增加原子持久回执、PUBACK 门控与重启补发，S5-F 对齐现有 nexus-core v1 并迁移 v3 快照，源码契约回环见 integration/README.md | 断网/重连/重复消息/ACK 通过；延迟与内存达标；S5-A/B/C1/C2 主机测试与默认/fake/关闭网络三种构建通过，实机待验证 |
+| A1 音频基础（软件实现 2026-11-11） | `pet_hal` PCM/FIFO、双 I²S BSP、`svc_audio` 半双工录放音诊断；默认不录音 | 主机/ASan/UBSan、默认与诊断完整构建通过；真实声音/时序/水位未验收，见 `01-ai-agent.md` A1 |
+| A2 端点/会话状态机（软件实现 2026-11-11） | `svc_ai_agent` 纯 C 控制引擎、轮次隔离与离线 CLI；不自动启动音频/网络 | 主机/ASan/UBSan、CLI、默认完整构建及关闭 AI 针对性编译通过；应用尚未调用引擎，模型/运行任务/云端待接入，见 `01-ai-agent.md` A2 |
+| A3 运行拥有者与前端边界（软件实现 2026-11-12） | `svc_ai_agent/runtime` 串行执行 sink，注入 WakeNet/VAD 结果并回送端口错误；不创建任务/启动硬件 | 主机/ASan/UBSan 与默认固件构建通过，关闭 AI 组合根编译通过；真实模型、FreeRTOS 任务、音频/云端/实机未验收，见 `01-ai-agent.md` A3 |
+| A4 拥有者任务与 HAL 执行（软件实现 2026-11-12） | `svc_ai_agent/api` 的 FreeRTOS 拥有者独占 HAL，跨任务队列、流式 PCM 与 drain 门控；传输显式注入 | 主机线程/ASan/UBSan/TSan、默认固件与关闭 AI/音频针对性编译通过；应用未启动服务，模型/云端/真实 SMP、DMA 与资源水位未验收，见 `01-ai-agent.md` A4 |
+| A5 小智协议与 Opus 适配库（软件实现 2026-11-12） | `svc_ai_agent/xiaozhi` 隔离 v1 格式与连接代次，`opus` 封装固定 SDK 配置；单拥有者、有限帧缓冲 | 主机/ASan/UBSan、默认固件及真实 codec 强制链接通过；网络接线见 A6，真实 codec 执行/云端/实机待验收，见 `01-ai-agent.md` A5 |
+| A6 WSS 网络拥有者与 A4 接线（软件实现 2026-11-12） | `svc_ai_agent/wss` 独占 SDK/codec，有限队列与故障回送；`main/app/ai_startup` 可选组合入口默认关闭 | 31 主机场景/ASan/UBSan/TSan、默认与启动开关完整固件通过；输入/UI/模型、真实网络/音频与设备资源未验收，见 `01-ai-agent.md` A6 |
+| A7 输入、状态与隐私仲裁（软件实现 2026-11-12） | `ui_lvgl` 读快照与提交意图，A4 独占 HAL；复用 BOOT 菜单与原消息回执保护，优先邮箱与按字段策略更新 | 主机/渲染/构建与配置门控见 `01-ai-agent.md` A7；未烧录、未接真实模型或云端，不作为硬件停止延迟证据 |
+| A8 WakeNet 与模型 VAD 接入（软件实现 2026-11-12） | `svc_ai_agent/sr` 固定双模型、窗口拼接与 open/reset/close；构建校验包/分区并生成配套 SHA256，A4 独占推理与失败回收 | 模型/API 边界、拥有者与视图回归和目标构建见 `01-ai-agent.md` A8；真实识别、物理隐私、时延和堆/栈水位未验收 |
+| S6 扩展软件（2026-11-12） | 设备控制/本地确认/审计/Mac 网关、舵机守卫/LEDC，默认关闭 | 主机引擎与完整功能构建；真实动作/校准待验收，见 09 |
 
 原则：S1、S2 未完成前，不进入具体业务功能开发；否则会在错误边界上写代码。
 
@@ -549,7 +559,7 @@ SemVer、签名 OTA、A/B 回滚、factory 恢复、依赖锁、SBOM、许可证
 | 项 | 决策 | 说明 |
 | --- | --- | --- |
 | A1 AI 供应商 | 沿用 `03` 小智服务 | 首版不自建 ASR/LLM/TTS，不引入第二家供应商 |
-| A2 唤醒词 | 内置 `wn9_nihaoxiaozhi_tts`（你好小智） | 模型约 291 KB，1 MB 分区可容纳；可换其他内置词；自定义词约 3.9 MB 不在首版 |
+| A2 唤醒词 | 内置 `wn9_xiaoaitongxue`（小爱同学，2026-11-12 更新） | 与模型 VAD 配套构建，保持 1 MiB 分区；实际产物与校验见 `01-ai-agent.md` A8；自定义词不在首版 |
 | A3 AI 网关 | 复用 `03` + `ai_session` 契约隔离 | 固件只依赖契约，替换实现不改 UI/成长/消息模块 |
 | A4 安全基线 | 开发不启用，量产启用 Secure Boot + Flash Encryption | eFuse 不可逆；开发期不锁芯片 |
 | A5 板级基线 | `03` DODO-S3-LCD，背光 GPIO42 PWM | S1 只落此板；其他板型后续独立 board profile |

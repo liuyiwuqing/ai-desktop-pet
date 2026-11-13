@@ -1,0 +1,74 @@
+name: Software checks
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: software-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  voice-bridge-preparation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Verify source pins, dependency hashes and preparation guards
+        # Full voice/CORE interop additionally needs the paired nexus-core checkout.
+        run: python3 tools/ci/test_memory_voice_prepare.py
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [default, full, off, tones]
+    container:
+      # espressif/idf:v6.1, pinned multi-platform image index.
+      image: espressif/idf@sha256:81893c71bb5e570088901f21def8684c25cd2a9020281bd01b843a7655edb18c
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build isolated preset
+        run: |
+          source "$IDF_PATH/export.sh"
+          python tools/ci/check_deps.py
+          python tools/ci/check_contracts.py
+          python tools/board_codegen.py --check
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "$RUNNER_TEMP/ci-private.pem" >/dev/null 2>&1
+          openssl rsa -in "$RUNNER_TEMP/ci-private.pem" -RSAPublicKey_out -outform DER -out "$RUNNER_TEMP/ci-public.der" >/dev/null 2>&1
+          rm "$RUNNER_TEMP/ci-private.pem"
+          python tools/build_matrix.py --profile '${{ matrix.profile }}' --ota-public-key "$RUNNER_TEMP/ci-public.der" --execute --jobs 2
+      - name: Host, protocol, DSP and LVGL checks
+        if: matrix.profile == 'full'
+        env:
+          PET_HOST_SANITIZE: '1'
+          ASAN_OPTIONS: detect_leaks=0
+        run: |
+          source "$IDF_PATH/export.sh"
+          bash tools/ci/test_host.sh
+          bash tools/ci/test_ai_protocol_host.sh
+          bash tools/ci/test_ai_wss_host.sh
+          bash tools/ci/test_sr_frontend_host.sh
+          bash tools/ci/test_ui_host.sh
+      - name: Preserve unsigned test output and evidence
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: unsigned-software-check-${{ matrix.profile }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            firmware/build-matrix/${{ matrix.profile }}/build-evidence.json
+            firmware/build-matrix/${{ matrix.profile }}/dependency-licenses.json
+            firmware/build-matrix/${{ matrix.profile }}/nexus_pet.bin
+            firmware/build-matrix/${{ matrix.profile }}/nexus_pet.elf
+            firmware/build-matrix/${{ matrix.profile }}/bootloader/bootloader.bin
+            firmware/build-matrix/${{ matrix.profile }}/partition_table/partition-table.bin
+            firmware/build-matrix/${{ matrix.profile }}/ota_data_initial.bin
+            firmware/build-matrix/${{ matrix.profile }}/srmodels/srmodels.bin

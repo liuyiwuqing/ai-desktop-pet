@@ -60,9 +60,14 @@ static esp_err_t fake_publish(const char *topic, const char *payload, size_t len
     return ESP_OK;
 }
 
-static bool fake_is_online(void)
+static bool fake_is_online(void) { return s_online; }
+
+static esp_err_t fake_publish_confirmed(const char *topic, const char *payload, size_t length,
+                                        bool retain, uint32_t timeout_ms)
 {
-    return s_online;
+    (void)timeout_ms;
+    /* 仅 fake 配置模拟 Broker 确认，不能作为真实 MQTT 交付证据。 */
+    return fake_publish(topic, payload, length, retain);
 }
 
 static esp_err_t fake_set_rx_handler(pet_net_rx_handler_t handler, void *context)
@@ -84,6 +89,7 @@ const pet_net_t *pet_fake_net_driver(void)
         .start = fake_start,
         .stop = fake_stop,
         .publish = fake_publish,
+        .publish_confirmed = fake_publish_confirmed,
         .set_rx_handler = fake_set_rx_handler,
         .is_online = fake_is_online,
         .is_time_synced = fake_is_time_synced,

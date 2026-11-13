@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pet.local/contracts/nexus-v1/DeviceState.schema.json",
+  "title": "DeviceState",
+  "description": "QoS 1、retained，nexus/v1/devices/{deviceId}/state；online=true 的 observedAt 必须为当前 UTC 秒，LWT 可用 online=false/observedAt=0。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "deviceId",
+    "online",
+    "observedAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "deviceId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,40}$"
+    },
+    "online": {
+      "type": "boolean"
+    },
+    "observedAt": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    }
+  }
+}

@@ -1,0 +1,37 @@
+# 可选 Mac 控制网关：在 Bridge/Gateway 所在 Mac 上运行这一份代理。
+{$PET_CONTROL_DOMAIN} {
+	@execute {
+		method POST
+		path /v1/execute
+	}
+	handle @execute {
+		request_body {
+			max_size 2048
+		}
+		reverse_proxy {$PET_CONTROL_UPSTREAM:127.0.0.1:8092} {
+			lb_retries 0
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 15s
+				max_conns_per_host 8
+			}
+		}
+	}
+	@result {
+		method GET
+		path_regexp result ^/v1/results/[a-zA-Z0-9_-]{1,40}/[0-9]+$
+	}
+	handle @result {
+		reverse_proxy {$PET_CONTROL_UPSTREAM:127.0.0.1:8092} {
+			lb_retries 0
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 15s
+				max_conns_per_host 8
+			}
+		}
+	}
+	handle {
+		respond 404
+	}
+}

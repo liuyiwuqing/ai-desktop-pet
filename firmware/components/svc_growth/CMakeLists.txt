@@ -1,6 +1,18 @@
 idf_component_register(
     SRCS
-        "src/svc_growth.c"
+        "src/growth_engine.c"
+        "src/growth_environment.c"
+        "src/growth_store.c"
+        "src/growth_service.c"
+        "src/growth_runtime.c"
     INCLUDE_DIRS
         "include"
+    PRIV_INCLUDE_DIRS
+        "private_include"
+    REQUIRES
+        "contracts"
+    PRIV_REQUIRES
+        "core"
+        "storage"
+        "esp_timer"
 )

@@ -9,15 +9,111 @@ climate_priv_inc="${repo_root}/firmware/components/svc_climate/private_include"
 presentation_inc="${repo_root}/firmware/components/presentation/include"
 message_priv_inc="${repo_root}/firmware/components/svc_message_hub/private_include"
 net_priv_inc="${repo_root}/firmware/components/svc_net/private_include"
+growth_priv_inc="${repo_root}/firmware/components/svc_growth/private_include"
 
 mkdir -p "${out_dir}"
+
+host_flags=(-std=c17 -Wall -Wextra -Werror)
+if [[ "${PET_HOST_SANITIZE:-0}" == 1 ]]; then
+    host_flags+=(-g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer)
+fi
 
 build_and_run() {
     local name="$1"
     shift
-    cc -std=c17 -Wall -Wextra -Werror "$@" -o "${out_dir}/${name}"
+    cc "${host_flags[@]}" "$@" -o "${out_dir}/${name}"
     "${out_dir}/${name}"
 }
+
+python3 "${repo_root}/tools/ci/test_board_codegen.py"
+python3 "${repo_root}/tools/ci/test_voice_simulator.py"
+python3 "${repo_root}/tools/ci/test_sr_models.py"
+python3 "${repo_root}/tools/ci/test_control_gateway.py"
+
+bash "${repo_root}/tools/ci/test_config_host.sh"
+bash "${repo_root}/tools/ci/test_ota_host.sh"
+
+build_and_run test_ai_session \
+    -I "${contracts_inc}" -I "${hal_inc}" \
+    -I "${repo_root}/firmware/components/svc_ai_agent/include" \
+    "${repo_root}/firmware/components/svc_ai_agent/src/ai_session.c" \
+    "${repo_root}/firmware/components/pet_hal/src/audio_pcm.c" \
+    "${repo_root}/firmware/tests/host/test_ai_session.c" -lm
+
+build_and_run test_ai_runtime \
+    -I "${contracts_inc}" -I "${hal_inc}" \
+    -I "${repo_root}/firmware/components/svc_ai_agent/include" \
+    "${repo_root}/firmware/components/svc_ai_agent/src/ai_session.c" \
+    "${repo_root}/firmware/components/svc_ai_agent/src/ai_runtime.c" \
+    "${repo_root}/firmware/components/pet_hal/src/audio_pcm.c" \
+    "${repo_root}/firmware/tests/host/test_ai_runtime.c" -lm
+
+build_and_run test_ai_agent \
+    -pthread -I "${repo_root}/firmware/tests/host/support/ai_agent" \
+    -I "${repo_root}/firmware/tests/host/support" \
+    -I "${contracts_inc}" -I "${hal_inc}" \
+    -I "${repo_root}/firmware/components/svc_ai_agent/include" \
+    "${repo_root}/firmware/components/svc_ai_agent/src/ai_agent.c" \
+    "${repo_root}/firmware/components/svc_ai_agent/src/ai_context.c" \
+    "${repo_root}/firmware/components/pet_hal/src/audio_buffer.c" \
+    "${repo_root}/firmware/components/svc_ai_agent/src/ai_session.c" \
+    "${repo_root}/firmware/components/svc_ai_agent/src/ai_runtime.c" \
+    "${repo_root}/firmware/components/pet_hal/src/audio_pcm.c" \
+    "${repo_root}/firmware/tests/host/test_ai_agent.c" -lm
+for scenario in notification notification-only notification-critical prebuffer wake alloc-fail control-queue-fail playback-queue-fail task-fail init-fail \
+    capture-fail read-fail read-overrun deinit-fail read-stall partial-read burst-read transport-fail \
+    stop-fail write-fail partial-write write-stall drain-fail queue-full cancel-fail \
+    empty-playback playback-stall barge-in priority-mute priority-cancel privacy privacy-read \
+    privacy-wake privacy-playback privacy-stop-fail privacy-concurrent privacy-patches \
+    frontend-open-fail frontend-reset-fail frontend-lifecycle frontend-policy-wake frontend-cancel-wake \
+    frontend-wake-fail frontend-vad-fail frontend-vad-invalid; do
+    "${out_dir}/test_ai_agent" "${scenario}"
+done
+
+build_and_run test_audio_pcm \
+    -I "${contracts_inc}" -I "${hal_inc}" \
+    "${repo_root}/firmware/components/pet_hal/src/audio_pcm.c" \
+    "${repo_root}/firmware/tests/host/test_audio_pcm.c" -lm
+
+build_and_run test_audio_buffer \
+    -I "${contracts_inc}" -I "${hal_inc}" \
+    "${repo_root}/firmware/components/pet_hal/src/audio_buffer.c" \
+    "${repo_root}/firmware/tests/host/test_audio_buffer.c"
+
+build_and_run test_audio_loopback \
+    -I "${repo_root}/firmware/tests/host/support" \
+    -I "${contracts_inc}" -I "${hal_inc}" \
+    -I "${repo_root}/firmware/components/svc_audio/include" \
+    "${repo_root}/firmware/components/svc_audio/src/audio_loopback.c" \
+    "${repo_root}/firmware/components/pet_hal/src/audio_pcm.c" \
+    "${repo_root}/firmware/components/pet_hal/src/audio_buffer.c" \
+    "${repo_root}/firmware/tests/host/test_audio_loopback.c" -lm
+
+build_and_run test_audio_fake \
+    -I "${repo_root}/firmware/tests/host/support" \
+    -I "${contracts_inc}" -I "${hal_inc}" \
+    -I "${repo_root}/firmware/components/svc_audio/include" \
+    "${repo_root}/firmware/components/svc_audio/src/audio_loopback.c" \
+    "${repo_root}/firmware/components/pet_hal/src/audio_pcm.c" \
+    "${repo_root}/firmware/components/pet_hal/src/audio_buffer.c" \
+    "${repo_root}/firmware/components/pet_hal/src/fake_audio.c" \
+    "${repo_root}/firmware/tests/host/test_audio_fake.c" -lm
+
+for variant in default pin-conflict; do
+    audio_flags=()
+    if [[ "${variant}" == pin-conflict ]]; then
+        audio_flags=(-DCONFIG_PET_CLIMATE_DHT11_GPIO=17)
+    fi
+    build_and_run "test_bsp_audio_${variant}" \
+        ${audio_flags[@]+"${audio_flags[@]}"} \
+        -I "${repo_root}/firmware/tests/host/support/audio_bsp" \
+        -I "${repo_root}/firmware/tests/host/support" \
+        -I "${contracts_inc}" -I "${hal_inc}" \
+        -I "${repo_root}/firmware/components/bsp_dodo_s3_lcd/private_include" \
+        "${repo_root}/firmware/components/bsp_dodo_s3_lcd/src/bsp_audio.c" \
+        "${repo_root}/firmware/components/pet_hal/src/audio_pcm.c" \
+        "${repo_root}/firmware/tests/host/test_bsp_audio.c" -lm
+done
 
 build_and_run test_event_contract \
     -I "${contracts_inc}" \
@@ -26,6 +122,45 @@ build_and_run test_event_contract \
 build_and_run test_config_generated \
     -I "${contracts_inc}" \
     "${repo_root}/firmware/tests/host/test_config_generated.c"
+
+build_and_run test_growth \
+    -I "${contracts_inc}" -I "${growth_priv_inc}" \
+    "${repo_root}/firmware/components/svc_growth/src/growth_engine.c" \
+    "${repo_root}/firmware/tests/host/test_growth.c"
+
+build_and_run test_growth_service \
+    -pthread -I "${repo_root}/firmware/tests/host/support" \
+    -I "${contracts_inc}" -I "${growth_priv_inc}" \
+    -I "${repo_root}/firmware/components/core/include" \
+    -I "${repo_root}/firmware/components/storage/include" \
+    -I "${repo_root}/firmware/components/svc_growth/include" \
+    "${repo_root}/firmware/components/svc_growth/src/growth_engine.c" \
+    "${repo_root}/firmware/components/svc_growth/src/growth_store.c" \
+    "${repo_root}/firmware/components/svc_growth/src/growth_service.c" \
+    "${repo_root}/firmware/components/svc_growth/src/growth_environment.c" \
+    "${repo_root}/firmware/tests/host/test_growth_service.c"
+
+build_and_run test_growth_runtime \
+    -I "${repo_root}/firmware/tests/host/support/growth_runtime" \
+    -I "${repo_root}/firmware/tests/host/support" \
+    -I "${contracts_inc}" -I "${repo_root}/firmware/components/core/include" \
+    -I "${repo_root}/firmware/components/svc_growth/include" \
+    "${repo_root}/firmware/components/svc_growth/src/growth_runtime.c" \
+    "${repo_root}/firmware/tests/host/test_growth_runtime.c"
+for scenario in init-fail queue-fail task-fail subscribe-fail; do
+    "${out_dir}/test_growth_runtime" "${scenario}"
+done
+
+build_and_run test_growth_runtime_no_climate \
+    -DCONFIG_PET_MODULE_CLIMATE_ENABLED=0 \
+    -I "${repo_root}/firmware/tests/host/support/growth_runtime" \
+    -I "${repo_root}/firmware/tests/host/support" \
+    -I "${contracts_inc}" -I "${repo_root}/firmware/components/core/include" \
+    -I "${repo_root}/firmware/components/svc_growth/include" \
+    "${repo_root}/firmware/components/svc_growth/src/growth_runtime.c" \
+    "${repo_root}/firmware/tests/host/test_growth_runtime.c"
+"${out_dir}/test_growth_runtime_no_climate" init-fail
+"${out_dir}/test_growth_runtime_no_climate" task-fail
 
 build_and_run test_climate_decode \
     -I "${contracts_inc}" \
@@ -83,11 +218,53 @@ build_and_run test_message_codec \
     "${repo_root}/firmware/components/svc_message_hub/src/message_codec.c" \
     "${repo_root}/firmware/tests/host/test_message_codec.c"
 
+build_and_run test_nexus_codec \
+    -I "${contracts_inc}" -I "${message_priv_inc}" \
+    "${repo_root}/firmware/components/svc_message_hub/src/message_time.c" \
+    "${repo_root}/firmware/components/svc_message_hub/src/message_codec.c" \
+    "${repo_root}/firmware/components/svc_message_hub/src/message_validate.c" \
+    "${repo_root}/firmware/tests/host/test_nexus_codec.c"
+
 build_and_run test_message_store \
+    -DTEST_FIXTURE_DIR="\"${repo_root}/firmware/tests/host/fixtures\"" \
     -I "${contracts_inc}" \
     -I "${message_priv_inc}" \
     "${repo_root}/firmware/components/svc_message_hub/src/message_store_codec.c" \
+    "${repo_root}/firmware/components/svc_message_hub/src/message_validate.c" \
     "${repo_root}/firmware/tests/host/test_message_store.c"
+
+build_and_run test_message_presenter \
+    -I "${contracts_inc}" -I "${presentation_inc}" -I "${message_priv_inc}" \
+    "${repo_root}/firmware/components/presentation/src/message_presenter.c" \
+    "${repo_root}/firmware/components/svc_message_hub/src/message_validate.c" \
+    "${repo_root}/firmware/tests/host/test_message_presenter.c"
+
+build_and_run test_message_service \
+    -DTEST_FIXTURE_DIR="\"${repo_root}/firmware/tests/host/fixtures\"" \
+    -I "${repo_root}/firmware/tests/host/support" \
+    -I "${contracts_inc}" -I "${message_priv_inc}" \
+    -I "${net_priv_inc}" \
+    -I "${repo_root}/firmware/components/core/include" \
+    -I "${repo_root}/firmware/components/storage/include" \
+    -I "${repo_root}/firmware/components/svc_message_hub/include" \
+    "${repo_root}"/firmware/components/svc_message_hub/src/*.c \
+    "${repo_root}/firmware/components/storage/src/storage.c" \
+    "${repo_root}/firmware/components/svc_net/src/net_policy.c" \
+    "${repo_root}/firmware/tests/host/test_message_service.c"
+"${out_dir}/test_message_service" storage-failed
+"${out_dir}/test_message_service" capacity
+"${out_dir}/test_message_service" limit
+"${out_dir}/test_message_service" inbox-capacity
+"${out_dir}/test_message_service" concurrent-upgrade
+"${out_dir}/test_message_service" snapshot-space
+"${out_dir}/test_message_service" legacy-migration
+"${out_dir}/test_message_service" identity
+"${out_dir}/test_message_service" save-read "${out_dir}/power-cut-nvs.bin"
+"${out_dir}/test_message_service" restore-read "${out_dir}/power-cut-nvs.bin"
+"${out_dir}/test_message_service" restore-other-device "${out_dir}/power-cut-nvs.bin"
+"${out_dir}/test_message_service" save-confirmed "${out_dir}/power-cut-nvs.bin"
+"${out_dir}/test_message_service" restore-confirmed "${out_dir}/power-cut-nvs.bin"
+rm "${out_dir}/power-cut-nvs.bin"
 
 build_and_run test_net_policy \
     -I "${contracts_inc}" \
@@ -104,3 +281,38 @@ for ext_dir in "${repo_root}"/extensions/*/; do
         "${ext_dir}/src/${ext_id}.c" \
         "${ext_dir}/test/host/test_${ext_id}_contract.c"
 done
+
+build_and_run test_growth_input \
+    -I "${contracts_inc}" \
+    -I "${repo_root}/firmware/components/ui_lvgl/src" \
+    "${repo_root}/firmware/components/ui_lvgl/src/growth_input.c" \
+    "${repo_root}/firmware/tests/host/test_growth_input.c"
+
+build_and_run test_pet_motion \
+    -I "${contracts_inc}" -I "${presentation_inc}" \
+    "${repo_root}/firmware/components/presentation/src/pet_motion.c" \
+    "${repo_root}/firmware/tests/host/test_pet_motion.c"
+
+build_and_run test_focus -I "${repo_root}/firmware/components/svc_focus/include" \
+    "${repo_root}/firmware/components/svc_focus/src/focus_engine.c" \
+    "${repo_root}/firmware/tests/host/test_focus.c"
+
+build_and_run test_command -I "${contracts_inc}" -I "${repo_root}/extensions/device_control/include" \
+    "${repo_root}/extensions/device_control/src/command.c" \
+    "${repo_root}/extensions/device_control/test/host/test_command.c"
+build_and_run test_actuator -I "${repo_root}/extensions/servo/include" \
+    "${repo_root}/extensions/servo/src/servo_engine.c" \
+    "${repo_root}/extensions/servo/test/host/test_actuator.c"
+build_and_run test_control_confirmation -I "${repo_root}/firmware/components/ui_lvgl/src" \
+    "${repo_root}/firmware/components/ui_lvgl/src/control_confirmation.c" \
+    "${repo_root}/firmware/tests/host/test_control_confirmation.c"
+
+# The same boot-loop policy used by the target; RTC/reset inputs are the boundary.
+build_and_run test_recovery -I "${repo_root}/firmware/main/app" \
+    "${repo_root}/firmware/main/app/recovery_engine.c" \
+    "${repo_root}/firmware/tests/host/test_recovery.c"
+build_and_run test_recovery_presenter -I "${presentation_inc}" \
+    "${repo_root}/firmware/components/presentation/src/recovery_presenter.c" \
+    "${repo_root}/firmware/tests/host/test_recovery_presenter.c"
+python3 "${repo_root}/tools/ci/test_build_matrix.py"
+python3 "${repo_root}/tools/ci/test_crash_dump.py"

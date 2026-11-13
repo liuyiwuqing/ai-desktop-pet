@@ -1,9 +1,22 @@
 idf_component_register(
     SRCS
+        "src/bsp_audio.c"
         "src/bsp_climate_sensor.c"
+        "src/bsp_display.c"
+        "src/bsp_input.c"
+        "src/bsp_pins.c"
+    PRIV_INCLUDE_DIRS
+        "private_include"
     REQUIRES
         "contracts"
         "pet_hal"
         "esp_driver_rmt"
+        "esp_driver_i2s"
         "esp_driver_gpio"
+        "esp_driver_spi"
+        "esp_driver_ledc"
+        "esp_lcd"
+        "heap"
+    PRIV_REQUIRES
+        "esp_timer"
 )

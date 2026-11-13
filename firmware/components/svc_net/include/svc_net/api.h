@@ -18,10 +18,14 @@ bool pet_net_is_online(void);
 esp_err_t pet_net_set_rx_handler(pet_net_rx_handler_t handler, void *context);
 
 /* 使用已保存的 device_id 构建主题并发布。 */
-esp_err_t pet_net_publish_topic(pet_net_topic_t topic, const char *payload,
-                                size_t length, bool retain);
+esp_err_t pet_net_publish_topic(pet_net_topic_t topic, const char *payload, size_t length,
+                                bool retain);
 
-/* SNTP 是否已成功对时；未对时时消息 TTL 检查会降级。 */
+/* 后台任务使用：等待 Broker PUBACK；超时/断线不等于应用回执已经送达。 */
+esp_err_t pet_net_publish_confirmed(pet_net_topic_t topic, const char *payload, size_t length,
+                                    bool retain, uint32_t timeout_ms);
+
+/* SNTP 是否已成功对时；未对时时暂不接受有 TTL 的新消息。 */
 bool pet_net_is_time_synced(void);
 
 const char *pet_net_state_name(pet_net_state_t state);

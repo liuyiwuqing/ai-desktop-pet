@@ -2,8 +2,9 @@
 
 static const char *const s_capabilities[] = {
     "device.discover",
+    "system.info",
+    "project.status",
     "app.open",
-    "media.play_pause",
 };
 
 static const pet_ext_manifest_t s_manifest = {
@@ -12,7 +13,7 @@ static const pet_ext_manifest_t s_manifest = {
     .version_minor = 1,
     .version_patch = 0,
     .contract_version = PET_EXT_CONTRACT_VERSION,
-    .risk = PET_EXT_RISK_L2_DESTRUCTIVE,
+    .risk = PET_EXT_RISK_L1_REVERSIBLE,
     .capabilities = s_capabilities,
     .capability_count = (uint8_t)(sizeof(s_capabilities) / sizeof(s_capabilities[0])),
 };

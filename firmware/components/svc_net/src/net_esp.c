@@ -2,16 +2,21 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
-#include "esp_app_desc.h"
 #include "esp_crt_bundle.h"
 #include "esp_event.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_netif_sntp.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "mqtt_client.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
 
 #include "net_policy.h"
 #include "pet/event_bus.h"
@@ -26,7 +31,7 @@
 
 static const char *TAG = "net_esp";
 
-static const char *const s_offline_payload = "{\"online\":false}";
+static char s_offline_payload[160];
 
 static const pet_net_config_t *s_config;
 static esp_netif_t *s_netif;
@@ -34,6 +39,7 @@ static esp_mqtt_client_handle_t s_mqtt;
 static esp_timer_handle_t s_retry_timer;
 static esp_timer_handle_t s_sync_timer;
 static bool s_running;
+static bool s_stopping;
 static bool s_mqtt_connected;
 static bool s_mqtt_started;
 static bool s_time_synced;
@@ -51,6 +57,47 @@ static uint8_t s_rx_buffer[NET_MQTT_BUFFER_SIZE];
 static char s_rx_topic[PET_NET_TOPIC_MAX];
 static size_t s_rx_length;
 static bool s_rx_dropping;
+
+typedef struct {
+    char topic[PET_NET_TOPIC_MAX];
+    uint8_t payload[NET_MQTT_BUFFER_SIZE];
+    size_t length;
+    bool retained;
+} net_rx_delivery_t;
+static QueueHandle_t s_rx_queue;
+static QueueHandle_t s_pubacks;
+static SemaphoreHandle_t s_confirm_lock;
+static void publish_status(bool online);
+static esp_err_t esp_net_publish_confirmed(const char *topic, const char *payload, size_t length,
+                                           bool retain, uint32_t timeout_ms);
+
+/* MQTT 在持有自身 API 锁时调用 DATA 回调；消息中心的 NVS 事务转到独立任务，
+ * 避免慢速 Flash 操作阻塞 MQTT 心跳与 PUBACK。 */
+static void rx_task(void *arg)
+{
+    (void)arg;
+    net_rx_delivery_t *item;
+    int64_t last_status = 0;
+    for (;;) {
+        if (xQueueReceive(s_rx_queue, &item, pdMS_TO_TICKS(1000)) == pdTRUE) {
+            if (s_running && s_rx_handler != NULL) {
+                s_rx_handler(item->topic, (const char *)item->payload, item->length, item->retained,
+                             s_rx_context);
+            }
+            heap_caps_free(item);
+        }
+        /* 在线快照需刷新 observedAt；也覆盖先连上 MQTT、稍后才完成 SNTP 的情况。
+         * 复用生命周期锁，避免 stop 销毁 MQTT 时后台任务仍在入队。 */
+        const int64_t now = esp_timer_get_time();
+        if (now - last_status >= 30000000 && xSemaphoreTake(s_confirm_lock, 0) == pdTRUE) {
+            if (s_running && !s_stopping && s_mqtt_connected && s_time_synced) {
+                publish_status(true);
+                last_status = now;
+            }
+            xSemaphoreGive(s_confirm_lock);
+        }
+    }
+}
 
 static void start_mqtt(void);
 
@@ -77,19 +124,19 @@ static esp_err_t publish_qos1(const char *topic, const char *payload, size_t len
     if (s_mqtt == NULL || !s_mqtt_connected) {
         return ESP_ERR_INVALID_STATE;
     }
-    int message_id = esp_mqtt_client_publish(s_mqtt, topic, payload, (int)length, 1,
-                                             retain ? 1 : 0);
+    /* 普通状态上报只入队；需等待 PUBACK 的持久回执走 publish_confirmed。 */
+    int message_id =
+        esp_mqtt_client_enqueue(s_mqtt, topic, payload, (int)length, 1, retain ? 1 : 0, true);
     return message_id < 0 ? ESP_FAIL : ESP_OK;
 }
 
 static void publish_status(bool online)
 {
-    const esp_app_desc_t *description = esp_app_get_description();
+    if (s_config == NULL)
+        return;
     char payload[160];
-    int length = snprintf(payload, sizeof(payload),
-                          "{\"online\":%s,\"firmware\":\"%s\",\"reconnects\":%u}",
-                          online ? "true" : "false", description->version,
-                          (unsigned)s_reconnect_count);
+    const int length = pet_net_presence_format(payload, sizeof(payload), s_config->device_id,
+                                               online, s_time_synced ? (uint32_t)time(NULL) : 0);
     if (length > 0 && (size_t)length < sizeof(payload)) {
         (void)publish_qos1(s_status_topic, payload, (size_t)length, true);
     }
@@ -309,8 +356,18 @@ static void mqtt_data_event(const esp_mqtt_event_handle_t event)
     }
 
     if (s_rx_handler != NULL && s_rx_topic[0] != '\0') {
-        s_rx_handler(s_rx_topic, (const char *)s_rx_buffer, s_rx_length, event->retain,
-                     s_rx_context);
+        net_rx_delivery_t *item =
+            heap_caps_malloc(sizeof(*item), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (item != NULL) {
+            strlcpy(item->topic, s_rx_topic, sizeof(item->topic));
+            memcpy(item->payload, s_rx_buffer, s_rx_length);
+            item->length = s_rx_length;
+            item->retained = event->retain;
+        }
+        if (item == NULL || xQueueSend(s_rx_queue, &item, 0) != pdTRUE) {
+            heap_caps_free(item);
+            ESP_LOGW(TAG, "inbox delivery busy; no application ACK, server may retry");
+        }
     }
     s_rx_length = 0;
 }
@@ -360,6 +417,12 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base, int32_t event_i
 
     case MQTT_EVENT_DATA:
         mqtt_data_event(event);
+        break;
+
+    case MQTT_EVENT_PUBLISHED:
+        /* 回调只交接 packet ID，不等待业务锁，不在 MQTT 任务中写 NVS。
+         * 队列满时不确认，由持久回执超时重试。 */
+        (void)xQueueSend(s_pubacks, &event->msg_id, 0);
         break;
 
     case MQTT_EVENT_SUBSCRIBED:
@@ -433,6 +496,10 @@ static esp_err_t wifi_init_and_configure(const pet_net_config_t *config)
 
 static esp_err_t mqtt_init(const pet_net_config_t *config)
 {
+    const int will_length = pet_net_presence_format(s_offline_payload, sizeof(s_offline_payload),
+                                                     config->device_id, false, 0);
+    if (will_length < 0)
+        return ESP_ERR_INVALID_ARG;
     esp_mqtt_client_config_t mqtt_config = {0};
     mqtt_config.broker.address.uri = config->broker_uri;
     if (config->ca_cert_pem != NULL) {
@@ -454,7 +521,7 @@ static esp_err_t mqtt_init(const pet_net_config_t *config)
     mqtt_config.session.disable_clean_session = true;
     mqtt_config.session.last_will.topic = s_status_topic;
     mqtt_config.session.last_will.msg = s_offline_payload;
-    mqtt_config.session.last_will.msg_len = (int)strlen(s_offline_payload);
+    mqtt_config.session.last_will.msg_len = will_length;
     mqtt_config.session.last_will.qos = 1;
     mqtt_config.session.last_will.retain = 1;
 
@@ -462,6 +529,8 @@ static esp_err_t mqtt_init(const pet_net_config_t *config)
     mqtt_config.network.timeout_ms = 10000;
     mqtt_config.buffer.size = NET_MQTT_BUFFER_SIZE;
     mqtt_config.buffer.out_size = NET_MQTT_BUFFER_SIZE;
+    /* Broker 不确认时，重试也不能让内存 outbox 无限增长。 */
+    mqtt_config.outbox.limit = NET_MQTT_BUFFER_SIZE;
     mqtt_config.task.stack_size = NET_MQTT_TASK_STACK;
 
     s_mqtt = esp_mqtt_client_init(&mqtt_config);
@@ -480,12 +549,30 @@ static esp_err_t esp_net_start(const pet_net_config_t *config)
 
     esp_err_t err = ESP_OK;
 
-    if (!pet_net_topic_build(PET_NET_TOPIC_STATUS, config->device_id,
-                             s_status_topic, sizeof(s_status_topic)) ||
-        !pet_net_topic_build(PET_NET_TOPIC_INBOX, config->device_id,
-                             s_inbox_topic, sizeof(s_inbox_topic)) ||
-        !pet_net_topic_build(PET_NET_TOPIC_CONFIG, config->device_id,
-                             s_config_topic, sizeof(s_config_topic))) {
+    if (s_pubacks == NULL)
+        s_pubacks = xQueueCreate(16, sizeof(int));
+    if (s_confirm_lock == NULL)
+        s_confirm_lock = xSemaphoreCreateMutex();
+    if (s_pubacks == NULL || s_confirm_lock == NULL)
+        return ESP_ERR_NO_MEM;
+
+    if (s_rx_queue == NULL) {
+        s_rx_queue = xQueueCreate(2, sizeof(net_rx_delivery_t *));
+        if (s_rx_queue == NULL)
+            return ESP_ERR_NO_MEM;
+        if (xTaskCreate(rx_task, "pet_net_rx", 8192, NULL, 4, NULL) != pdPASS) {
+            vQueueDelete(s_rx_queue);
+            s_rx_queue = NULL;
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    if (!pet_net_topic_build(PET_NET_TOPIC_STATUS, config->device_id, s_status_topic,
+                             sizeof(s_status_topic)) ||
+        !pet_net_topic_build(PET_NET_TOPIC_INBOX, config->device_id, s_inbox_topic,
+                             sizeof(s_inbox_topic)) ||
+        !pet_net_topic_build(PET_NET_TOPIC_CONFIG, config->device_id, s_config_topic,
+                             sizeof(s_config_topic))) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -520,6 +607,7 @@ static esp_err_t esp_net_start(const pet_net_config_t *config)
     s_mqtt_connected = false;
     s_mqtt_started = false;
     s_time_synced = false;
+    s_stopping = false;
     s_running = true;
     publish_state(PET_NET_STATE_CONNECTING, PET_NET_ERROR_NONE);
 
@@ -538,8 +626,15 @@ static esp_err_t esp_net_stop(void)
         return ESP_OK;
     }
 
+    /* 正常 DISCONNECT 不触发 LWT；先有界确认 offline，停止心跳与新业务发布。 */
+    s_stopping = true;
+    if (s_mqtt_connected &&
+        esp_net_publish_confirmed(s_status_topic, s_offline_payload, strlen(s_offline_payload),
+                                   true, 3000) != ESP_OK)
+        ESP_LOGW(TAG, "offline state not confirmed before shutdown");
     s_running = false;
     s_mqtt_connected = false;
+    xSemaphoreTake(s_confirm_lock, portMAX_DELAY);
     if (s_retry_timer != NULL) {
         (void)esp_timer_stop(s_retry_timer);
     }
@@ -562,6 +657,7 @@ static esp_err_t esp_net_stop(void)
     }
 
     (void)esp_wifi_stop();
+    xSemaphoreGive(s_confirm_lock);
     publish_state(PET_NET_STATE_IDLE, PET_NET_ERROR_NONE);
     return ESP_OK;
 }
@@ -582,15 +678,42 @@ static esp_err_t esp_net_set_rx_handler(pet_net_rx_handler_t handler, void *cont
     return ESP_OK;
 }
 
-static bool esp_net_is_online(void)
+static esp_err_t esp_net_publish_confirmed(const char *topic, const char *payload, size_t length,
+                                           bool retain, uint32_t timeout_ms)
 {
-    return s_running && s_mqtt_connected;
+    if (s_confirm_lock == NULL || s_pubacks == NULL)
+        return ESP_ERR_INVALID_STATE;
+    if (xSemaphoreTake(s_confirm_lock, pdMS_TO_TICKS(timeout_ms)) != pdTRUE)
+        return ESP_ERR_TIMEOUT;
+    esp_err_t result = ESP_ERR_INVALID_STATE;
+    if (s_running && s_mqtt_connected && s_mqtt != NULL) {
+        int acknowledged;
+        while (xQueueReceive(s_pubacks, &acknowledged, 0) == pdTRUE) {
+        }
+        const int id =
+            esp_mqtt_client_enqueue(s_mqtt, topic, payload, (int)length, 1, retain ? 1 : 0, true);
+        result = id < 0 ? ESP_FAIL : ESP_ERR_TIMEOUT;
+        const int64_t deadline = esp_timer_get_time() + (int64_t)timeout_ms * 1000;
+        while (id >= 0) {
+            const int64_t remaining = deadline - esp_timer_get_time();
+            if (remaining <= 0)
+                break;
+            if (xQueueReceive(s_pubacks, &acknowledged,
+                              pdMS_TO_TICKS((uint32_t)((remaining + 999) / 1000))) != pdTRUE)
+                break;
+            if (acknowledged == id) {
+                result = ESP_OK;
+                break;
+            }
+        }
+    }
+    xSemaphoreGive(s_confirm_lock);
+    return result;
 }
 
-static bool esp_net_is_time_synced(void)
-{
-    return s_time_synced;
-}
+static bool esp_net_is_online(void) { return s_running && !s_stopping && s_mqtt_connected; }
+
+static bool esp_net_is_time_synced(void) { return s_time_synced; }
 
 const pet_net_t *pet_net_esp_driver(void)
 {
@@ -599,6 +722,7 @@ const pet_net_t *pet_net_esp_driver(void)
         .start = esp_net_start,
         .stop = esp_net_stop,
         .publish = esp_net_publish,
+        .publish_confirmed = esp_net_publish_confirmed,
         .set_rx_handler = esp_net_set_rx_handler,
         .is_online = esp_net_is_online,
         .is_time_synced = esp_net_is_time_synced,

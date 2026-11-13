@@ -19,7 +19,7 @@ int main(void)
     CHECK(PET_CFG_TIMEZONE_MAX_LEN == 32);
     CHECK(PET_CFG_VOLUME_MIN == 0);
     CHECK(PET_CFG_VOLUME_MAX == 100);
-    CHECK(PET_CFG_DEFAULT_VOLUME == 60);
+    CHECK(PET_CFG_DEFAULT_VOLUME == 25);
     CHECK(PET_CFG_DEFAULT_BRIGHTNESS == 80);
     CHECK(PET_CFG_DND_START_MINUTE_MAX == 1439);
     CHECK(PET_CFG_DND_DEFAULT_ENABLED == false);
@@ -43,7 +43,7 @@ int main(void)
 
     CHECK(config.schema_version == 1);
     CHECK(config.language == PET_CFG_LANGUAGE_ZH_CN);
-    CHECK(config.volume == 60);
+    CHECK(config.volume == 25);
     CHECK(config.dnd.start_minute == 1320);
     CHECK(config.dnd.end_minute == 420);
     CHECK(config.message.queue_depth == 8);

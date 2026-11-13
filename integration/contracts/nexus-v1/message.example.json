@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "type": "inbox.message",
+  "eventId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+  "deviceId": "dodo-01",
+  "sentAt": 1794362400,
+  "expiresAt": 1794448800,
+  "payload": {
+    "messageId": "11111111-2222-4333-8444-555555555555",
+    "source": "halo",
+    "eventType": "comment.created",
+    "title": "博客有新评论",
+    "summary": "访客：很喜欢这个桌宠项目。",
+    "priority": "normal"
+  }
+}

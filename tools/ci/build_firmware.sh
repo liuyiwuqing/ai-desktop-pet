@@ -5,6 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 firmware_dir="${repo_root}/firmware"
 
 python3 "${repo_root}/tools/ci/check_deps.py"
+python3 "${repo_root}/tools/board_codegen.py" --check
 python3 "${repo_root}/tools/ci/check_contracts.py"
 "${repo_root}/tools/ci/test_host.sh"
 
@@ -24,3 +25,8 @@ fi
 
 idf.py build
 idf.py size
+
+# 协议测试使用同一锁文件解析出的真实 JSON 源码与 codec SDK 头文件。
+bash "${repo_root}/tools/ci/test_ai_protocol_host.sh"
+bash "${repo_root}/tools/ci/test_ai_wss_host.sh"
+bash "${repo_root}/tools/ci/test_sr_frontend_host.sh"

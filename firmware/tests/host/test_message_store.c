@@ -154,13 +154,13 @@ static void test_encode_errors(void)
           PET_MESSAGE_STORE_ERR_SIZE);
     CHECK(pet_message_store_encode(s_messages, 1, s_dedupe, PET_MESSAGE_DEDUPE_SLOTS, s_buffer,
                                    sizeof(s_buffer), &length) == PET_MESSAGE_STORE_ERR_ARG);
-    CHECK(pet_message_store_encode(NULL, 1, s_dedupe, 0, s_buffer, sizeof(s_buffer),
-                                   &length) == PET_MESSAGE_STORE_ERR_ARG);
-    CHECK(pet_message_store_encode(s_messages, 1, s_dedupe, 0, s_buffer, sizeof(s_buffer),
-                                   NULL) == PET_MESSAGE_STORE_ERR_ARG);
-    CHECK(pet_message_store_encode(s_messages, PET_MESSAGE_QUEUE_CAPACITY + 1u, s_dedupe, 0,
-                                   s_buffer, sizeof(s_buffer), &length) ==
+    CHECK(pet_message_store_encode(NULL, 1, s_dedupe, 0, s_buffer, sizeof(s_buffer), &length) ==
           PET_MESSAGE_STORE_ERR_ARG);
+    CHECK(pet_message_store_encode(s_messages, 1, s_dedupe, 0, s_buffer, sizeof(s_buffer), NULL) ==
+          PET_MESSAGE_STORE_ERR_ARG);
+    CHECK(pet_message_store_encode(s_messages, PET_MESSAGE_QUEUE_CAPACITY + 1u, s_dedupe, 0,
+                                   s_buffer, sizeof(s_buffer),
+                                   &length) == PET_MESSAGE_STORE_ERR_ARG);
 }
 
 static void test_invalid_record(void)
@@ -181,6 +181,90 @@ static void test_invalid_record(void)
     CHECK(decode(length, PET_MESSAGE_QUEUE_CAPACITY) == PET_MESSAGE_STORE_ERR_RECORD);
 }
 
+static void test_durable_receipts_and_legacy_snapshot(void)
+{
+    static pet_message_snapshot_t snapshot;
+    static pet_message_snapshot_t restored;
+    static uint8_t bytes[PET_MESSAGE_SNAPSHOT_MAX_SIZE];
+    message_fixture_init(&snapshot.messages[0], "msg_legacy1", PET_MESSAGE_PRIORITY_NORMAL, 100);
+    snapshot.count = 1;
+    snapshot.ack_count = 1;
+    strcpy(snapshot.acks[0].id, "11111111-2222-4333-8444-555555555555");
+    strcpy(snapshot.acks[0].delivery.event_id, "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+    strcpy(snapshot.acks[0].delivery.device_id, "dodo-01");
+    snapshot.acks[0].state = PET_MESSAGE_STATE_READ;
+    snapshot.acks[0].at_epoch_s = 110;
+    snapshot.acks[0].queue_depth = 1;
+    size_t length = 0;
+    CHECK(pet_message_snapshot_encode(&snapshot, bytes, sizeof(bytes), &length) ==
+          PET_MESSAGE_STORE_OK);
+    CHECK(pet_message_snapshot_decode(bytes, length, &restored) == PET_MESSAGE_STORE_OK);
+    CHECK(restored.count == 1 && restored.ack_count == 1);
+    CHECK(strcmp(restored.acks[0].id, snapshot.acks[0].id) == 0);
+    CHECK(strcmp(restored.acks[0].delivery.event_id, snapshot.acks[0].delivery.event_id) == 0);
+    CHECK(strcmp(restored.acks[0].delivery.device_id, "dodo-01") == 0);
+    CHECK(restored.acks[0].state == PET_MESSAGE_STATE_READ);
+    CHECK(restored.acks[0].at_epoch_s == 110 && restored.acks[0].queue_depth == 1);
+    bytes[length - 1] ^= 1;
+    CHECK(pet_message_snapshot_decode(bytes, length, &restored) == PET_MESSAGE_STORE_ERR_CRC);
+    CHECK(pet_message_snapshot_decode(bytes, length - 1, &restored) != PET_MESSAGE_STORE_OK);
+
+    CHECK(pet_message_store_encode(snapshot.messages, 1, snapshot.dedupe, 0, bytes, sizeof(bytes),
+                                   &length) == PET_MESSAGE_STORE_OK);
+    CHECK(pet_message_snapshot_decode(bytes, length, &restored) == PET_MESSAGE_STORE_OK);
+    CHECK(restored.count == 1 && restored.ack_count == 0);
+    CHECK(strcmp(restored.messages[0].id, "msg_legacy1") == 0);
+    snapshot.acks[0].state = PET_MESSAGE_STATE_COUNT;
+    CHECK(pet_message_snapshot_encode(&snapshot, bytes, sizeof(bytes), &length) ==
+          PET_MESSAGE_STORE_ERR_RECORD);
+}
+
+static void test_v3_routing_and_migration(void)
+{
+    static pet_message_snapshot_t snapshot;
+    static pet_message_snapshot_t restored;
+    static uint8_t bytes[PET_MESSAGE_SNAPSHOT_MAX_SIZE];
+    const char *fixtures[] = {"message-snapshot-v1.bin", "message-snapshot-v2.bin"};
+    for (unsigned version = 1; version <= 2; ++version) {
+        char path[1024];
+        snprintf(path, sizeof(path), "%s/%s", TEST_FIXTURE_DIR, fixtures[version - 1]);
+        FILE *file = fopen(path, "rb");
+        CHECK(file != NULL);
+        if (file == NULL)
+            return;
+        size_t length = fread(bytes, 1, sizeof(bytes), file);
+        fclose(file);
+        CHECK(pet_message_snapshot_decode(bytes, length, &snapshot) == PET_MESSAGE_STORE_OK);
+        CHECK(snapshot.count == 1 && snapshot.ack_count == 0);
+        CHECK(strcmp(snapshot.messages[0].id, "msg_legacy1") == 0);
+        CHECK(snapshot.messages[0].delivery.event_id[0] == 0);
+        CHECK(snapshot.legacy_ack_count == version - 1);
+        if (version == 2) {
+            CHECK(strcmp(snapshot.legacy_acks[0].id, "msg_oldread") == 0);
+            CHECK(snapshot.legacy_acks[0].state == PET_MESSAGE_STATE_READ);
+        }
+        message_fixture_init(&snapshot.messages[1], "11111111-2222-4333-8444-555555555555",
+                              PET_MESSAGE_PRIORITY_HIGH, 1794362400);
+        strcpy(snapshot.messages[1].delivery.event_id, "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+        strcpy(snapshot.messages[1].delivery.device_id, "dodo-01");
+        snapshot.count = 2;
+        snapshot.ack_count = 1;
+        strcpy(snapshot.acks[0].id, snapshot.messages[1].id);
+        snapshot.acks[0].delivery = snapshot.messages[1].delivery;
+        snapshot.acks[0].state = PET_MESSAGE_STATE_READ;
+        snapshot.acks[0].expired = true;
+        CHECK(pet_message_snapshot_encode(&snapshot, bytes, sizeof(bytes), &length) == PET_MESSAGE_STORE_OK);
+        CHECK(pet_message_snapshot_decode(bytes, length, &restored) == PET_MESSAGE_STORE_OK);
+        CHECK(restored.count == 2 && restored.ack_count == 1 && restored.legacy_ack_count == version - 1);
+        CHECK(strcmp(restored.messages[1].delivery.event_id, snapshot.messages[1].delivery.event_id) == 0);
+        CHECK(strcmp(restored.messages[1].delivery.device_id, "dodo-01") == 0);
+        CHECK(restored.acks[0].expired);
+        CHECK(memcmp(restored.legacy_acks, snapshot.legacy_acks, sizeof(snapshot.legacy_acks)) == 0);
+        snapshot.acks[0].delivery.event_id[0] = 0;
+        CHECK(pet_message_snapshot_encode(&snapshot, bytes, sizeof(bytes), &length) == PET_MESSAGE_STORE_ERR_RECORD);
+    }
+}
+
 int main(void)
 {
     test_sizes();
@@ -189,6 +273,8 @@ int main(void)
     test_corrupt();
     test_encode_errors();
     test_invalid_record();
+    test_durable_receipts_and_legacy_snapshot();
+    test_v3_routing_and_migration();
 
     if (s_failures == 0) {
         printf("host tests passed: message store codec\n");

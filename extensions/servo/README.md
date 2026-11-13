@@ -1,17 +1,11 @@
-# servo（扩展）
+# servo
 
-语音控制舵机等硬件的扩展包。当前仅规划，未实现。
+2026-11-12：纯执行引擎、FreeRTOS 拥有者与 LEDC 接线已实现，默认关闭；没有执行机械动作。
 
-## 计划内容
+`actuator.h/servo_engine.c` 支持最多两路校准 profile、角度/脉宽/速度约束、最多 8 帧且总长 10 秒的序列、停止/软件急停、请求去重及运动前持久预留。超过 90° 位移或 120°/s 需本地确认；超 100 ms 调度缺口故障撤销 PWM。角度是命令位置，不是编码器反馈。
 
-- `include/actuator.h`：初始化、角度、速度、停止、急停、状态。
-- `include/command_parser.h`：自然语言/JSON 指令解析与校验。
-- `include/servo_sequence.h`：关键帧、循环、取消。
-- `src/`：LEDC 驱动、序列播放器、安全守卫。
-- `README.md`：供电、共地、校准、限位、急停。
+当前固件服务配置一路，`CONFIG_PET_SERVO_GPIO=-1` 不启用；必须选择未被板型、Flash、USB、按键等占用的 GPIO，并按实物校准。LEDC 使用独立 timer/channel，启动仅配置服务，不输出 PWM。默认限位 30–150°、安全位 90°、最高 90°/s 是软件保守配置，不能当作某型号已校准。
 
-## 约束
+供电/共地、脉宽、机构限位和停止方式确认后，物理串口执行 `configure_device.py servo-arm --calibrated-power`；仍需 `--send --port` 才发送。MCP 无 arm 权限，只提供 status/move/home/wag/nod/stop/emergency。急停撤销 PWM，重新工作需本地 arm；软件急停不等于硬件断电，实际停止时延需上板测试。
 
-- 首版 1–2 路 LEDC，独立 5V 供电；不直接从 3.3V 取电。
-- 越界角度、超速、超时长一律拒绝；急停 ≤100 ms。
-- 详细方案见 [`../../docs/06-extension-servo.md`](../../docs/06-extension-servo.md)。
+`test_host.sh` 运行真实插值/限位/去重/序列/故障逻辑，LEDC/GPIO/电源为边界接口；完整功能构建检查实际驱动链接。没有验证物理转角、扭矩、电源跌落或机械安全。

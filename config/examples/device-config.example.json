@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "timezone": "Asia/Shanghai",
   "language": "zh-CN",
-  "volume": 60,
+  "volume": 25,
   "brightness": 80,
   "dnd": {
     "enabled": false,

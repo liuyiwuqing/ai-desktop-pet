@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "deviceId": "dodo-1",
+  "requestId": "config-example-1",
+  "expectedRevision": 0,
+  "issuedAt": 1794441600,
+  "expiresAt": 1794441900,
+  "config": {
+    "schemaVersion": 1,
+    "timezone": "Asia/Shanghai",
+    "language": "zh-CN",
+    "volume": 25,
+    "brightness": 80,
+    "dnd": {
+      "enabled": false,
+      "startMinute": 1320,
+      "endMinute": 420,
+      "allowCritical": true
+    },
+    "message": {
+      "queueDepth": 8,
+      "durationMs": 8000
+    }
+  }
+}

@@ -17,10 +17,11 @@ static void test_device_id(void)
 {
     CHECK(pet_net_device_id_valid("pet-dev-01"));
     CHECK(pet_net_device_id_valid("A1"));
-    CHECK(pet_net_device_id_valid("pet.dev_2"));
+    CHECK(!pet_net_device_id_valid("pet.dev_2"));
     CHECK(!pet_net_device_id_valid(NULL));
     CHECK(!pet_net_device_id_valid(""));
-    CHECK(!pet_net_device_id_valid("-pet"));
+    CHECK(pet_net_device_id_valid("-pet"));
+    CHECK(PET_NET_DEVICE_ID_MAX == 40);
     CHECK(!pet_net_device_id_valid("pet/dev"));
     CHECK(!pet_net_device_id_valid("pet+dev"));
     CHECK(!pet_net_device_id_valid("pet#dev"));
@@ -44,10 +45,10 @@ static void test_topics(void)
     CHECK(strcmp(topic, "nexus/v1/devices/pet-dev-01/inbox") == 0);
     CHECK(pet_net_topic_build(PET_NET_TOPIC_ACK, "pet-dev-01", topic,
                               sizeof(topic)));
-    CHECK(strcmp(topic, "nexus/v1/devices/pet-dev-01/ack") == 0);
+    CHECK(strcmp(topic, "nexus/v1/devices/pet-dev-01/acks") == 0);
     CHECK(pet_net_topic_build(PET_NET_TOPIC_STATUS, "pet-dev-01", topic,
                               sizeof(topic)));
-    CHECK(strcmp(topic, "nexus/v1/devices/pet-dev-01/status") == 0);
+    CHECK(strcmp(topic, "nexus/v1/devices/pet-dev-01/state") == 0);
     CHECK(pet_net_topic_build(PET_NET_TOPIC_CONFIG, "pet-dev-01", topic,
                               sizeof(topic)));
     CHECK(strcmp(topic, "nexus/v1/devices/pet-dev-01/config") == 0);
@@ -184,12 +185,25 @@ static void test_names(void)
     CHECK(strcmp(pet_net_error_name(PET_NET_ERROR_COUNT), "unknown") == 0);
 }
 
+static void test_presence(void)
+{
+    char payload[160];
+    CHECK(pet_net_presence_format(payload, sizeof(payload), "dodo-01", true, 1794362400) > 0);
+    CHECK(strcmp(payload, "{\"schemaVersion\":1,\"deviceId\":\"dodo-01\",\"online\":true,\"observedAt\":1794362400}") == 0);
+    CHECK(pet_net_presence_format(payload, sizeof(payload), "dodo-01", true, 0) == -1);
+    CHECK(pet_net_presence_format(payload, sizeof(payload), "dodo-01", false, 0) > 0);
+    CHECK(strstr(payload, "\"online\":false,\"observedAt\":0") != NULL);
+    CHECK(pet_net_presence_format(payload, sizeof(payload), "bad\"id", false, 0) == -1);
+    CHECK(pet_net_presence_format(payload, 12, "dodo-01", true, 1794362400) == -1);
+}
+
 int main(void)
 {
     test_device_id();
     test_topics();
     test_config_validation();
     test_names();
+    test_presence();
 
     if (s_failures != 0) {
         printf("%d check(s) failed\n", s_failures);

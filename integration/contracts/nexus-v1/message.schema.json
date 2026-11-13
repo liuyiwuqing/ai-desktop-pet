@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pet.local/contracts/nexus-v1/MessageEnvelope.schema.json",
+  "title": "MessageEnvelope",
+  "description": "nexus-core v1；QoS 1、非 retained，nexus/v1/devices/{deviceId}/inbox；JSON UTF-8 总长不超过 1024 B，expiresAt > sentAt。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "type",
+    "eventId",
+    "deviceId",
+    "sentAt",
+    "expiresAt",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "type": {
+      "type": "string",
+      "const": "inbox.message"
+    },
+    "eventId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "deviceId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,40}$"
+    },
+    "sentAt": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4294967295
+    },
+    "expiresAt": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4294967295
+    },
+    "payload": {
+      "description": "DeviceText.fit 限制 title 为 96 UTF-8 字节、summary 为 180 UTF-8 字节；字节约束由固件与契约检查补充。",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "messageId",
+        "source",
+        "eventType",
+        "title",
+        "summary",
+        "priority"
+      ],
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "source": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]{1,32}$"
+        },
+        "eventType": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]{1,64}$"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 96
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "normal",
+            "high",
+            "critical"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -22,6 +22,11 @@ EXAMPLE_SCHEMAS = {
     "device-config.example.json": "DeviceConfig",
     "message.example.json": "MessageEnvelope",
     "message-ack.example.json": "MessageAck",
+    "message-rejection.example.json": "MessageRejection",
+    "device-state.example.json": "DeviceState",
+    "telemetry.example.json": "PetTelemetry",
+    "config-request.example.json": "PetConfigRequest",
+    "config-result.example.json": "PetConfigResult",
 }
 
 
@@ -73,6 +78,28 @@ def check_examples(schemas: dict[str, dict]) -> list[str]:
             errors.append(f"missing example: config/examples/{filename}")
             continue
         errors.extend(validate_file(path, schemas[title], title))
+    return errors
+
+
+def check_nexus_snapshots() -> list[str]:
+    """线上契约由版本化快照固定，config 镜像和可读示例不得各改各的。"""
+    errors: list[str] = []
+    versioned = ROOT / "integration" / "contracts" / "nexus-v1"
+    for path in sorted(versioned.glob("*.json")):
+        if path.name == "source-manifest.json":
+            continue
+        kind = "schemas" if path.name.endswith(".schema.json") else "examples"
+        mirror = CONFIG_DIR / kind / path.name
+        if not mirror.is_file() or mirror.read_bytes() != path.read_bytes():
+            errors.append(f"{mirror.relative_to(ROOT)}: differs from nexus-v1 snapshot")
+    packet = load_json(versioned / "message.example.json")
+    if len((versioned / "message.example.json").read_bytes()) > 1024:
+        errors.append("nexus-v1 message example exceeds 1024 UTF-8 bytes")
+    for field, maximum in (("title", 96), ("summary", 180)):
+        if len(packet["payload"][field].encode("utf-8")) > maximum:
+            errors.append(f"nexus-v1 payload.{field} exceeds {maximum} UTF-8 bytes")
+    if packet["expiresAt"] <= packet["sentAt"]:
+        errors.append("nexus-v1 expiresAt must be later than sentAt")
     return errors
 
 
@@ -138,7 +165,7 @@ def check_extensions(schemas: dict[str, dict]) -> list[str]:
 def main() -> int:
     try:
         schemas = schemas_by_title()
-        errors = check_profiles(schemas) + check_examples(schemas) + check_extensions(schemas)
+        errors = check_profiles(schemas) + check_examples(schemas) + check_extensions(schemas) + check_nexus_snapshots()
     except codegen.SchemaError as exc:
         print(f"FAIL {exc}", file=sys.stderr)
         return 1

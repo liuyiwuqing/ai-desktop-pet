@@ -11,10 +11,12 @@
 #define PET_CFG_DEFAULT_LANGUAGE PET_CFG_LANGUAGE_ZH_CN
 #define PET_CFG_VOLUME_MIN 0
 #define PET_CFG_VOLUME_MAX 100
-#define PET_CFG_DEFAULT_VOLUME 60
+#define PET_CFG_DEFAULT_VOLUME 25
 #define PET_CFG_BRIGHTNESS_MIN 0
 #define PET_CFG_BRIGHTNESS_MAX 100
 #define PET_CFG_DEFAULT_BRIGHTNESS 80
+#define PET_CFG_DEFAULT_MUTED false
+#define PET_CFG_DND_DEFAULT_MANUAL false
 #define PET_CFG_DND_DEFAULT_ENABLED false
 #define PET_CFG_DND_START_MINUTE_MIN 0
 #define PET_CFG_DND_START_MINUTE_MAX 1439
@@ -36,6 +38,7 @@ typedef enum {
 } pet_config_language_t;
 
 typedef struct {
+    bool manual;
     bool enabled;
     uint16_t start_minute;
     uint16_t end_minute;
@@ -53,6 +56,7 @@ typedef struct {
     pet_config_language_t language;
     uint8_t volume;
     uint8_t brightness;
+    bool muted;
     pet_config_dnd_t dnd;
     pet_config_message_t message;
 } pet_config_t;

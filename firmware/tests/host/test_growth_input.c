@@ -1,0 +1,86 @@
+#include <assert.h>
+#include <stdio.h>
+#include "growth_input.h"
+static int click(pet_growth_input_t *p, uint32_t start, uint32_t duration)
+{
+    assert(pet_growth_input_update(p, true, false, start) == -1);
+    assert(pet_growth_input_update(p, true, false, start + 30) == -1);
+    assert(pet_growth_input_update(p, false, false, start + duration) == -1);
+    return pet_growth_input_update(p, false, false, start + duration + 30);
+}
+int main(void)
+{
+    pet_growth_input_t p = {0};
+    pet_growth_input_update(&p, false, false, 0);
+    assert(click(&p, 100, 100) == -1 && !p.menu);
+    assert(click(&p, 300, 1000) == -1 && p.menu && p.selection == 0);
+    assert(click(&p, 1500, 100) == -1 && p.selection == 1);
+    assert(click(&p, 1700, 1000) == 1 && !p.menu);
+    click(&p, 3000, 1000);
+    pet_growth_input_update(&p, true, false, 4200);
+    pet_growth_input_update(&p, true, true, 4500); /* 消息抢占取消手势 */
+    pet_growth_input_update(&p, false, false, 5300);
+    assert(pet_growth_input_update(&p, false, false, 5330) == -1 && !p.menu);
+    p = (pet_growth_input_t){0};
+    pet_growth_input_update(&p, true, false, 0); /* 开机按住不得执行 */
+    pet_growth_input_update(&p, false, false, 2000);
+    assert(pet_growth_input_update(&p, false, false, 2030) == -1 && !p.menu);
+    click(&p, 3000, 1000);
+    for (unsigned i=0;i<8;i++) click(&p, 4200+i*200,100);
+    assert(p.selection == 8);
+    assert(p.selection == PET_GROWTH_MENU_ACHIEVEMENTS);
+    assert(click(&p, 6000,1000) == -1 && !p.menu);
+    click(&p, 7200, 1000);
+    for (unsigned i = 0; i < PET_GROWTH_MENU_RETURN; ++i) click(&p, 8400 + i * 200, 100);
+    assert(p.selection == PET_GROWTH_MENU_RETURN);
+    assert(click(&p, 12000, 1000) == -1 && !p.menu);
+    click(&p, 13400, 1000);
+    for (unsigned i = 0; i < PET_GROWTH_MENU_COUNT; ++i) click(&p, 14600 + i * 200, 100);
+    assert(p.selection == 0 && p.menu);
+    pet_growth_input_update(&p, false, true, 20000);
+    assert(!p.menu);
+    p = (pet_growth_input_t){.voice_enabled = true, .voice_only = true};
+    pet_growth_input_update(&p, false, false, 0);
+    click(&p, 100, 1000);
+    assert(p.menu && p.selection == PET_GROWTH_MENU_AI_TALK);
+    pet_growth_input_update(&p, true, false, 1300);
+    pet_growth_input_update(&p, true, false, 1330);
+    assert(pet_growth_input_update(&p, true, false, 2099) == -1);
+    assert(pet_growth_input_update(&p, true, false, 2100) == PET_GROWTH_MENU_AI_TALK);
+    assert(p.holding && !p.menu);
+    assert(pet_growth_input_update(&p, true, false, 2200) == -1);
+    pet_growth_input_update(&p, false, false, 2300);
+    assert(pet_growth_input_update(&p, false, false, 2330) == PET_GROWTH_INPUT_AI_RELEASE);
+    assert(!p.holding);
+    p.voice_active = true;
+    assert(click(&p, 2500, 100) == PET_GROWTH_INPUT_AI_CANCEL);
+    click(&p, 2800, 1000);
+    assert(p.menu && p.selection == PET_GROWTH_MENU_AI_TALK);
+    click(&p, 4000, 100);
+    assert(p.selection == PET_GROWTH_MENU_AI_MUTE);
+    assert(click(&p, 4200, 1000) == PET_GROWTH_MENU_AI_MUTE);
+    click(&p, 5500, 1000);
+    pet_growth_input_update(&p, true, false, 6800);
+    pet_growth_input_update(&p, true, false, 6830);
+    assert(pet_growth_input_update(&p, true, false, 7600) == PET_GROWTH_MENU_AI_TALK);
+    assert(pet_growth_input_update(&p, true, true, 7650) == PET_GROWTH_INPUT_AI_CANCEL);
+    assert(!p.press_voice);
+    pet_growth_input_update(&p, false, false, 7800);
+    assert(pet_growth_input_update(&p, false, false, 7830) == -1);
+    p = (pet_growth_input_t){.voice_enabled = true, .voice_ready = true};
+    pet_growth_input_update(&p, false, false, 0);
+    click(&p, 100, 1000);
+    assert(p.selection == PET_GROWTH_MENU_AI_TALK);
+    click(&p, 1300, 100);
+    click(&p, 1500, 100);
+    assert(p.selection == PET_GROWTH_MENU_AI_DND);
+    click(&p,1700,100);
+    assert(p.selection==PET_GROWTH_MENU_AI_CLEAR);
+    click(&p,1900,100);
+    assert(p.selection==PET_GROWTH_FEED);
+    for (unsigned i = 0; i < PET_GROWTH_MENU_RETURN; ++i) click(&p, 2100 + i * 200, 100);
+    assert(p.selection == PET_GROWTH_MENU_RETURN);
+    click(&p,6000,100);
+    assert(p.selection==PET_GROWTH_MENU_AI_TALK);
+    puts("growth input: navigation, submit, cancel, preemption and held boot passed");
+}

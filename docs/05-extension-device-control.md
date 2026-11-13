@@ -1,6 +1,6 @@
 # 05 · 扩展一：语音控制手机/电脑
 
-状态：待评审，仅预留接口与前置架构，不进入功能实现。依赖：`00-architecture.md`、`01-ai-agent.md`。
+状态：首版 Mac 适配已实现（2026-11-12）：设备发现、`system.info`、`project.status`、需本地确认的 `app.open`，并具备请求去重、审计与未知结果查询。扩展默认关闭；[Gateway](../server/README.md) 与 Bridge 尚未在真实设备链路验收。手机、Home Assistant 及下文更多能力属于后续设计。依赖：`00-architecture.md`、`01-ai-agent.md`。
 
 ## 1. 范围
 
@@ -185,3 +185,7 @@ typedef struct {
 | 令牌泄露 | 越权 | NVS/私有 env、脱敏、轮换 |
 
 待确认：首批接入平台（Mac/iPhone/HA）、允许的能力清单、L1 是否免确认、审计保留天数、是否需要服务端统一鉴权。
+
+## 2026-11-12 当前实现
+
+当前仅注册 system.info、project.status、app.open，分别为 L0/L0/L1；app.open 需屏幕展示后新的 BOOT 长按确认。已接严格白名单、持久水位、去重/冲突、限速、审计、UNKNOWN 查询和 Mac Bridge HTTPS 薄网关。无任意 shell、破坏性能力或手机平台执行器。扩展默认关闭，部署与凭据见 [扩展说明](../extensions/device_control/README.md)。纯引擎/确认/LVGL/Gateway 通过主机检查，真实 Bridge 与 TLS 未联调。
