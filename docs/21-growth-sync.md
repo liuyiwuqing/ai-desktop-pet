@@ -39,7 +39,7 @@ python3 tools/upgrade_broker_policy.py --directory /srv/nexus/broker/config
 - `python3 tools/run_local.py build`：64 条中 59 通过、5 条条件跳过；新增固件 producer 可选用例已用 `PET_HOST_SANITIZE=1 python3 tools/ci/test_growth_sync_contract.py` 单独通过。实际设备引擎/JSON → MQTT → Java/数据库/HTTP 回环通过；未连接实机 NVS。
 - `PET_HOST_SANITIZE=1 bash tools/ci/test_host.sh` 通过，含新格式化边界；旧 Java→C→Java 消息协议回归通过。新增 Schema/示例/生成代码检查通过。
 - `bash tools/ci/test_growth_sync_ui.sh`：真实 Vue/浏览器 18 项通过，含失败/恢复、禁用、空数据、各存档状态、名称转义及 390 px 布局；HTTP 为隔离夹具。ACL 维护 CLI 4 项、交付 CLI 10 项通过。
-- 四种固件预设 default/full/off/tones 均退出 0；每份证据的 363 份源码与当前文件一致，6 个产物哈希逐项核对。应用分别为 2,885,120 / 3,622,384 / 225,760 / 2,885,136 B。首次构建期间更新配置说明触发输入快照保护，冻结后重新构建并核对，未采用混合来源证据。真实 Broker/TLS、设备 Wi-Fi/时钟/堆栈水位及掉电稳定性尚未验收；只读快照不能替代恢复备份或奖励流水。
+- 四种固件预设 default/full/off/tones 均退出 0；每份证据的 363 份源码与当前文件一致，6 个产物哈希逐项核对。应用分别为 2,885,120 / 3,622,384 / 225,760 / 2,925,840 B。首次构建期间更新配置说明触发输入快照保护，冻结后重新构建并核对，未采用混合来源证据。真实 Broker/TLS、设备 Wi-Fi/时钟/堆栈水位及掉电稳定性尚未验收；只读快照不能替代恢复备份或奖励流水。
 
 CORE 配套 `3e38ee5` 已推送并核对远程；04 实现、协议与本页同项提交，远程 CI 需另行核对。
 
