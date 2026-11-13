@@ -75,6 +75,8 @@ HTTP/隔离 PostgreSQL 的 4 项专项通过，包含同键八并发仅一条、
 
 浏览器只使用实际 Vue 与回环 RAM HTTP，不连接真实 CORE、Bridge、数据库、供应商或设备；HTTP 专项的真实数据库证据单独记录。不将规则入队、工具服务端状态或夹具结果当作真实提醒/应用已打开。规范沉淀留在项目契约，沿用现有检查，无需修改通用 Skill。
 
+CORE `28793aa` / 04 `052851f` 均已推送并核对远端。[CORE Docker CI 43414082430 第二次运行](https://github.com/liuyiwuqing/nexus-core/actions/runs/43414082430/attempts/2) 全步骤 success，含 CLI 11 项、源码镜像与隔离 Compose。第一次运行在 Maven 解析父 POM 时失败；直连中央仓库得到 200，内容哈希与本地缓存一致，未改版本或源码而重跑同一提交后通过，具体网络原因未确认。[04 CI 43414283771](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43414283771) 七个 job success，含五种固件预设和 full 主机/协议/DSP/LVGL。两项 workflow 不运行本项 349 项浏览器专项或完整 Maven 集成套件，这些仍为上述本地证据。
+
 ## CONSOLE-02 · 当前实现与完整规划的差距
 
 以下按当前源码核对。九个主导航在 CORE `frontend/src/App.vue`；页面通过同仓控制器调用现有业务，功能实现和验收覆盖分别说明。这里整理当前可验收范围，不删改 02 的原始完整需求，也不把缺项重新命名为“已完成”。
