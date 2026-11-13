@@ -56,4 +56,6 @@ python3 tools/server_release.py probe --env-file /etc/nexus/core.env --url https
 
 支持轮换的 format=2 包可增加 `--auth-rotation`：在 Linux 私有 tmpfs 卷中，以实际非 root UID 运行包内 CLI 原子替换凭据，检查 admin 过渡/到期/撤销、范围隔离、异常文件拒绝和不重启恢复，再验证主动重启。此模式额外拉取 `python:3.13-alpine` 并记录 digest；清理临时卷。它不启用 Memory MCP、不触及真实凭据，详细边界见 [20](../docs/20-credential-rotation.md#linux-私有文件重载验证)。
 
+`--memory-rotation` 包含上述检查，并以同包实际 JAR/stdio 验证 Memory MCP 轮换、同一 stdio 进程的文件重载/恢复、范围隔离、异常拒绝及无转发/重放。CORE/客户端分别使用私有只读卷，上游仅为空 HTTP 契约夹具；不连接真实 Halo/OpenViking、供应商或设备。实际命令、证据及未覆盖边界见 [20](../docs/20-credential-rotation.md#linux-memory-mcp-与-stdio-验证)。
+
 受保护凭据文件模式、current/previous 过渡和客户端导出见 [凭据轮换](../docs/20-credential-rotation.md)。预检和 probe 从 `NEXUS_AUTH_TOKEN_FILE` 读取管理员当前值，桥接预检验证独立客户端 token 仍有效；不回退旧环境变量，不输出秘密。配置文件只保留在 `/etc/nexus/`，发布 ZIP 不带真实凭据。

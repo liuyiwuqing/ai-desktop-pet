@@ -81,4 +81,29 @@
 
 公开 HTTP 验证：双令牌均可用、旧令牌显式撤销/到期后 401、memory 范围不能访问管理 API、损坏文件及 0644 权限返回固定 503且不回退环境变量、修复后立即恢复。Docker 启动时间和 RestartCount 在轮换前后相同；之后另行主动重启，当前令牌仍可用。首次启动/重启、V1–V11 与管理台资源同时通过。容器、网络、卷和临时凭据均在成功返回前清理。
 
-证据只含状态、功能标志、包哈希和镜像 digest，不包含令牌。此 Linux 检查覆盖 admin 文件重载及范围隔离；没有在 Linux 启用 Memory MCP 或执行 stdio 轮换，后两者仍采用上文 macOS/TLS 检查证据。目标 systemd、生产凭据和设备不在本次范围。
+证据只含状态、功能标志、包哈希和镜像 digest，不包含令牌。DEL-03 当时仅覆盖 admin 文件重载及范围隔离；Memory MCP/stdio 的后续 Linux 验证见下节。目标 systemd、生产凭据和设备不在本次范围。
+
+## Linux Memory MCP 与 stdio 验证
+
+DEL-05 使用已有的 `3e38ee5` 不可变包，未重新打包或修改 CORE：
+
+```sh
+python3 tools/ci/test_server_linux.py \
+  --bundle build/server-release-20261113/nexus-server-0.1.0-SNAPSHOT-3e38ee5.zip \
+  --memory-rotation \
+  --evidence build/server-release-20261113/linux-memory-rotation-ready-3e38ee5.json
+```
+
+命令退出 0，`--memory-rotation` 包含既有 `--auth-rotation` 检查，并额外启用临时 CORE 的 Memory MCP。实际包内 JAR、凭据 CLI 和 stdio 脚本在 Linux 运行；CORE 与 stdio 仅挂载各自的私有只读凭据卷，维护容器负责原子更新。两个运行容器均为 UID 65534、只读根文件系统，stdio 无法读取 CORE 的管理员文件。
+
+已检查：
+
+- Memory MCP 双令牌过渡、显式撤销、旧值到期和 admin/memory 范围隔离；memory 轮换后管理员凭据仍可用。
+- 同一 stdio 进程只初始化一次，客户端文件原子导出后使用新令牌；旧文件在令牌过期后被拒绝，再导出后继续处理。
+- 客户端 JSON 损坏或权限变为 0644 时返回固定错误；即使环境中的旧工具令牌仍有效，也不回退、不转发、不重放。修复或替换文件后保留协议协商并恢复。
+- CORE 文件损坏或权限错误时 MCP 返回固定 503，stdio 返回固定不可用错误；修复后恢复。上游夹具的请求计数确认失败请求未被转发或随后重放。
+- stdout 仅有匹配请求 ID 的 JSON-RPC，stderr 为空且无测试令牌。CORE 启动时间/RestartCount 在轮换前后相同，之后主动重启仍接受当前 MCP 凭据。
+
+新检查曾在首次 search 响应断言处失败；受控延迟 2 秒确认容器启动与 HTTP 就绪之间存在窗口，入口已增加有超时的就绪探测后重跑通过。原 `--auth-rotation` 独立重跑退出 0（`linux-auth-rotation-compat-3e38ee5.json`），其 Memory MCP 保持关闭；交付 CLI 10 项通过。
+
+本项 provider 是同一临时网络命名空间内的空 HTTP 契约夹具，检查固定公开目录/身份/请求及调用次数。它没有真实公开评论、Halo/OpenViking、供应商 WSS 或语音链路，不构成真实检索、权限或内容失效验收。测试使用分离挂载和相同非 root UID，不替代目标机不同系统用户/目录、systemd 或生产 TLS 验收。包 SHA256 仍为 `8f888362855fcedbad186e4e9efef76a61859b22d7703599dae15a3a1cc17237`；临时容器、网络、凭据卷清理成功，未操作真实配置。
