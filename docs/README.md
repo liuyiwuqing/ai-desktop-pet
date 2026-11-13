@@ -4,7 +4,7 @@
 
 更新：2026-11-13。最新语音记忆桥接准备与本地 TLS 全链回归见 [17](17-voice-bridge-regression.md)，公开记忆 MCP/stdio 接口与运维见 [16](16-voice-memory-tools.md)，长期记忆检索与副本失效见 [15](15-memory-lifecycle.md)，屏幕/BOOT 恢复与设备更名见 [14](14-recovery-and-device-names.md)，此前运行维护实现见 [13](13-operational-software.md)；设备首版软件见 [09](09-software-delivery.md)，NEXUS 管理闭环、上下文/工具回环及部署模板见 [11](11-product-software-closure.md)。维护见 [10](10-maintenance-recovery.md)，真实云端联调步骤见 [12](12-cloud-interop.md)，部署步骤见 [部署准备](../deployment/README.md)。历史切片说明保留，不能把早期“未接入”当作现状。暂不烧录，真实部署与硬件验收后置。
 
-服务端当前另已完成 CORE 本地 Git 基线、离线交付包、配置/主机预检和只读状态探测；包内 JAR 的 Linux 容器启动/重启检查通过，见[部署交付记录](../deployment/README.md)与[使用说明](../deployment/server-release.md)。没有目标服务器，真实部署仍待后续。
+服务端已完成 CORE 版本保护、离线交付包、配置/主机预检和只读状态探测。当前 V12 配套包、实际 JAR 的 Linux 启动/重启与 admin 凭据热轮换证据见 [21](21-growth-sync.md#配套离线交付包)，通用命令见[使用说明](../deployment/server-release.md)；旧包记录仍保留在[部署交付记录](../deployment/README.md)。没有目标服务器，真实部署仍待后续。
 
 本目录是 `04-ai-desktop-pet` 的设计与交付入口。先读 [00 当前架构](00-architecture.md)和最新交付记录，再按模块查阅接口、异常边界与验收项。[08 结构评审](08-structure-review.md)保留历史决策过程，不能作为当前完成度清单。
 

@@ -43,6 +43,7 @@
 19. `18-requirements-and-progress.md`：需求映射、当前任务台账与持续交付约定。
 20. `19-remote-ota.md`：远程 OTA 协议、持久事务、管理 UI、成套启用与本地验证。
 21. `20-credential-rotation.md`：CORE/记忆工具双令牌、受保护文件重载、CLI 与验收边界。
+22. `21-growth-sync.md`：设备成长只读镜像、顺序隔离、管理台及 V12 配套离线包。
 
 ## 仓库与版本
 

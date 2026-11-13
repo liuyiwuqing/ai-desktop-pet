@@ -31,7 +31,25 @@ python3 tools/upgrade_broker_policy.py --directory /srv/nexus/broker/config
 
 识别 legacy、management-v1、remote-ota-v1 及当前标准 ACL；自定义规则要求人工合并。实际应用使用独立 `.growth-sync-v1-backup`，保留先前 `.management-v1-backup` 与 `.remote-ota-v1-backup`；本次只对临时目录验证，未修改真实 Broker。新增规则为 CORE `topic read .../+/growth_status`、设备 `pattern write .../%u/growth_status`，无设备跨端读取或写入权限。
 
-已有离线 ZIP 保持其旧快照；部署本项需基于两仓新提交另建包。关闭功能后保留镜像数据，不伪装新鲜，也不擦除设备存档。
+已有离线 ZIP 保持其旧快照；本项配套新包见下节。关闭功能后保留镜像数据，不伪装新鲜，也不擦除设备存档。
+
+## 配套离线交付包
+
+DEL-04 使用 CORE `3e38ee5b53d3b722aa8094695270615d313aad26` 和 04 `69b6308dbbfc0c7e67efbe753a9250078776e9d2` 的干净快照，生成 `build/server-release-20261113/nexus-server-0.1.0-SNAPSHOT-3e38ee5.zip`（format=2、18 文件，含 121 份 CORE 源文件）。SHA256：`8f888362855fcedbad186e4e9efef76a61859b22d7703599dae15a3a1cc17237`。包内 JAR、工具与所列提交一致；不含真实配置或凭据，不提交 ZIP。
+
+```sh
+python3 tools/server_release.py create --core ../nexus-core \
+  --output build/server-release-20261113/nexus-server-0.1.0-SNAPSHOT-3e38ee5.zip
+python3 tools/server_release.py verify \
+  --bundle build/server-release-20261113/nexus-server-0.1.0-SNAPSHOT-3e38ee5.zip
+python3 tools/ci/test_server_linux.py --auth-rotation \
+  --bundle build/server-release-20261113/nexus-server-0.1.0-SNAPSHOT-3e38ee5.zip \
+  --evidence build/server-release-20261113/linux-auth-rotation-3e38ee5.json
+```
+
+三条命令均退出 0。同包实际 JAR 在 Linux UID 65534、只读根文件系统下完成首次启动和主动重启，V1–V12 清单与包内迁移资源一致，PostgreSQL/MQTT/TLS 就绪，两份管理台资源与包内字节一致。admin 凭据文件由同 UID 的隔离 CLI 原子替换，过渡、到期、撤销、作用域隔离、损坏/宽权限拒绝及修复通过；热轮换期间进程未重启。临时容器、私有卷及网络已清理。
+
+`913b3af` / `9559429` 旧包哈希保持不变。该检查没有启用 Linux Memory MCP，也未验证目标 systemd、生产 TLS、真实供应商或设备成长链路；成长协议的实际 C/Java 回环证据见下节。
 
 ## 验证与边界
 
@@ -41,6 +59,6 @@ python3 tools/upgrade_broker_policy.py --directory /srv/nexus/broker/config
 - `bash tools/ci/test_growth_sync_ui.sh`：真实 Vue/浏览器 18 项通过，含失败/恢复、禁用、空数据、各存档状态、名称转义及 390 px 布局；HTTP 为隔离夹具。ACL 维护 CLI 4 项、交付 CLI 10 项通过。
 - 四种固件预设 default/full/off/tones 均退出 0；每份证据的 363 份源码与当前文件一致，6 个产物哈希逐项核对。应用分别为 2,885,120 / 3,622,384 / 225,760 / 2,925,840 B。首次构建期间更新配置说明触发输入快照保护，冻结后重新构建并核对，未采用混合来源证据。真实 Broker/TLS、设备 Wi-Fi/时钟/堆栈水位及掉电稳定性尚未验收；只读快照不能替代恢复备份或奖励流水。
 
-CORE 配套 `3e38ee5` 已推送并核对远程；04 实现、协议与本页同项提交，远程 CI 需另行核对。
+CORE 配套 `3e38ee5` / 04 实现 `08a8ad3` 均已推送并核对远程。后续 04 `69b6308` 对应 [CI 43370460926](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43370460926) 六个 job 全部 success，含四固件预设及 full 的主机/协议/DSP/LVGL 检查；`08a8ad3` 的先前运行被并发策略取消，未计为成功。该远程 CI 不含配套 CORE 仓库的 Java/C 联调，后者使用上述本地真实数据库/Broker 回环证据。
 
 后续若做服务端奖励，应先定义持久档案身份、事件来源、独立去重水位、配额与存档迁移兼容性。不得把两个档案直接相加，也不得借用本地对话/专注去重水位接收云端自报完成。
