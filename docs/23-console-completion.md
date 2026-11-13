@@ -91,4 +91,4 @@ CORE 完整 `build` 退出 0：类型/前端构建与 Maven verify/JAR 通过，
 
 CONSOLE-01–03 已完成本地软件实现或文档核对；CONSOLE-04–12 保持待办，不计作已实现。完整管理台仍未全部完成。
 
-CONSOLE-03 的 CORE 配套 `b85f704`、04 专项/文档 `ff3ce39` 已推送并核对远端；本项源码指纹补充核对与远程 CI 另在台账记录。
+CONSOLE-03 的 CORE 配套 `b85f704`、04 专项/文档 `ff3ce39`、源码指纹补充 `f4c4b7e` 均已推送并核对远端。`ff3ce39` 对应 [CI 43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全部 success，含五种固件预设和 full 主机/协议/DSP/LVGL；174 项浏览器专项与 CORE Maven 是本地证据，该 workflow 不执行这两类检查。
