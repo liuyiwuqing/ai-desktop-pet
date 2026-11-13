@@ -2,6 +2,16 @@
 
 这些文件是待绑定真实环境的模板。本次只在独立测试环境验证，没有安装系统服务、修改真实数据库或 Broker，也没有申请公网证书或部署。基础语音直接由 ESP32 连接小智，日常不依赖开发用 Mac；NEXUS 可运行在长期在线服务器。Mac 控制是可选扩展，只有启用它时才需要目标 Mac 与 Bridge 在线。
 
+## 管理台 Docker 部署（DEL-06）
+
+线上管理台采用 CORE 仓库的独立 [Docker Compose 方案](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/docker-deployment.md)：一个非 root/只读 CORE 容器提供 Vue 页面和 API，配套 PostgreSQL、MQTT/TLS、Caddy HTTPS。源码多阶段构建、私有配置初始化、持久化、认证健康检查、日志轮换、备份和升级步骤在该文档维护；根目录开发 Compose 与下文 systemd 方案保留各自用途。
+
+初始化使用 `nexus-core/tools/init_docker.py`，只接受新的私有输出目录，拒绝覆盖原凭据。公开入口为 HTTPS 80/443 与 MQTT/TLS 8883；数据库与 CORE 8088 不发布到宿主。Halo/AI/记忆/Bridge、清理、OTA 和成长同步仍默认关闭。`server_release.py` 的 systemd 预检保持回环绑定要求，不能直接用于容器内的 `0.0.0.0` 配置。
+
+本地 CLI 11 项、完整前端/Maven 构建（62 通过/5 条件跳过）和实际 `linux/arm64` 源码镜像通过；随机隔离 Compose 项目的 HTTPS/鉴权/JAR 页面资源、严格 MQTT TLS、私有端口/非 root/只读、原样 env、容器重建保留消息和 Broker 故障恢复六组检查通过。报告在 CORE 忽略目录 `target/docker-smoke.json`，只删除本轮随机测试卷/网络；没有注册设备或向真实 Broker 发消息。远程 Docker CI 与配套提交另在 [台账 DEL-06](../docs/18-requirements-and-progress.md)核对。
+
+当前没有目标服务器，本次没有上线或申请公网证书。公网 DNS/防火墙、生产资源、真实库升级/备份恢复、供应商与设备仍需目标环境验收；本地 `localhost` 私有 CA 证据不能替代公网 HTTPS。原来的离线 ZIP 保持既有字节，不自动包含新 Docker 方案。
+
 ## 当前交付入口
 
 远程 OTA 已随 04 `0910e5f` 与 CORE `2808ed7` 推送，GitHub [43366086540](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43366086540) 六个 job 全部成功。当前凭据轮换和发布包 format=2 见 [20](../docs/20-credential-rotation.md)；下列基线包与 Linux 验证保留为历史记录，不自动包含后续功能。
@@ -18,9 +28,9 @@
 
 当前产物为 `build/server-release-20261113/nexus-server-0.1.0-SNAPSHOT-913b3af.zip`，SHA256 `d9121f8105ec8644c72777bf1fad71717abcdf56cf0d050ddac4cbd9d3614122`，配套 `linux-smoke.json` 记录实际镜像 digest 与验证边界。ZIP 包含 17 份交付文件及清单；04 本轮工具仍待提交，`petDirty=true` 如实记录，清单标识实际文件内容。该检查没有运行真实 systemd、生产 TLS、供应商/记忆服务或设备，不代表真实数据库升级与部署验收。
 
-## CORE 与管理台
+## CORE 与管理台（可选 systemd 方案）
 
-基准为 Linux/systemd、Java 21、PostgreSQL 17、Mosquitto 2.0.22；沿用 [nexus-core Compose](../../nexus-core/compose.yml) 的数据库/Broker，不新增编排系统。构建使用该项目 `python3 tools/run_local.py build`；它会执行前端检查和真实容器集成测试。将生成的 JAR 以不可变文件名保留，再原子切换 `/opt/nexus/core/nexus-core.jar` 指向选定版本。专用 `nexus` 系统用户只读 JAR/配置/CA，不能写源码或私钥。
+下列保留的替代方案为 Linux/systemd、Java 21、PostgreSQL 17、Mosquitto 2.0.22；沿用 [nexus-core 开发 Compose](../../nexus-core/compose.yml) 的数据库/Broker。Docker 线上部署使用上节独立配置，不能混用这两套启动命令。systemd 构建使用该项目 `python3 tools/run_local.py build`；它会执行前端检查和真实容器集成测试。将生成的 JAR 以不可变文件名保留，再原子切换 `/opt/nexus/core/nexus-core.jar` 指向选定版本。专用 `nexus` 系统用户只读 JAR/配置/CA，不能写源码或私钥。
 
 将 [core.env.example](core.env.example) 复制到 `/etc/nexus/core.env`，由部署者填写独立管理员、数据库、MQTT 凭据和有效 Broker 域名，权限 `600`。CA 是公开证书文件，须允许服务用户读取；检查证书 SAN、有效期和设备端信任链。MQTT 保持 TLS/主机名校验；不得用 `allow-insecure` 绕过。当前管理员是单一共享令牌，审计 actor 为 admin，尚无多用户/RBAC；管理入口应限制到可信网络或 VPN。
 

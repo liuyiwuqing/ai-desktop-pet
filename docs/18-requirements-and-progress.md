@@ -13,7 +13,7 @@
 | R3 温湿度 | DHT11 接口、采集/异常恢复、60 分钟图表、告警与成长联动；见 [03](03-climate-sensor.md) | 真实传感器接线、误差、刷新/故障恢复与长期采集 |
 | R4 成长 | 本地互动/每日任务/成就/动画、对话与专注奖励、双槽存档/受控恢复；CORE 专注与设备只读镜像；见 [04](04-growth-game.md)、[21](21-growth-sync.md) | 实机掉电/7 天；两端独立结算，服务端奖励下发为二期 |
 | R5 扩展控制 | 固定能力、确认/审计、Mac Bridge 与舵机软件/限位/急停；见 [05](05-extension-device-control.md)、[06](06-extension-servo.md) | 实际白名单控制、舵机型号/供电/机械校准；其他平台为后续范围 |
-| R6 维护与交付 | 物理配置/诊断/备份、签名及远程 OTA/回滚逻辑、CORE/记忆工具双令牌、恢复 UI、隔离构建/CI、服务端发布包/预检 | 生产钥/HTTPS、真实服务凭据维护、目标机与实机恢复 |
+| R6 维护与交付 | 物理配置/诊断/备份、签名及远程 OTA/回滚逻辑、CORE/记忆工具双令牌、恢复 UI、隔离构建/CI、服务端发布包/预检、管理台 Docker Compose | 生产钥/HTTPS、真实服务凭据维护、目标机与实机恢复 |
 
 首版不做本地大模型、任意 shell、自动旧 NVS 迁移、多设备集群或舵机闭环反馈。资源管线、多语言和更多控制平台保留为后续工作，不能将目录预留当作实现。
 
@@ -30,6 +30,7 @@
 | DEL-03 | Linux 凭据文件轮换验证 | 04 `69b6308` 已推送；实际包内 JAR/CLI、Linux 私有卷/UID 65534 的 admin 过渡/到期/撤销/异常拒绝/修复与重启通过；见 [20](20-credential-rotation.md) | Memory MCP/stdio 后续验证见 DEL-05；目标 systemd/真实用户目录仍待验收 |
 | DEL-04 | 成长镜像配套离线包 | CORE `3e38ee5` / 04 `69b6308` 干净快照，18 文件；包内实际 JAR 的 Linux 启动/重启、V1–V12、admin 文件轮换通过；见 [21](21-growth-sync.md) | 包仅保留本地忽略目录；目标机、生产 TLS、真实供应商及实机仍待验收 |
 | DEL-05 | Linux Memory MCP/stdio 热轮换 | 04 `f99a118` 已推送；同一 `3e38ee5` 包实际 JAR/CLI/stdio 通过过渡、到期、撤销、范围隔离、异常拒绝/恢复；同一 stdio 进程不重初始化、不转发/重放失败请求；见 [20](20-credential-rotation.md#linux-memory-mcp-与-stdio-验证) | 原 admin 模式/交付 CLI 10 项通过；[43384944971](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43384944971) 六个 job 全绿；真实 provider、生产 TLS/systemd/不同用户目录仍待验收 |
+| DEL-06 | 管理台 Docker 线上部署方案 | CORE `9026e41` 已推送并核对远端；源码镜像/Compose/私有初始化/健康检查与 [部署说明](../deployment/README.md#管理台-docker-部署del-06)；本地 CLI 11 项、完整构建 62 通过/5 跳过、实际 Linux Compose 六组检查通过 | 本次 [Docker CI 43398869944](https://github.com/liuyiwuqing/nexus-core/actions/runs/43398869944) 待核对；尚无目标服务器，公网证书/真实升级恢复/生产资源与设备仍待验收 |
 | CI-01 | 首次远程 CI 与容器 Git 所有权 | 首次运行的交付/桥接检查通过；四预设在 Git 源码清单处退出 128，尚未编译。真实 Git 所有权模拟复现并建立回归 | `5183050` 修复 Git 所有权，`43169dd` / `1ad19cf` 修复 Linux C17 的 `strnlen` / `strlcpy` 依赖；本地主机检查通过；远程 OTA `0910e5f` 的 [43366086540](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43366086540) 六个 job 全绿 |
 | SW-04 | 远程 OTA 管理 | 软件已验证；CORE 配套 `2808ed7` 已推送，协议、设备事务、管理台/审计/ACL 见 [19](19-remote-ota.md)；四固件预设、主机/实际 Java–MQTT–C、浏览器通过 | 04 `0910e5f` 已推送、远程 CI 六个 job 全绿；生产钥/HTTPS 与实机 OTA 仍待验收 |
 | SW-05 | CORE/记忆工具平滑凭据轮换 | 软件已验证；双令牌/到期/撤销、稳定任务归属、stdio 文件重载、CLI 与发布预检见 [20](20-credential-rotation.md) | CORE `9559429` / 04 `ccd3afa` 已推送；设备及上游服务凭据仍走各自维护流程，不经普通配置下发秘密 |
@@ -107,6 +108,12 @@ CONSOLE-03 的 CORE `b85f704` 已正常推送至 `codex/core-baseline` 并核对
 CONSOLE-03 的 04 `ff3ce39` 已推送并核对远程。补查时发现漏同步 `DeliveryService` 源码指纹，守卫先失败；核对旧基线 SHA 与完整差异仅为列表查询后，更新这一项、其余五项保持。首次命令沿用本机 JDK 17，编译拒绝 `--release 21`；按既有文档显式选择 JDK 21 后，原 Java→固件 C 持久化/回执→Java 源码契约及 Schema 全部通过，无 SQL/MQTT/实机结论。契约补充 `f4c4b7e` 已推送并核对远端，只有 `integration/**` 与 `docs/**`，未触发新的固件运行。
 
 CONSOLE-03 的本次远端 [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 已完成，绑定 `ff3ce39`：default/full/off/tones/duplex 五个固件预设及交付/桥接共七个 job 全部 success，full 的主机/协议/DSP/LVGL 步骤 success。该 workflow 不运行需要同级 CORE 和本地浏览器的 174 项专项，也不替代 CORE 的本地 Maven 验证；两类证据分别记录。最终只更新文档记录，不覆盖历史包或修改已验证实现。
+
+DEL-06：按本次线上 Docker 要求，在 CORE 交付独立的源码多阶段镜像和 `deploy/docker/compose.yml`，Vue 与 API 随同一 JAR 提供，配套 PostgreSQL/MQTT/Caddy。新私有目录初始化沿用已有 ACL/证书生成器，增加容器 DNS SAN，不覆盖现有目录；受鉴权健康检查验证数据库及 Broker，同时保留环境令牌/凭据文件模式。CORE 非 root/只读、无公开 8088，数据库无宿主端口；TLS、持久卷、有限日志和 30 秒停止均有配置，原开发 Compose/systemd 模板与旧离线包保留。
+
+DEL-06 本地 CLI 11 项、TypeScript/Vue 构建与完整 Maven verify 退出 0（67 条中 62 通过/5 条可选环境跳过，0 失败/错误）；实际源码 `linux/arm64` 镜像 `sha256:e6635840f0852cf16f6bc7f31233dbfd857c47f03458d7790ac9efdbf4ac8fd9`，包内 JAR SHA256 `13b4f72a55b447316c40c161983d316e6cb1847b159fc6db65b434c4fb856e57`。随机隔离 Compose 的 HTTPS/管理员鉴权/JAR 资源一致、严格 MQTT TLS、私有端口/非 root/只读、含 `$` 的原样 env、完整重建保留消息/HTTPS 证书、Broker 中断使健康失败及同进程恢复六组检查通过。初次严格 TLS 暴露新 CA 缺少 keyUsage，补齐约束后重跑通过；另修正脚本使用既有 `messageId` 字段，没有改业务 API。临时项目/卷/网络及失败私有目录均已清理，报告留 CORE 忽略目录 `target/docker-smoke.json`。没有注册设备、发送真实消息、迁移真实库、启用清理、申请公网证书或上线服务器。
+
+DEL-06 的 CORE `9026e41` 已正常推送并核对远程；新增 Ubuntu Docker workflow 只构建和运行临时 CLI/Compose，不发布镜像或部署。远程 [43398869944](https://github.com/liuyiwuqing/nexus-core/actions/runs/43398869944) 使用本次提交单独核对；04 本项仅更新本台账与部署索引，不触发固件矩阵，也不将此前固件 CI 计作 Docker 验证。
 
 DOC-01（2026-11-13）：产品介绍采用“栖团 Qitomo”，Logo 从现有猫形角色提炼猫耳与对话气泡，沿用 Mint / Ink 配色。新增三份介绍/品牌/上手文档，根 README 改为产品入口，文档索引保留所有技术与历史交付入口。品牌目录含 8 份独立 SVG、三尺寸 RGBA 图标及一份展示 PNG，字形来自项目已使用且 SHA-256 一致的 Noto Sans SC，正式资产均已转路径。图标与展示为品牌素材，不作为设备截图或固件资源。
 
