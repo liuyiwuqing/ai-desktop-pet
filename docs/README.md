@@ -1,4 +1,6 @@
-# AI 超级桌面宠物 · 方案索引
+# 栖团 Qitomo · 文档索引
+
+首次了解项目可从[项目介绍](24-project-introduction.md)、[品牌与 Logo](25-brand-identity.md)、[本地上手](26-getting-started.md)开始。产品名使用“栖团 Qitomo”；现有 NEXUS 技术标识和协议沿用原名，映射见品牌说明。
 
 当前需求、已完成任务和后续顺序统一见 [18 · 需求与任务台账](18-requirements-and-progress.md)，每项工作按“实现、验证、文档、提交、推送”闭环推进。
 
@@ -8,7 +10,7 @@
 
 本目录是 `04-ai-desktop-pet` 的设计与交付入口。先读 [00 当前架构](00-architecture.md)和最新交付记录，再按模块查阅接口、异常边界与验收项。[08 结构评审](08-structure-review.md)保留历史决策过程，不能作为当前完成度清单。
 
-## 模块清单
+## 文档清单
 
 | 文档 | 范围 | 状态 | 依赖 |
 | --- | --- | --- | --- |
@@ -30,6 +32,15 @@
 | [15-memory-lifecycle](15-memory-lifecycle.md) | 长期记忆检索、源评论复核、持久化删除与管理页 | 生命周期交付快照，语音工具后续见 16 | 13、14 |
 | [16-voice-memory-tools](16-voice-memory-tools.md) | 独立鉴权 MCP、stdio 适配、Linux 桥接及故障排查 | 接口交付快照，桥接回归后续见 17 | 12、15 |
 | [17-voice-bridge-regression](17-voice-bridge-regression.md) | 固定桥接、受控启动、stdio 恢复与本地 TLS 全链回归 | 当前交付与验证记录，真实供应商待验收 | 12、15、16 |
+| [18-requirements-and-progress](18-requirements-and-progress.md) | 当前需求、任务台账与交付边界 | 后续工作状态入口 | 全部 |
+| [19-remote-ota](19-remote-ota.md) | 远程 OTA 协议、事务、管理 UI 与成套启用 | 软件已验证，生产签发与实机待验收 | 10、11 |
+| [20-credential-rotation](20-credential-rotation.md) | CORE / 记忆工具双令牌、文件重载与交付预检 | 本地与隔离 Linux 已验证，真实运维待验收 | 13、16 |
+| [21-growth-sync](21-growth-sync.md) | 设备成长只读镜像、顺序隔离与管理台 | 软件已验证，跨端奖励下发为二期 | 04、11 |
+| [22-audio-duplex-diagnostic](22-audio-duplex-diagnostic.md) | 并行 HAL、有限诊断与隐私门控 | 普通 AI 仍半双工，声学验收待做 | 01、10 |
+| [23-console-completion](23-console-completion.md) | 管理台完成度、测试发送重试与状态筛选 | 当前实现、验证与完整规划缺口 | 02、11 |
+| [24-project-introduction](24-project-introduction.md) | 产品定位、使用场景、系统关系与阶段 | 项目介绍，完成度以 18 为准 | 00、18 |
+| [25-brand-identity](25-brand-identity.md) | 栖团 Qitomo 命名、Logo、配色与技术名映射 | 品牌资产已交付；固件技术名沿用 | 24 |
+| [26-getting-started](26-getting-started.md) | 成长、语音、LVGL 本地体验与开发检查 | 本机演练入口，硬件另行验收 | 01、04 |
 
 ## 评审方式
 
@@ -53,10 +64,3 @@
 - 事件命名：`<module>.<event>`，例如 `ai.state_changed`、`message.received`、`climate.alert`。
 - 跨模块调用使用 `contracts`、事件或明确的公开服务 API；组合根注册工具与平台端口，模块内部函数不对外暴露。
 - 先写失败反馈和状态机测试，再做硬件接线；主机测试不能替代实机验收。
-
-- [19 · 远程 OTA 管理](19-remote-ota.md)：版本目录、持久事务、安装与独立重启确认、完整回读和成套启用。
-
-- [20 · CORE 与记忆工具凭据轮换](20-credential-rotation.md)：双令牌、到期/撤销、stdio 重载与交付预检。
-- [21 · 设备成长只读同步](21-growth-sync.md)：设备快照上传、顺序隔离、存档状态与管理台展示。
-- [22 · 并行音频 HAL 与有限诊断](22-audio-duplex-diagnostic.md)：显式并行端口、隐私门控与维护预设；普通 AI 继续半双工。
-- [23 · 管理台完成度与验收](23-console-completion.md)：测试消息断线重试、实际验证与完整规划的差距。

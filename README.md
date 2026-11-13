@@ -1,174 +1,97 @@
-# 04 AI 超级桌面宠物（AI Desktop Pet）
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/qitomo-logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/brand/qitomo-logo.svg">
+    <img src="docs/assets/brand/qitomo-logo.svg" width="420" alt="栖团 Qitomo：猫耳与对话气泡组成的薄荷绿标志">
+  </picture>
+</p>
 
-状态：**设备软件与 NEXUS 远程管理已完成本地软件闭环，暂不上板。** 已接入运行配置、播放缓冲、对话文本/上下文/MCP、成长奖励/专注、温湿度图表、消息模板/提示音、诊断/备份、远程配置/回读/审计、DSP 回退、设备/舵机执行器和签名 OTA/恢复工具。语音开机服务、维护入口、扩展与 OTA 默认关闭；隔离 HTTP/PostgreSQL/MQTT 联调通过，真实部署、云端及硬件验收待做。CORE/记忆工具凭据轮换见 [20](docs/20-credential-rotation.md)。远程 OTA 的事务、管理台与启用步骤见 [19](docs/19-remote-ota.md)。最新语音记忆桥接准备与本地 TLS 回归见 [17](docs/17-voice-bridge-regression.md)，MCP/stdio 接口与运维见 [16](docs/16-voice-memory-tools.md)，长期记忆检索与副本失效见 [15](docs/15-memory-lifecycle.md)，屏幕/BOOT 恢复和设备更名见 [14](docs/14-recovery-and-device-names.md)，消息保留、隔离构建/CI 与浏览器回归见 [13](docs/13-operational-software.md)，前轮管理闭环见 [11](docs/11-product-software-closure.md)，设备首版记录保留在 [09](docs/09-software-delivery.md)。
+# 栖团 Qitomo
 
-## 目标
+**会回应、会成长的桌面伙伴。**
 
-在 ESP32-S3 桌面宠物上统一承载五类能力：
+栖团是一款基于 ESP32-S3 的实体 AI 桌面宠物，将语音对话、消息收件箱、环境感知和养成互动放进一块小屏幕。它用表情回应交流，接收来自服务端的消息，也会随着照料、对话和专注积累成长。
 
-1. AI 智能体语音对话（听、想、说、表情与动作）。
-2. 万能信息接收端（第三方消息推送、在线配置、屏幕渲染）。
-3. 温湿度传感器接入与可视化。
-4. 养成系游戏（成长数值、互动、存档）。
-5. 可插拔扩展：语音控制手机/电脑、语音控制舵机等硬件。
+设备的设计目标是插电联网后独立运行；Mac 用于开发，可选的电脑控制由 Mac Bridge 扩展提供。语音由设备直接连接小智服务，消息与远程管理由独立的 `nexus-core` 承担。
 
-设计约束：模块间只通过事件总线和版本化契约通信；HAL 与业务分离；新增能力以扩展包接入，不修改核心模块。
+> 当前为开发版本 `0.4.0-dev`。核心软件已有主机、构建及隔离联调证据；真实云端、生产部署与整机验收尚未完成，`04` 工程暂未烧录。普通 AI 会话仍为半双工，语音开机服务及敏感扩展需显式启用。当前状态以[需求与任务台账](docs/18-requirements-and-progress.md)为准。
 
-## 文档入口
+## 可以做什么
 
-当前需求、已完成任务、后续顺序和逐项交付约定统一见 [18 · 当前需求与任务台账](docs/18-requirements-and-progress.md)。每项工作同步文档、验证、提交并推送后继续下一项；软件验证与真实云端/生产部署/实机验收分别记录。
+| 能力 | 已有软件实现 | 使用条件与边界 |
+| --- | --- | --- |
+| 语音交流 | 唤醒/VAD、按住说话、WSS/Opus、对话文字与表情、上下文及工具接口 | 需要小智服务、设备凭据和显式开关；真实声音、延迟与声学打断待验收 |
+| 桌面收件箱 | 消息卡片、优先级、去重、离线持久化、展示/已读回执、免打扰 | 需要 CORE 与 MQTT/TLS；真实投递和掉电链路待验收 |
+| 环境感知 | DHT11 温湿度、60 分钟趋势、告警与冷/热/干/湿表现 | 需要实际接线；传感器误差与长期采集待验收 |
+| 陪伴成长 | 喂食、摸头、玩耍、睡眠、每日任务、成就、对话与专注奖励 | 成长逻辑可离线演练；物理存档掉电与 7 天体验待验收 |
+| 可选扩展 | Mac 白名单工具、舵机限位/急停、远程配置、签名 OTA 与恢复 | 分别按开关启用；Mac 控制、机械校准与实机 OTA 待验收 |
 
-设备成长只读同步见 [21](docs/21-growth-sync.md)：上传设备快照并在 CORE 展示，保留两端各自的奖励规则和存档所有权。
+成长界面已有八种原生 LVGL 状态动画。品牌 Logo 提炼自当前猫形角色的猫耳与薄荷绿配色，资源位于[品牌资产目录](docs/assets/brand/README.md)。
 
-并行音频 HAL 与有限维护诊断见 [22](docs/22-audio-duplex-diagnostic.md)；普通 AI 会话仍半双工，声学 AEC/打断尚待验收。
+## 从这里开始
 
-管理台测试发送的断线重试修复与当前验收记录见 [23](docs/23-console-completion.md)；完整管理台规划仍有待补功能。
+| 想了解什么 | 阅读入口 |
+| --- | --- |
+| 项目定位、场景与系统组成 | [项目介绍](docs/24-project-introduction.md) |
+| 名称含义、Logo 与使用规范 | [品牌说明](docs/25-brand-identity.md) |
+| 无设备体验与开发检查 | [本地上手](docs/26-getting-started.md) |
+| 当前完成度和剩余验收 | [需求与任务台账](docs/18-requirements-and-progress.md) |
+| 架构、功能设计和历史交付 | [文档索引](docs/README.md) |
+| 服务器预检、离线交付与部署 | [部署说明](deployment/README.md) |
 
-完整架构与分模块方案在 [`docs/README.md`](docs/README.md)。评审顺序：
+在仓库根目录运行以下命令，可先体验真实成长规则，无需开发板、网络或云端凭据：
 
-1. `00-architecture.md`：总体架构、目录规范、事件总线、契约与部署拓扑。
-2. `01-ai-agent.md`：语音输入/输出、对话上下文、AI 选型、表情与动作。
-3. `02-message-hub.md`：接收端选型、配置面板、推送接口、渲染逻辑。
-4. `03-climate-sensor.md`：DHT11/升级选型、采集、可视化、异常处理。
-5. `04-growth-game.md`：成长数值、互动、状态表现、持久化。
-6. `05-extension-device-control.md`：手机/电脑控制扩展接口。
-7. `06-extension-servo.md`：舵机与硬件执行器扩展接口。
-8. `07-roadmap-acceptance.md`：阶段、依赖与总体验收。
-9. `08-structure-review.md`：目录结构、生产级原则与迁移计划。
-10. `09-software-delivery.md`：设备首版软件实现、验证入口与当时的交付边界。
-11. `10-maintenance-recovery.md`：物理配置、诊断、备份恢复、OTA 与 02 迁移方案。
-12. `11-product-software-closure.md`：跨项目管理闭环与该轮构建记录。
-13. `12-cloud-interop.md`：小智协议、上下文/工具注册、诊断与真实云端联调步骤。
-14. `13-operational-software.md`：消息保留、隔离构建/CI、崩溃恢复及该轮验证证据。
-15. `14-recovery-and-device-names.md`：屏幕/BOOT 恢复、设备重命名与该轮验证。
-16. `15-memory-lifecycle.md`：长期记忆检索、源评论失效、持久化删除与当前验证。
-17. `16-voice-memory-tools.md`：独立 MCP/stdio 公开记忆接口、运维与真实联调步骤。
-18. `17-voice-bridge-regression.md`：固定桥接准备、受控启动、stdio 退出恢复与本地 TLS 全链回归。
-19. `18-requirements-and-progress.md`：需求映射、当前任务台账与持续交付约定。
-20. `19-remote-ota.md`：远程 OTA 协议、持久事务、管理 UI、成套启用与本地验证。
-21. `20-credential-rotation.md`：CORE/记忆工具双令牌、受保护文件重载、CLI 与验收边界。
-22. `21-growth-sync.md`：设备成长只读镜像、顺序隔离、管理台及 V12 配套离线包。
-23. `22-audio-duplex-diagnostic.md`：并行音频 HAL、一次诊断、隐私门控及后续声学验收条件。
-24. `23-console-completion.md`：管理台完成度、测试消息断线重试与验收边界。
+```sh
+bash tools/simulate_growth.sh
+```
 
-## 仓库与版本
+输入 `feed`、`pet`、`play`、`sleep`、`wait 3600`、`wake`，用 `status` 查看数值，`quit` 退出。桌面存档保存在忽略的构建目录中。语音状态机和真实 LVGL 动画的本地入口见[上手文档](docs/26-getting-started.md)。
 
-本工程使用独立 Git 仓库，与 `02`、`03`、`nexus-core`、`mac-bridge` 分开版本化：
+## 系统与仓库边界
 
-- 架构与模块文档随代码放在 `docs/`，保证设计、实现和发布记录可原子提交。
-- 构建依赖必须提交锁文件；发布以 tag 标记，契约变更单独升版本。
-- 跨仓库复用通过版本化契约或组件抽取完成，不在本仓库直接复制其他工程源码。
+| 部分 | 职责 |
+| --- | --- |
+| 本仓库 `04-ai-desktop-pet` | ESP32 固件、屏幕表现、设备端业务、集成契约与交付工具 |
+| 独立仓库 `nexus-core` | 消息接入、MQTT 投递、管理台、设备配置、OTA 管理和可选公开记忆工具 |
+| 小智服务 | 设备直连的云端语音会话；CORE 不代理音频 |
+| 独立仓库 `mac-bridge` | 可选的 Mac 白名单执行能力；Mac 不作为设备常驻运行依赖 |
+| `02-desktop-pet` / `03-xiaozhi-voice` | 独立 donor 工程，提供既有玩法、板型与语音经验 |
 
-## 目录结构
+`server/ai-gateway/` 为自建语音网关预留，当前没有替代小智服务。品牌名称使用“栖团 Qitomo”，工程目录、`nexus_pet` 构建标识、MQTT/NVS 命名及独立仓库名称沿用现有技术标识，映射见[品牌说明](docs/25-brand-identity.md)。
+
+## 目录
 
 ```text
 04-ai-desktop-pet/
-├── README.md                     项目入口与目录说明
-├── docs/                         架构、交付、维护、云端联调与任务台账
-├── deployment/                   CORE 服务、TLS 代理、升级与恢复模板
-├── firmware/                     ESP32-S3 固件工程（ESP-IDF）
-│   ├── main/                     组合根：app_main、启动编排、诊断
-│   ├── components/               ESP-IDF 组件（只暴露 include/）
-│   │   ├── contracts/            跨模块契约（纯 C，可主机测试）
-│   │   ├── core/                 事件总线与基础服务
-│   │   ├── pet_hal/              HAL 接口与 fake 实现
-│   │   ├── storage/              NVS 薄封装
-│   │   ├── svc_climate/          温湿度采集
-│   │   ├── svc_message_hub/      消息校验、优先级队列、去重与 NVS 持久化
-│   │   ├── ui_lvgl/               消息卡片、成长动画、刷新确认与 BOOT 操作
-│   │   ├── svc_config/           配置事务、物理入口与远程配置
-│   │   ├── svc_intent/           结构化 MCP 工具路由
-│   │   ├── svc_focus/            专注计时
-│   │   ├── svc_ota/              身份、签名升级与回滚接线
-│   │   ├── svc_ai_agent/         会话/上下文/模型/WSS/音频拥有者
-│   │   ├── svc_audio/            半双工录放音诊断（默认不录音）
-│   │   ├── svc_net/              Wi-Fi + MQTT/TLS 传输层
-│   │   └── svc_growth/           成长规则、双槽存档与运行服务
-│   ├── boards/dodo-s3-lcd/       板级 board.json（引脚/能力唯一事实源）
-│   ├── partitions/               分区表与迁移说明
-│   └── tests/host/               主机测试
-├── server/                       AI 网关预留与 Mac 控制薄网关
-│   └── ai-gateway/               ASR/LLM/TTS 会话编排与供应商适配
-├── integration/                  与 nexus-core 的契约与部署（不放业务代码）
-│   └── contracts/generated/      Schema 生成的 TypeScript 类型
-├── bridge/                       本机工具桥（复用 mac-bridge）
-├── config/                       非敏感配置与 JSON Schema（唯一事实源）
-│   ├── schemas/                  设备配置/profile/消息/回执/扩展 manifest
-│   ├── profiles/                 板型与功能开关
-│   └── examples/                 示例配置（不含凭据）
-├── resources/                    运行时资源
-│   ├── fonts/                    中文与数字字体子集
-│   ├── images/                   表情、图标、背景
-│   ├── animations/               表情/动作帧序列
-│   ├── audio/                    提示音、音效
-│   └── i18n/                     国际化资源预留（当前 UI 中文）
-├── extensions/                   扩展包（manifest + 组件 + 主机契约测试）
-│   ├── device_control/           设备控制适配器与能力注册
-│   └── servo/                    舵机执行器与安全限制
-├── tools/                        构建、契约生成、资源打包、迁移、诊断脚本
-└── tests/                        跨模块契约与集成测试
+├── docs/                 产品介绍、架构、验收与任务台账
+│   └── assets/brand/     SVG Logo、PNG 图标与品牌展示图
+├── firmware/             ESP-IDF 固件、板型与主机测试
+│   ├── main/             应用组合根与启动编排
+│   ├── components/       契约、HAL、业务服务、表现与 LVGL
+│   └── boards/           板级 board.json，引脚配置事实源
+├── config/               JSON Schema、非敏感示例与 profile
+├── integration/          与 CORE 的版本化契约及联调入口
+├── extensions/           设备控制、舵机扩展
+├── resources/            运行时字体与资源；品牌素材不打入固件
+├── deployment/           服务端交付、TLS 与恢复模板
+├── server/               Mac 控制薄网关及 AI 网关预留
+├── bridge/               Mac Bridge 集成说明
+├── tools/                构建、模拟、配置与诊断工具
+└── tests/                跨模块契约与集成测试说明
 ```
 
-`main` 只做组合根，业务与基础能力放在 `components/`，每个组件只暴露 `include/`，依赖通过 `REQUIRES` 显式声明。扩展能力统一在 `extensions/` 下，通过 `CONFIG_PET_EXT_*` 编译开关接入，默认关闭。配置与消息以 `config/schemas/` 为唯一事实源，生成 C 头与 TypeScript 类型并由 CI 校验。
-
-## 与现有工程的关系
-
-| 现有资产 | 复用方式 |
-| --- | --- |
-| `02-desktop-pet` | 复用离线玩法、DHT11/光敏/摇杆/触摸驱动思路、NVS 存档经验；不复制整仓。 |
-| `03-xiaozhi-voice` | 语音底座、DODO 板型、ST7789/INMP441/MAX98357A 接线与构建经验。 |
-| `nexus-core` | 消息中心：Halo/Webhook 接入、消息去重、MQTT/TLS 与设备认证、配置下发/回读/审计和管理台；不代理语音。 |
-| `server/ai-gateway` | 自建 ASR/LLM/TTS 网关预留；首版由 ESP32 直接连接小智，经 `ai_session` 契约隔离。 |
-| `mac-bridge` | 手机/电脑控制的本机执行适配器，继续用固定白名单与确认机制。 |
-| `docs/HARDWARE.md` | 硬件与分区事实来源；新工程重新定义分区，不复用 02/03 的分区表。 |
-
-原则：先抽取可复用组件，再在新工程引用；禁止把 02/03 的源码整段复制成第二份实现。
+固件以 C17 / ESP-IDF 6.1 / LVGL 9.x 实现，CORE 使用 Java 21 / Spring Boot / PostgreSQL / Vue 3。`main` 负责组合，业务、HAL 与 UI 分层；跨模块使用版本化契约、事件和明确的公开服务接口，详见[总体架构](docs/00-architecture.md)。
 
 ## 硬件基线
 
-- ESP32-S3 N16R8：16 MB Flash、8 MB PSRAM。
-- 2.4 英寸 ST7789 240×320 SPI 屏。
-- INMP441 I2S 麦克风、MAX98357A I2S 功放与扬声器。
-- DHT11/KY-015 温湿度；37 合 1 KY 套件中的光敏、摇杆、触摸、蜂鸣器。
-- 预留 1–2 路舵机扩展（独立 5V 供电）。
+当前板型为 `dodo-s3-lcd`：ESP32-S3 N16R8（16 MB Flash、8 MB PSRAM）、240×320 ST7789 屏、INMP441 麦克风、MAX98357A 功放与扬声器、DHT11 温湿度传感器。舵机为可选扩展，需要独立供电和校准。
 
-## 当前进度（2026-11-13）
+实际引脚以 [board.json](firmware/boards/dodo-s3-lcd/board.json) 为准。`02`、`03` 与本工程使用独立版本和存档/分区方案；首次上板前需按[维护与迁移文档](docs/10-maintenance-recovery.md)核对，当前流程只构建、不烧录或擦除。
 
-服务端已建立独立本地 Git 基线，离线发布包、配置/主机预检和只读探测已实现，包内实际 JAR 的 Linux 容器启动/重启通过，见 [部署记录](deployment/README.md)。后续任务以 [18](docs/18-requirements-and-progress.md) 为准，以下保留早期切片说明。
+## 开发与交付
 
-S1–S4、S5-A 至 S5-F、G1–G6 成长模块及 A1–A8 音频/会话/WSS/输入/UI/模型接入软件已完成相应代码切片。消息链路现在使用现有 nexus-core v1；v3 消息快照保存完整投递身份，兼容 v1/v2 旧数据。离线已读、重启补发、终态重投和满队列重试已有主机验证；仍需真实 Broker 与上板验收。详细行为与验证见[消息模块](docs/02-message-hub.md#s5-f-nexus-core-v1-协议适配2026-11-11)。
+新增功能优先验证公开行为，沿用现有主机、真实 LVGL、Java/HTTP/PostgreSQL/MQTT 与 CLI 检查。每项同步实现、契约、说明与台账，分别记录本地软件、远程 CI、部署和实机证据；详细入口见[本地上手](docs/26-getting-started.md)与[项目交付约定](AGENTS.md)。
 
-- 当前仍未烧录 `04`，硬件与整条消息时间线待实机验收。
-- 2026-11-12 补齐 14 项设备软件交付及跨项目管理闭环，见 [当前记录](docs/11-product-software-closure.md)。NEXUS 配置事务、管理台、ACL 升级工具与 Java/C 回环均已实现；真实库和 Broker 尚未升级。当前电脑控制仅 Mac Bridge 三项白名单能力。
-- 02/03 保持独立；分区不兼容，烧录前需备份、核对板上固件与迁移方案，不自动擦除 NVS。
-- 本阶段主机测试与构建结果不能替代屏幕、按键、网络、掉电和长期稳定性的实机验收。
+各仓库独立版本化，依赖锁文件随源码提交，发布以 tag 标记，契约变更单独升版本。跨仓复用通过版本化契约或抽取组件完成，保持 `02` / `03` donor 独立。
 
-以下 G/A 条目保留各切片落地时的状态，后续接线与最终结果以 [11](docs/11-product-software-closure.md) 为准。
-
-成长服务可直接在桌面体验：运行 `./tools/simulate_growth.sh`，输入 `feed`、`pet`、`play`、`sleep`、`wait 3600`、`wake`。说明与边界见[成长模块 G1](docs/04-growth-game.md#9-g1-软件切片2026-11-11)。
-
-G2：空闲主页长按 BOOT 进入互动菜单，短按切换、长按执行；主页及消息页的短按消息操作保留。消息弹出取消菜单。
-
-G3：每日喂食 1 次、摸头 3 次、玩耍 1 次，每项可领取 15 经验与 5 金币。菜单中进入对应任务领取；CLI 使用 `claim-feed` / `claim-pet` / `claim-play`。
-
-G4：成长主页显示原生图元宠物，随发呆、开心、兴奋、低落、困倦、饥饿、生病、睡眠切换动作；消息和菜单遮挡时停帧。运行 `./tools/ci/test_ui_host.sh` 后执行 `python3 tools/export_pet_preview.py`，打开生成的 `firmware/build-ui-preview/pet-animation.html`，可在桌面切换八种状态预览。
-
-G5：首次成功照料、亲密 20、等级 5 分别奖励 10/20/30 金币，随成功操作一次性保存；菜单在任务之后新增成就查看页，CLI 使用 `achievements`。成长存档现为 v3，兼容 v1/v2，旧固件不能读取 v3，降级需先备份/迁移。
-
-G6：可信温湿度读数可触发冷/热/干/湿表现，并按有效读数覆盖的在线时长每小时额外扣 1 点心情；读数 30 秒过期，不外推关机环境。CLI 使用 `climate 31 90`、`climate-off`、`climate-loss`；动画预览新增四种环境。规则与验证见[成长模块 G6](docs/04-growth-game.md#14-g6-温湿度成长联动2026-11-11)。
-
-A1：新增 I²S 音频 HAL、PCM 转换/音量/电平、有限 FIFO 与一秒录放音诊断。默认不开麦，诊断需显式编译启用；真实音频验收待做。见[音频模块 A1](docs/01-ai-agent.md#13-a1-音频基础软件切片2026-11-11)。
-
-A2：新增端点与会话状态机，支持 300 ms 静音端点、15 s 上限、手动打断、静音和旧轮次隔离。运行 `./tools/simulate_voice.sh` 可用合成 PCM 与注入事件演练；未绑定 BOOT、未接入唤醒模型或云端。见[会话模块 A2](docs/01-ai-agent.md#14-a2-端点与会话状态机2026-11-11)。
-
-A3：新增单一拥有者 runtime 边界和 WakeNet/VAD 适配接口，固定音频/传输动作顺序与失败回送；此层同步执行端口，任务由 A4 持有。见[运行边界 A3](docs/01-ai-agent.md#15-a3-运行拥有者与前端适配边界2026-11-12)。
-
-A4：新增 FreeRTOS 拥有者服务、控制/播放队列及 HAL 流式采集/播放，支持短读短写、同毫秒帧暂存、打断、静音、超时、真实 drain 门控与故障锁定。应用接入前必须提供传输端口，当前不自动启动。见[任务执行 A4](docs/01-ai-agent.md#16-a4-拥有者任务与-hal-流式执行2026-11-12)。
-
-A5：新增小智 WebSocket v1 协议与 Opus 适配库，20/60 ms 帧转换、尾包补齐、播放背压与单轮连接隔离已有主机验证；真实 SDK 入口已通过 ESP32-S3 强制链接检查。见[协议与编解码 A5](docs/01-ai-agent.md#17-a5-小智-v1-协议与-opus-适配库2026-11-12)。
-
-A6：新增独立 WSS/codec 任务，向 A4 提供有限队列、分片重组、超时、失败回送和每轮新连接。`CONFIG_PET_AI_XIAOZHI_ON_BOOT` 默认关闭，显式开启后读取 NVS 并组合 A4/WSS，未启用模型时需主动 PTT；BOOT/UI 接线见 A7，模型接入见 A8。见[网络接线 A6](docs/01-ai-agent.md#18-a6-wss-网络拥有者与-a4-接线2026-11-12)。
-
-A7：现有 BOOT 菜单增加按住说话、静音和免打扰；AI 状态页使用采集电平快照，critical 抢占会取消对话。控制队满不再丢失静音/取消，策略变化不恢复旧会话。见[输入、状态与隐私 A7](docs/01-ai-agent.md#19-a7-boot-输入ai-状态与隐私仲裁2026-11-12)。
-
-A8：接入锁定 ESP-SR 的“小爱同学”与模型 VAD，增加模型包/分区/SHA256 检查、拥有者生命周期及失败锁定。默认关闭；显式启用后本地监听可见，云端轮次由唤醒或 PTT 触发，保留半双工与静音/DND 门控。见[模型接入 A8](docs/01-ai-agent.md#20-a8-wakenet-与模型-vad-接入2026-11-12)。
+凭据、私有 env、NVS/崩溃备份、生成固件和服务端发布包不进入 Git。首版不做本地大模型、任意 shell、多设备集群或自动旧 NVS 迁移；完整产品验收标准保留在[路线与验收](docs/07-roadmap-acceptance.md)。
