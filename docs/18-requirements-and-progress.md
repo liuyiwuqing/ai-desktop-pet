@@ -42,6 +42,7 @@
 | CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；来源/设备/时间筛选与导出仍待后续，取消/时间线见 CONSOLE-04 |
 | CONSOLE-04 | 投递状态时间线与受限取消 | CORE `109b83f` / 04 `0dec4b6` 已推送并核对远程；HTTP/worker/隔离 SQL 6 项，实际 Vue 新增 62/既有 191 项，Java→固件 C→Java 契约通过；完整构建 70 通过/5 跳过、JAR 一致；见 [23](23-console-completion.md#console-04--事务状态时间线与受限取消) | CORE [43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) Docker job、04 [43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job 全绿；V13 只在隔离库验证，旧行历史未知，无设备撤回或生产迁移 |
 | CONSOLE-05 | 只读运行概览 | CORE `af916aa` / 04 `24df6d9` 已推送并核对远程；HTTP/隔离 PostgreSQL 2 项、实际 Vue 17 项、完整构建 64 通过/5 跳过及 JAR 一致；见 [23](23-console-completion.md#console-05--只读运行概览) | CORE [43408287857](https://github.com/liuyiwuqing/nexus-core/actions/runs/43408287857) Docker job、04 [43408341106](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43408341106) 七个 job 全绿；生产/设备另行验收 |
+| CONSOLE-12-A | 工具/规则创建与页面故障处理 | CORE `28793aa` 已推送并核对远端；HTTP/隔离 PostgreSQL 4 项、实际 Vue 新增 96/既有 253 项；完整构建 74 通过/5 跳过、JAR 三资源/V14 一致；见 [23](23-console-completion.md#console-12-a--工具规则创建与页面故障处理) | 04 专项同项提交，本次 CI 单独核对；固定提交/参数、V14 可选规则键、后台错误保留，不扩大自动化条件/动作 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 | ACC-01 | 真实云端与常在线部署 | 等待接入条件；尚无目标服务器/域名及供应商桥接凭据 | [部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | 未开始，当前不烧录 | P1–P7、NVS 掉电、真实 OTA/回滚、24h/7d，见 [07](07-roadmap-acceptance.md) |
@@ -134,3 +135,9 @@ CONSOLE-04：先复现历史接口 404 和页面缺少时间线动作，再新�
 CONSOLE-04 最终 `python3 tools/run_local.py build` 退出 0：类型/前端及 Maven verify/JAR 通过，75 条中 70 通过、5 条可选环境跳过，0 失败/错误。JAR 内三份静态资源与本轮前端逐字节哈希一致，无旧资源。CORE `109b83f` 已正常推送至 `codex/core-baseline`，`ls-remote` 核对一致；04 专项入口、源码契约与文档同项提交，本次推送的远程 CI 另行核对。
 
 CONSOLE-04 的 CORE `109b83f` / 04 `0dec4b6` 已推送并核对远端；对应 [CORE CI 43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) 的 Docker job 与全部步骤 success，[04 CI 43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job success，含 full 主机/协议/DSP/LVGL。源码构建/隔离 Compose、固件 CI 与本地 HTTP/Maven/浏览器分别记录。本次文档回填同步修正 02 的概览和时间线当前状态，不改变原 Webhook/路由/角色规划，也不覆盖旧包。
+
+CONSOLE-12-A：旧工具页保存后丢响应稳定产生第二条请求；固定逻辑提交后回归通过。规则公开接口先拒绝尚未支持的 `requestKey`（400），V14 和可选键实现后 4 项真实 HTTP/PostgreSQL 通过，含八个同键并发、启用后重放不重置版本、旧调用和 V13→V14 旧行兼容。另以实际 Vue 复现操作拒绝提示在 5.3 秒轮询后消失；修复后只读后台刷新不会清掉操作错误。
+
+本项 `bash tools/ci/test_operations_ui.sh` 96 项、既有页面 253 项均退出 0，合计 349 项，所有任务空间成功关闭；新夹具只用回环 RAM，不执行真实 Bridge/提醒。完整 `python3 tools/run_local.py build` 退出 0：79 条中 74 通过/5 条可选环境跳过，0 失败/错误；JAR 三份前端资源及 V14 与本轮来源逐字节一致，无旧资源。Schema 14/1 profile/12 examples/2 extensions 检查通过，原消息契约六份源码指纹未变。文档链接、Python/Bash 语法与差异检查通过；不迁移真实库、不执行清理/真实消息/工具、不部署或烧录。逐仓提交推送、本项 CI 另行核对。
+
+CONSOLE-12-A 的 CORE `28793aa` 已正常推送至 `codex/core-baseline`，`ls-remote` 核对一致；04 专项、HTTP 边界与本页配套记录同项提交。原 Docker/固件 CI 只覆盖此前切片，本次推送使用新运行单独核对；规范留在项目契约，不写通用 Skill 或替换旧交付包。
