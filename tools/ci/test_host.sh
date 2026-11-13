@@ -226,6 +226,7 @@ build_and_run test_nexus_codec \
     "${repo_root}/firmware/tests/host/test_nexus_codec.c"
 
 build_and_run test_message_store \
+    -D_POSIX_C_SOURCE=200112L \
     -DTEST_FIXTURE_DIR="\"${repo_root}/firmware/tests/host/fixtures\"" \
     -I "${contracts_inc}" \
     -I "${message_priv_inc}" \
@@ -240,6 +241,7 @@ build_and_run test_message_presenter \
     "${repo_root}/firmware/tests/host/test_message_presenter.c"
 
 build_and_run test_message_service \
+    -D_POSIX_C_SOURCE=200112L \
     -DTEST_FIXTURE_DIR="\"${repo_root}/firmware/tests/host/fixtures\"" \
     -I "${repo_root}/firmware/tests/host/support" \
     -I "${contracts_inc}" -I "${message_priv_inc}" \

@@ -35,7 +35,7 @@ static void publish_event(pet_event_id_t id, const pet_message_view_t *message,
                           pet_message_ack_state_t state, uint8_t depth)
 {
     pet_message_event_t payload = {0};
-    strlcpy(payload.id, message->id, sizeof(payload.id));
+    (void)snprintf(payload.id, sizeof(payload.id), "%s", message->id);
     payload.state = state;
     payload.queue_depth = depth;
     pet_event_t event;
@@ -136,7 +136,7 @@ static bool queue_ack_locked(const pet_message_view_t *message, pet_message_ack_
     }
     pet_message_pending_ack_t *ack = &s_work->acks[index];
     memset(ack, 0, sizeof(*ack));
-    strlcpy(ack->id, message->id, sizeof(ack->id));
+    (void)snprintf(ack->id, sizeof(ack->id), "%s", message->id);
     ack->delivery = message->delivery;
     ack->state = state;
     ack->at_epoch_s = at;
@@ -199,7 +199,7 @@ esp_err_t pet_message_hub_init(const char *device_id, pet_message_hub_ack_publis
     }
     pet_message_queue_init(&s_queue, s_slots, PET_MESSAGE_QUEUE_CAPACITY);
     memset(s_work, 0, sizeof(*s_work));
-    strlcpy(s_device_id, device_id, sizeof(s_device_id));
+    (void)snprintf(s_device_id, sizeof(s_device_id), "%s", device_id);
     snprintf(s_inbox_topic, sizeof(s_inbox_topic), PET_NEXUS_TOPIC_PREFIX "%s/inbox", device_id);
     s_publisher = publisher;
     s_publisher_context = context;
