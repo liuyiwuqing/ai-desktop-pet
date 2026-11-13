@@ -11,6 +11,9 @@ static const char *const s_topic_names[PET_NET_TOPIC_COUNT] = {
     [PET_NET_TOPIC_CONFIG] = "config",
     [PET_NET_TOPIC_CONFIG_ACK] = "config_acks",
     [PET_NET_TOPIC_TELEMETRY] = "telemetry",
+    [PET_NET_TOPIC_OTA] = "ota",
+    [PET_NET_TOPIC_OTA_ACK] = "ota_acks",
+    [PET_NET_TOPIC_OTA_STATUS] = "ota_status",
 };
 
 static const char *const s_state_names[PET_NET_STATE_COUNT] = {

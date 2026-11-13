@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "deviceId": "dodo-1",
+  "requestId": "install-1",
+  "commandId": "install-1",
+  "operation": "install",
+  "bootId": "11111111111111111111111111111111",
+  "issuedAt": 1794528000,
+  "expiresAt": 1794528300,
+  "target": {
+    "releaseId": "release-0_4_1",
+    "version": "0.4.1",
+    "imageSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "imageSize": 1024,
+    "releaseSequence": 10
+  }
+}

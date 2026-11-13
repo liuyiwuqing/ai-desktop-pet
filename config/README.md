@@ -36,3 +36,5 @@ python3 tools/ci/check_contracts.py
 MQTT/WSS/控制分别要求 `mqtts://`、`wss://`、`https://`；CA 省略时使用 SDK 信任包。allowed_apps/projects 为逗号分隔白名单 ID，最多 16 项，每项 `[a-zA-Z0-9_-]{1,40}`，并须与控制网关一致。配置入口拒绝未知/重复字段、深层 JSON 和超长输入，不导出凭据，日志不输出秘密。
 
 新包不存在才兼容旧 namespace/key；包存在但损坏/缺必填键，不拼接旧凭据。设备身份已存在时禁止更换，避免历史回执错发。凭据成功后需显式重启；首次配置串口默认关闭。发布签名私钥与供应商密钥始终留在维护者/服务端，不下发设备。
+
+远程升级命令/回执/完整状态见 [remote-ota-v1](../integration/contracts/remote-ota-v1/README.md)，与消息和配置通道并列；不包含 URL、公钥或秘密。

@@ -68,3 +68,5 @@ A7：`test_host.sh` 覆盖 PTT/隐私/抢占与独立策略更新，`test_ui_hos
 `python3 tools/ci/test_memory_mcp_stdio.py` 使用同级 `nexus-core/tools/memory_mcp_stdio.py`，以真实子进程和隔离 HTTP 验证初始化/通知/请求 ID、凭据不外泄、禁止重定向和自动重试、异常响应、体积/Unicode/配置边界。只需 Python 标准库，不启动供应商桥接或访问真实实例。CORE `MemoryLifecycleFlowTest` 另运行真实 stdio→CORE→PostgreSQL/外部 HTTP 夹具回环；构建和部署方式见 [16](../docs/16-voice-memory-tools.md)。
 
 `python3 tools/memory_voice.py prepare --directory build/memory-voice` 下载并校验固定桥接与两个依赖 wheel，创建独立 venv；`verify` 离线检查；`python3 tools/memory_voice.py run --directory build/memory-voice --stdio ../nexus-core/tools/memory_mcp_stdio.py` 使用受控环境启动。工具不读取私有 env 文件，凭据由环境注入；只有 `run` 才建立配置的 WSS。`ci/test_memory_voice_prepare.py` 验证准备/启动边界；准备后用 `build/memory-voice/.venv/bin/python tools/ci/test_memory_voice_bridge.py` 运行实际桥接+stdio+临时 TLS 端点回归。真实 CORE 全链测试需额外启用，命令与边界见 [17](../docs/17-voice-bridge-regression.md)。
+
+远程 OTA 检查：`PET_HOST_SANITIZE=1 bash tools/ci/test_ota_remote_host.sh`、`PET_HOST_SANITIZE=1 python3 tools/ci/test_remote_ota_contract.py`、`bash tools/ci/test_remote_ota_ui.sh`。分别覆盖实际 C 事务、真实 CORE/数据库/Broker 与 C 回环、真实 Vue/浏览器 + HTTP 边界夹具；均不烧录、不执行真实升级，见 [19](../docs/19-remote-ota.md)。

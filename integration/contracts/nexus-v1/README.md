@@ -2,7 +2,7 @@
 
 2026-11-11 按同级 `nexus-core` 当前源码固定；源码 SHA-256 见 `source-manifest.json`，不包含服务端凭据、业务数据或 Java 实现副本。
 
-2026-11-13 核对历史原文件后更新 `MqttTransport.java` 指纹：新增 `telemetry`、`config_acks` 订阅与 `publishConfig`，并收紧主题前缀校验；原 inbox/acks/state 的主题、QoS、1024 B 上限及消息字段保持兼容。配置通道另见 `device-management-v1`。其余五个服务端源文件指纹、现有 schema 与示例未变；源码变化检查继续启用。
+2026-11-13 核对历史原文件后更新 `MqttTransport.java` 指纹：新增 `telemetry`、`config_acks` 订阅与 `publishConfig`，并收紧主题前缀校验；原 inbox/acks/state 的主题、QoS、1024 B 上限及消息字段保持兼容。配置通道另见 `device-management-v1`。本轮进一步加入默认关闭的 `ota_acks`/`ota_status` 条件订阅及 `publishOta`，见 `remote-ota-v1`。其余五个服务端源文件指纹、现有 schema 与示例未变；源码变化检查继续启用。
 
 - `message.schema.json`：DeliveryWorker 的 inbox.message 信封，epoch 秒、UUID、96/180 UTF-8 字节标题/摘要、整包不超过 1024 B。
 - `message-ack.schema.json`：DeliveryService 接受的 received/displayed/read。

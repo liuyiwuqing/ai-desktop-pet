@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "deviceId": "dodo-1",
+  "observedAt": 1794528001,
+  "reportSequence": 1,
+  "bootId": "11111111111111111111111111111111",
+  "available": true,
+  "state": "installing",
+  "code": 0,
+  "requestId": "install-1",
+  "rebootId": "",
+  "writtenBytes": 0,
+  "reservedSequence": 10,
+  "identity": {
+    "project": "nexus_pet",
+    "board": "dodo-s3-lcd",
+    "modelSha256": "none",
+    "partitionSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "configSchema": 1,
+    "growthSchema": 4
+  },
+  "target": {
+    "releaseId": "release-0_4_1",
+    "version": "0.4.1",
+    "imageSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "imageSize": 1024,
+    "releaseSequence": 10
+  }
+}

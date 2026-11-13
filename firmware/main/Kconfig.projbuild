@@ -281,6 +281,14 @@ config PET_OTA_ENABLED
       RSA-3072-PSS manifest, HTTPS, inactive app only and rollback health check.
       Never writes the single model partition; changing models requires a USB recovery package.
 
+config PET_OTA_REMOTE_ENABLED
+    bool "Enable journaled CORE remote OTA management"
+    depends on PET_OTA_ENABLED
+    default n
+    help
+      Requires paired CORE and ota/ota_acks/ota_status device-scoped broker ACL.
+      Commands bind the current boot ID and a short lifetime. Reboot needs a separate request.
+
 config PET_OTA_BASE_URL
     string "Pinned HTTPS release root (no trailing slash)"
     depends on PET_OTA_ENABLED

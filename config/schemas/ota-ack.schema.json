@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pet.local/contracts/remote-ota-v1/PetOtaAck.schema.json",
+  "title": "PetOtaAck",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "commandId",
+    "operation",
+    "accepted",
+    "status",
+    "code"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 40,
+      "pattern": "^[a-zA-Z0-9_-]*$"
+    },
+    "commandId": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 40,
+      "pattern": "^[a-zA-Z0-9_-]*$"
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "",
+        "install",
+        "reboot"
+      ]
+    },
+    "accepted": {
+      "type": "boolean"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "rejected",
+        "expired",
+        "conflict",
+        "unavailable"
+      ]
+    },
+    "code": {
+      "type": "integer",
+      "minimum": -2147483648,
+      "maximum": 2147483647
+    }
+  }
+}

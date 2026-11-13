@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "requestId": "install-1",
+  "commandId": "install-1",
+  "operation": "install",
+  "accepted": true,
+  "status": "accepted",
+  "code": 0
+}

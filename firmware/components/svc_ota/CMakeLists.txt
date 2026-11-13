@@ -1,4 +1,4 @@
-set(ota_sources "src/manifest.c" "src/transfer.c" "src/identity.c")
+set(ota_sources "src/manifest.c" "src/transfer.c" "src/identity.c" "src/remote.c")
 if(CONFIG_PET_OTA_ENABLED)
     list(APPEND ota_sources "src/ota_esp.c")
 endif()

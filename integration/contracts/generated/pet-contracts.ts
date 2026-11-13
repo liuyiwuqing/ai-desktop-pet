@@ -150,6 +150,70 @@ export interface MessageEnvelope {
   payload: MessageEnvelopePayload;
 }
 
+export interface PetOtaAck {
+  schemaVersion: 1;
+  requestId: string;
+  commandId: string;
+  operation: "" | "install" | "reboot";
+  accepted: boolean;
+  status: "accepted" | "rejected" | "expired" | "conflict" | "unavailable";
+  code: number;
+}
+
+export interface PetOtaCommandTarget {
+  releaseId: string;
+  version: string;
+  imageSha256: string;
+  imageSize: number;
+  releaseSequence: number;
+}
+
+export interface PetOtaCommand {
+  schemaVersion: 1;
+  deviceId: string;
+  requestId: string;
+  commandId: string;
+  operation: "install" | "reboot";
+  bootId: string;
+  issuedAt: number;
+  expiresAt: number;
+  target: PetOtaCommandTarget;
+}
+
+export interface PetOtaStatusIdentity {
+  project: string;
+  board: string;
+  modelSha256: string;
+  partitionSha256: string;
+  configSchema: number;
+  growthSchema: number;
+}
+
+export interface PetOtaStatusTarget {
+  releaseId: string;
+  version: string;
+  imageSha256: string;
+  imageSize: number;
+  releaseSequence: number;
+}
+
+export interface PetOtaStatus {
+  schemaVersion: 1;
+  deviceId: string;
+  observedAt: number;
+  reportSequence: number;
+  bootId: string;
+  available: boolean;
+  state: "idle" | "installing" | "pending_reboot" | "reboot_requested" | "verifying" | "healthy" | "failed" | "interrupted" | "rolled_back" | "unconfirmed" | "unavailable";
+  code: number;
+  requestId: string;
+  rebootId: string;
+  writtenBytes: number;
+  reservedSequence: number;
+  identity: PetOtaStatusIdentity;
+  target?: PetOtaStatusTarget;
+}
+
 export interface PetTelemetryConfigDnd {
   /** 手动免打扰，独立于定时规则。 */
   manual?: boolean;

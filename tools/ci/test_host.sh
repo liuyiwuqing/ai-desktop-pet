@@ -32,6 +32,7 @@ python3 "${repo_root}/tools/ci/test_control_gateway.py"
 
 bash "${repo_root}/tools/ci/test_config_host.sh"
 bash "${repo_root}/tools/ci/test_ota_host.sh"
+bash "${repo_root}/tools/ci/test_ota_remote_host.sh"
 
 build_and_run test_ai_session \
     -I "${contracts_inc}" -I "${hal_inc}" \

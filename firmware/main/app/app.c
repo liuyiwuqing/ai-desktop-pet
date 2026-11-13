@@ -3,6 +3,7 @@
 #include "app_diagnostics.h"
 #include "app_behavior.h"
 #include "app_recovery.h"
+#include "app_ota_remote.h"
 
 #include <inttypes.h>
 #include <string.h>
@@ -236,6 +237,7 @@ static void message_ack_task(void *arg)
         if (pet_net_is_online()) {
             pet_message_hub_flush_acks();
             uint32_t epoch=app_epoch_now();
+            app_ota_remote_poll(epoch);
             if(epoch&&(!last_summary||epoch<last_summary||epoch-last_summary>=30)) {
                 char summary[1536];
                 if(app_summary_json(s_device_id,epoch,summary,sizeof(summary))==ESP_OK&&
@@ -250,6 +252,7 @@ static void on_net_message(const char *topic, const char *payload, size_t length
                            bool retained, void *context)
 {
     (void)context;
+    if(app_ota_remote_message(topic,payload,length,retained,app_epoch_now()))return;
     char settings_topic[PET_NET_TOPIC_MAX];
     int written=snprintf(settings_topic,sizeof(settings_topic),PET_NEXUS_TOPIC_PREFIX "%s/config",s_device_id);
     if (written>0&&(size_t)written<sizeof(settings_topic)&&!strcmp(topic,settings_topic)) {
@@ -549,6 +552,9 @@ esp_err_t app_start(void)
 #if CONFIG_PET_OTA_ENABLED
     esp_err_t ota_error=pet_ota_start();
     if(ota_error!=ESP_OK)ESP_LOGW(TAG,"OTA unavailable: %s",esp_err_to_name(ota_error));
+#if CONFIG_PET_OTA_REMOTE_ENABLED
+    if(ota_error==ESP_OK)app_ota_remote_init(s_device_id);
+#endif
 #endif
 
     if (xTaskCreate(settings_runtime,"pet_settings_rt",4096,NULL,2,NULL)!=pdPASS)

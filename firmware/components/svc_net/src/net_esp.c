@@ -50,6 +50,9 @@ static uint32_t s_retry_delay_ms;
 static char s_status_topic[PET_NET_TOPIC_MAX];
 static char s_inbox_topic[PET_NET_TOPIC_MAX];
 static char s_config_topic[PET_NET_TOPIC_MAX];
+#if CONFIG_PET_OTA_REMOTE_ENABLED
+static char s_ota_topic[PET_NET_TOPIC_MAX];
+#endif
 
 static pet_net_rx_handler_t s_rx_handler;
 static void *s_rx_context;
@@ -387,6 +390,9 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base, int32_t event_i
         publish_status(true);
         (void)esp_mqtt_client_subscribe(s_mqtt, s_inbox_topic, 1);
         (void)esp_mqtt_client_subscribe(s_mqtt, s_config_topic, 1);
+#if CONFIG_PET_OTA_REMOTE_ENABLED
+        (void)esp_mqtt_client_subscribe(s_mqtt, s_ota_topic, 1);
+#endif
         break;
 
     case MQTT_EVENT_DISCONNECTED:
@@ -575,6 +581,10 @@ static esp_err_t esp_net_start(const pet_net_config_t *config)
                              sizeof(s_config_topic))) {
         return ESP_ERR_INVALID_ARG;
     }
+
+#if CONFIG_PET_OTA_REMOTE_ENABLED
+    if(!pet_net_topic_build(PET_NET_TOPIC_OTA,config->device_id,s_ota_topic,sizeof(s_ota_topic)))return ESP_ERR_INVALID_ARG;
+#endif
 
     if (s_retry_timer == NULL) {
         const esp_timer_create_args_t timer_args = {

@@ -215,7 +215,7 @@ def preflight(env_file, voice_file, check_host):
     require(Path(env['NEXUS_MQTT_CA_CERT']).is_absolute(), 'mqtt_ca_requires_absolute_path')
     require(not any(value for key, value in env.items() if key.endswith('_CONFIG_FILE')), 'development_config_reference_rejected')
     features = {name: enabled(env, 'NEXUS_' + name + '_ENABLED')
-                for name in ('HALO', 'AI', 'AI_AUTO', 'MEMORY', 'MEMORY_MCP', 'BRIDGE', 'RETENTION')}
+                for name in ('HALO', 'AI', 'AI_AUTO', 'MEMORY', 'MEMORY_MCP', 'BRIDGE', 'RETENTION', 'OTA')}
     require(not features['AI_AUTO'] or features['AI'], 'automatic_ai_requires_ai')
     for feature, names in {'HALO': ('URL', 'TOKEN'), 'AI': ('BASE_URL', 'API_KEY', 'MODEL'),
                            'MEMORY': ('URL', 'API_KEY', 'ACCOUNT', 'USER', 'PEER'), 'BRIDGE': ('URL', 'TOKEN')}.items():

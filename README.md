@@ -1,6 +1,6 @@
 # 04 AI 超级桌面宠物（AI Desktop Pet）
 
-状态：**设备软件与 NEXUS 远程管理已完成本地软件闭环，暂不上板。** 已接入运行配置、播放缓冲、对话文本/上下文/MCP、成长奖励/专注、温湿度图表、消息模板/提示音、诊断/备份、远程配置/回读/审计、DSP 回退、设备/舵机执行器和签名 OTA/恢复工具。语音开机服务、维护入口、扩展与 OTA 默认关闭；隔离 HTTP/PostgreSQL/MQTT 联调通过，真实部署、云端及硬件验收待做。最新语音记忆桥接准备与本地 TLS 回归见 [17](docs/17-voice-bridge-regression.md)，MCP/stdio 接口与运维见 [16](docs/16-voice-memory-tools.md)，长期记忆检索与副本失效见 [15](docs/15-memory-lifecycle.md)，屏幕/BOOT 恢复和设备更名见 [14](docs/14-recovery-and-device-names.md)，消息保留、隔离构建/CI 与浏览器回归见 [13](docs/13-operational-software.md)，前轮管理闭环见 [11](docs/11-product-software-closure.md)，设备首版记录保留在 [09](docs/09-software-delivery.md)。
+状态：**设备软件与 NEXUS 远程管理已完成本地软件闭环，暂不上板。** 已接入运行配置、播放缓冲、对话文本/上下文/MCP、成长奖励/专注、温湿度图表、消息模板/提示音、诊断/备份、远程配置/回读/审计、DSP 回退、设备/舵机执行器和签名 OTA/恢复工具。语音开机服务、维护入口、扩展与 OTA 默认关闭；隔离 HTTP/PostgreSQL/MQTT 联调通过，真实部署、云端及硬件验收待做。远程 OTA 的事务、管理台与启用步骤见 [19](docs/19-remote-ota.md)。最新语音记忆桥接准备与本地 TLS 回归见 [17](docs/17-voice-bridge-regression.md)，MCP/stdio 接口与运维见 [16](docs/16-voice-memory-tools.md)，长期记忆检索与副本失效见 [15](docs/15-memory-lifecycle.md)，屏幕/BOOT 恢复和设备更名见 [14](docs/14-recovery-and-device-names.md)，消息保留、隔离构建/CI 与浏览器回归见 [13](docs/13-operational-software.md)，前轮管理闭环见 [11](docs/11-product-software-closure.md)，设备首版记录保留在 [09](docs/09-software-delivery.md)。
 
 ## 目标
 
@@ -39,6 +39,7 @@
 17. `16-voice-memory-tools.md`：独立 MCP/stdio 公开记忆接口、运维与真实联调步骤。
 18. `17-voice-bridge-regression.md`：固定桥接准备、受控启动、stdio 退出恢复与本地 TLS 全链回归。
 19. `18-requirements-and-progress.md`：需求映射、当前任务台账与持续交付约定。
+20. `19-remote-ota.md`：远程 OTA 协议、持久事务、管理 UI、成套启用与本地验证。
 
 ## 仓库与版本
 

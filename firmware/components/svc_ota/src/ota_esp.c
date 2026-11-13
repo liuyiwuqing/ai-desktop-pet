@@ -130,7 +130,7 @@ static void transfer_cleanup(void *ctx)
 {download_t *d=ctx;if(d->handle)esp_ota_abort(d->handle);close_http(d->http);d->handle=0;d->http=NULL;}
 static void transfer_progress(void *ctx,uint32_t written)
 {(void)ctx;publish(PET_OTA_DOWNLOADING,ESP_OK,written);vTaskDelay(1);}
-static esp_err_t update(const char *release)
+static esp_err_t update(const pet_ota_target_t *target)
 {
     typedef struct {char url[512],envelope[PET_OTA_ENVELOPE_MAX+1];uint8_t block[4096+256];} buffers_t;
     buffers_t *buffers=heap_caps_malloc(sizeof(*buffers),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
@@ -138,7 +138,7 @@ static esp_err_t update(const char *release)
     esp_err_t result=ESP_FAIL;esp_http_client_handle_t http=NULL;
     char *url=buffers->url,*envelope=buffers->envelope;int64_t length=0;
     uint64_t deadline=now_ms()+120000;size_t used=0;
-    int n=snprintf(url,sizeof(buffers->url),"%s/%s/manifest.json",CONFIG_PET_OTA_BASE_URL,release);
+    int n=snprintf(url,sizeof(buffers->url),"%s/%s/manifest.json",CONFIG_PET_OTA_BASE_URL,target->release_id);
     if(n<0||(size_t)n>=sizeof(buffers->url)){result=ESP_ERR_INVALID_ARG;goto done;}
     http=open_url(url,deadline,&length);if(!http||length<1||length>PET_OTA_ENVELOPE_MAX)goto done;
     while(used<(size_t)length) {
@@ -151,11 +151,13 @@ static esp_err_t update(const char *release)
     close_http(http);http=NULL;
     pet_ota_manifest_t manifest;
     if(pet_ota_manifest_parse(envelope,used,pet_ota_identity(),sequence,verify,NULL,&manifest)!=PET_OTA_VALID)goto done;
+    if(target->sequence&&(manifest.release_sequence!=target->sequence||manifest.image_size!=target->image_size||
+        strcmp(manifest.image_sha256,target->image_sha256)||strcmp(manifest.version,target->version)))goto done;
     const esp_partition_t *running=esp_ota_get_running_partition(),*next=esp_ota_get_next_update_partition(NULL);
     esp_ota_img_states_t state;
     if(!running||!next||running->address==next->address||next->size<manifest.image_size||
         (esp_ota_get_state_partition(running,&state)==ESP_OK&&state==ESP_OTA_IMG_PENDING_VERIFY))goto done;
-    n=snprintf(url,sizeof(buffers->url),"%s/%s/%s",CONFIG_PET_OTA_BASE_URL,release,manifest.image);
+    n=snprintf(url,sizeof(buffers->url),"%s/%s/%s",CONFIG_PET_OTA_BASE_URL,target->release_id,manifest.image);
     if(n<0||(size_t)n>=sizeof(buffers->url))goto done;
     download_t download={.url=url,.partition=next,.deadline=deadline,.buffer=buffers->block};
     const pet_ota_transfer_port_t port={&download,transfer_now,transfer_begin,transfer_read,transfer_write,
@@ -166,10 +168,10 @@ done:
 }
 static void worker(void *arg)
 {
-    (void)arg;char release[65];
-    for(;;)if(xQueueReceive(jobs,release,portMAX_DELAY)==pdTRUE) {
-        if(!release[0]){vTaskDelay(pdMS_TO_TICKS(500));esp_restart();}
-        esp_err_t result=update(release);pet_ota_snapshot_t current;pet_ota_snapshot(&current);
+    (void)arg;pet_ota_target_t target;
+    for(;;)if(xQueueReceive(jobs,&target,portMAX_DELAY)==pdTRUE) {
+        if(!target.release_id[0]){vTaskDelay(pdMS_TO_TICKS(500));esp_restart();}
+        esp_err_t result=update(&target);pet_ota_snapshot_t current;pet_ota_snapshot(&current);
         publish(result==ESP_OK?PET_OTA_PENDING_REBOOT:PET_OTA_FAILED,result,current.written_bytes);
     }
 }
@@ -181,31 +183,68 @@ esp_err_t pet_ota_start(void)
     error=pet_storage_load("pet_ota","sequence",bytes,sizeof(bytes),&count);
     if(error==ESP_OK){if(count!=4)return ESP_ERR_INVALID_STATE;for(unsigned i=0;i<4;++i)sequence|=(uint32_t)bytes[i]<<(8*i);}
     else if(error!=ESP_ERR_NVS_NOT_FOUND)return error;
-    jobs=xQueueCreate(1,65);if(!jobs)return ESP_ERR_NO_MEM;
+    jobs=xQueueCreate(1,sizeof(pet_ota_target_t));if(!jobs)return ESP_ERR_NO_MEM;
     publish(PET_OTA_IDLE,ESP_OK,0);
     if(xTaskCreate(worker,"pet_ota",16384,NULL,2,NULL)!=pdPASS){vQueueDelete(jobs);jobs=NULL;return ESP_ERR_NO_MEM;}
     return ESP_OK;
 }
-esp_err_t pet_ota_apply(const char *release)
+static esp_err_t enqueue(const pet_ota_target_t *target)
 {
     if(!jobs)return ESP_ERR_INVALID_STATE;
+    const char *release=target->release_id;
     if(!release||!release[0]||strlen(release)>64)return ESP_ERR_INVALID_ARG;
-    char job[65]={0};for(size_t i=0;release[i];++i) {
+    for(size_t i=0;release[i];++i) {
         char c=release[i];if(!((c>='0'&&c<='9')||(c>='a'&&c<='z')||(c>='A'&&c<='Z')||c=='-'||c=='_'))return ESP_ERR_INVALID_ARG;
-        job[i]=c;
     }
     portENTER_CRITICAL(&lock);
     bool blocked=view.state==PET_OTA_DOWNLOADING||view.state==PET_OTA_PENDING_REBOOT;
     if(!blocked)view=(pet_ota_snapshot_t){PET_OTA_DOWNLOADING,ESP_OK,0,sequence};
     portEXIT_CRITICAL(&lock);if(blocked)return ESP_ERR_INVALID_STATE;
-    if(xQueueSend(jobs,job,0)!=pdTRUE){publish(PET_OTA_FAILED,ESP_ERR_TIMEOUT,0);return ESP_ERR_TIMEOUT;}return ESP_OK;
+    if(xQueueSend(jobs,target,0)!=pdTRUE){publish(PET_OTA_FAILED,ESP_ERR_TIMEOUT,0);return ESP_ERR_TIMEOUT;}return ESP_OK;
+}
+esp_err_t pet_ota_apply(const char *release)
+{
+    if(!release||!release[0]||strlen(release)>64)return ESP_ERR_INVALID_ARG;
+    pet_ota_target_t target={0};strcpy(target.release_id,release);return enqueue(&target);
+}
+esp_err_t pet_ota_apply_target(const pet_ota_target_t *target)
+{
+    if(!target||!memchr(target->release_id,0,sizeof(target->release_id))||
+        !memchr(target->version,0,sizeof(target->version))||!target->version[0]||
+        target->image_sha256[64]||strlen(target->image_sha256)!=64||!target->sequence||
+        !target->image_size||target->image_size>4*1024*1024)return ESP_ERR_INVALID_ARG;
+    for(unsigned i=0;i<64;++i)if(!((target->image_sha256[i]>='0'&&target->image_sha256[i]<='9')||
+        (target->image_sha256[i]>='a'&&target->image_sha256[i]<='f')))return ESP_ERR_INVALID_ARG;
+    if(target->sequence<=sequence)return ESP_ERR_INVALID_STATE;
+    return enqueue(target);
+}
+pet_ota_image_state_t pet_ota_running_target(const pet_ota_target_t *target)
+{
+    if(!target)return PET_OTA_IMAGE_UNKNOWN;
+    // Active image verification is expensive; cache the immutable bytes per boot and target.
+    static pet_ota_target_t checked;static bool known,matched;
+    const esp_partition_t *part=esp_ota_get_running_partition();
+    if(!part)return PET_OTA_IMAGE_UNKNOWN;
+    if(!known||memcmp(&checked,target,sizeof(checked))) {
+        uint8_t *block=heap_caps_malloc(4096+256,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+        if(!block)return PET_OTA_IMAGE_UNKNOWN;
+        esp_app_desc_t desc;
+        matched=target->image_size<=part->size&&esp_ota_get_partition_description(part,&desc)==ESP_OK&&
+            !strcmp(desc.version,target->version)&&hash_partition(part,target->image_size,target->image_sha256,true,block);
+        heap_caps_free(block);checked=*target;known=true;
+    }
+    if(!matched)return PET_OTA_IMAGE_OTHER;
+    esp_ota_img_states_t state;
+    if(esp_ota_get_state_partition(part,&state)!=ESP_OK)return PET_OTA_IMAGE_UNKNOWN;
+    if(state==ESP_OTA_IMG_PENDING_VERIFY)return PET_OTA_IMAGE_PENDING;
+    return state==ESP_OTA_IMG_VALID?PET_OTA_IMAGE_HEALTHY:PET_OTA_IMAGE_UNKNOWN;
 }
 esp_err_t pet_ota_snapshot(pet_ota_snapshot_t *out)
 {if(!out)return ESP_ERR_INVALID_ARG;portENTER_CRITICAL(&lock);*out=view;portEXIT_CRITICAL(&lock);return jobs?ESP_OK:ESP_ERR_INVALID_STATE;}
 esp_err_t pet_ota_reboot(void)
 {
     pet_ota_snapshot_t current;if(pet_ota_snapshot(&current)!=ESP_OK||current.state!=PET_OTA_PENDING_REBOOT)return ESP_ERR_INVALID_STATE;
-    char reboot[65]={0};return xQueueSend(jobs,reboot,0)==pdTRUE?ESP_OK:ESP_ERR_TIMEOUT;
+    pet_ota_target_t reboot={0};return xQueueSend(jobs,&reboot,0)==pdTRUE?ESP_OK:ESP_ERR_TIMEOUT;
 }
 void pet_ota_health_tick(bool healthy)
 {

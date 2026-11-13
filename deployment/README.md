@@ -57,3 +57,5 @@ CORE `/mcp/memory` 默认关闭，仅暴露 `memory.search`，使用独立 `NEXU
 使用 [维护恢复](../docs/10-maintenance-recovery.md)的设备配置、分区和备份流程。OTA 签名私钥由部署者离线保存，固件只包含配套公钥；本机编译测试公钥及 `.invalid` URL 不可用于生产。发布前使用 `tools/package_release.py` 生成并验证签名清单，再在独立目录验证下载、哈希、版本、板型、分区与 SR 模型配套。TLS 证书不替代 OTA 签名。首次启动确认健康后才接受新镜像；烧录、断电恢复与真实升级仍需设备验收。
 
 CORE 故障时先停服务，保留日志和数据库，不执行 `down -v`/Flyway clean；在独立数据库恢复备份并验证后，切回相容 JAR 与数据库。当前迁移无自动 down，不可直接在已写入新数据的库上降级后宣称恢复成功。Broker 用升级脚本保存的 `.management-v1-backup` 恢复 ACL/配置后人工重启。设备配置结果 unknown/unconfirmed 必须读取原请求与设备状态核对，不能换 requestId 重发动作。
+
+远程 OTA 为独立默认关闭能力；V11、设备固件、公钥/HTTPS 与 Broker OTA ACL 须成套部署，步骤见 [远程 OTA](../docs/19-remote-ota.md)。现有 `913b3af` 离线包保持原快照；部署本功能须另行构建新包。

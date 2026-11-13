@@ -7,6 +7,7 @@ import argparse
 import copy
 import http.server
 import json
+import os
 from pathlib import Path
 import socket
 import threading
@@ -15,6 +16,8 @@ from urllib.parse import urlparse
 
 TOKEN='ui-regression-fixture-token-at-least-32-characters'
 CONTROL='isolated-ui-fixture-control'
+OTA_TARGET={'releaseId':'release-ui','version':'0.4.1','imageSha256':'c'*64,'imageSize':1024,'releaseSequence':10}
+OTA_IDENTITY={'project':'nexus_pet','board':'dodo-s3-lcd','modelSha256':'none','partitionSha256':'a'*64,'configSchema':1,'growthSchema':4}
 CONFIG={'schemaVersion':1,'timezone':'Asia/Shanghai','language':'zh-CN','volume':25,'brightness':80,'muted':False,
     'dnd':{'enabled':False,'manual':False,'startMinute':1320,'endMinute':480,'allowCritical':True},
     'message':{'queueDepth':8,'durationMs':8000}}
@@ -22,6 +25,7 @@ CONFIG={'schemaVersion':1,'timezone':'Asia/Shanghai','language':'zh-CN','volume'
 class Fixture(http.server.SimpleHTTPRequestHandler):
     lock=threading.Lock()
     state={'mode':'empty','config':copy.deepcopy(CONFIG),'revision':1,'requests':[],'submissions':[],'dropNext':False,
+        'otaMode':'disabled','otaRequests':[],'otaSubmissions':[],'otaDrop':False,'otaBoot':'1'*32,'otaLastError':'',
         'deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success'}
     def log_message(self,*args):pass
     def json_response(self,status,value):
@@ -52,6 +56,14 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     'title':'','content':'','summary':'','sender':'','originalUrl':'','priority':'normal','receivedAt':stamp,'createdAt':stamp,
                     'expiresAt':stamp,'readAt':None,'readStatus':'unread','dataClass':'public_comment','contentPurgedAt':stamp}],
                     'total':1,'page':1,'size':30}
+            elif path=='/api/v1/ota/releases':value={'enabled':state['otaMode']!='disabled','items':[] if state['otaMode']=='no_releases' else [{'releaseId':'release-ui','target':OTA_TARGET,'identity':OTA_IDENTITY,'createdAt':'2026-11-13T00:00:00Z'}]}
+            elif path.endswith('/ota'):
+                mode=state['otaMode'];requests=state['otaRequests'];request=requests[0] if requests else None
+                observation=None if mode=='empty' else {'bootId':state['otaBoot'],'state':'pending_reboot' if mode=='pending_reboot' else 'idle','observedAt':now-(120 if mode=='stale' else 0),
+                    'available':mode!='unavailable','requestId':request['requestId'] if request else '', 'rebootId':'','writtenBytes':1024 if request else 0,'reservedSequence':0,'identity':OTA_IDENTITY}
+                value={'enabled':mode!='disabled','deviceId':'dodo-ui-fixture','fresh':mode not in ('empty','stale'), 'canInstall':mode in ('fresh','no_releases') and not requests,
+                    'installBlock':'ota_device_unavailable' if mode=='unavailable' else 'ota_readback_required' if mode in ('empty','stale') else 'ota_deployment_in_progress' if requests else '',
+                    'canReboot':mode=='pending_reboot','observation':observation,'deployments':requests}
             elif path.endswith('/management'):
                 telemetry=None if mode=='empty' else {'observedAt':now-(120 if mode=='stale' else 0),'firmwareVersion':'0.4.0-ui-fixture',
                     'configRevision':state['revision'],'configWritable':mode!='readonly','muted':False,'dnd':False,'volume':state['config']['volume'],
@@ -74,6 +86,12 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if value.get('reset'):
                     state.update(mode='empty',config=copy.deepcopy(CONFIG),revision=1,requests=[],submissions=[],dropNext=False,
                         deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success')
+                if value.get('otaReset'):state.update(otaMode='disabled',otaRequests=[],otaSubmissions=[],otaDrop=False,otaBoot='1'*32,otaLastError='')
+                if 'otaMode' in value:state['otaMode']=value['otaMode']
+                if 'otaDrop' in value:state['otaDrop']=value['otaDrop']
+                if 'otaBoot' in value:state['otaBoot']=value['otaBoot']
+                if 'otaLastError' in value:state['otaLastError']=value['otaLastError']
+                if value.get('otaStage') and state['otaRequests']:state['otaRequests'][0]['status']='pending_reboot';state['otaMode']='pending_reboot'
                 if 'mode' in value:state['mode']=value['mode']
                 if 'memoryMode' in value:state['memoryMode']=value['memoryMode']
                 if 'deviceName' in value:state['deviceName']=value['deviceName']
@@ -86,6 +104,21 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     state['revision']+=1;state['config']=copy.deepcopy(request['requestedConfig'])
                 return self.json_response(200,{'ok':True})
             if self.headers.get('Authorization')!='Bearer '+TOKEN:return self.json_response(401,{'error':'unauthorized'})
+            if path=='/api/v1/ota/releases':
+                state['otaSubmissions'].append(value)
+                return self.json_response(201,{'created':True})
+            if '/ota/deployments' in path:
+                state['otaSubmissions'].append(value)
+                if state['otaLastError']:return self.json_response(409,{'error':state['otaLastError']})
+                if state['otaDrop']:
+                    state['otaDrop']=False;self.close_connection=True;self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();return
+                stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+                if path.endswith('/reboot'):
+                    state['otaRequests'][0]['commands'].append({'commandId':value['requestId'],'operation':'reboot','status':'pending','attempts':0,'expiresAt':stamp})
+                    state['otaRequests'][0]['status']='rebooting';state['otaMode']='busy'
+                elif not any(row['requestId']==value['requestId'] for row in state['otaRequests']):
+                    state['otaRequests'].insert(0,{'requestId':value['requestId'],'releaseId':value['releaseId'],'target':OTA_TARGET,'status':'pending','lastError':'','createdAt':stamp,'commands':[]})
+                return self.json_response(202,{'created':True,'requestId':value['requestId']})
             if path=='/api/v1/memory/search':
                 mode=state['memoryMode']
                 if mode=='disabled':return self.json_response(409,{'error':'memory_not_configured'})
@@ -127,6 +160,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--frontend',type=Path,required=True);parser.add_argument('--port',type=int,default=18799)
     args=parser.parse_args();root=args.frontend.resolve()
+    Fixture.state['otaManifestPath']=os.environ.get('PET_OTA_UI_MANIFEST','')
     if not (root/'index.html').is_file():parser.error('build the actual CORE frontend first')
     handler=lambda *a,**kw:Fixture(*a,directory=str(root),**kw)
     with http.server.ThreadingHTTPServer(('127.0.0.1',args.port),handler) as server:

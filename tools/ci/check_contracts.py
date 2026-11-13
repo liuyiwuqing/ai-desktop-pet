@@ -27,6 +27,9 @@ EXAMPLE_SCHEMAS = {
     "telemetry.example.json": "PetTelemetry",
     "config-request.example.json": "PetConfigRequest",
     "config-result.example.json": "PetConfigResult",
+    "ota-command.example.json": "PetOtaCommand",
+    "ota-ack.example.json": "PetOtaAck",
+    "ota-status.example.json": "PetOtaStatus",
 }
 
 
