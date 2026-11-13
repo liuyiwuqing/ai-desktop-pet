@@ -143,7 +143,11 @@ def run(bundle, java_image):
                     assert response.read(2 * 1024 * 1024) == archive.read('BOOT-INF/classes/static' + asset)
             migrations = command('docker', 'exec', database, 'psql', '-U', 'nexus', '-d', 'nexus', '-t', '-A', '-c',
                                  'SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank').splitlines()
-            assert migrations == [str(n) for n in range(1, 11)]
+            with zipfile.ZipFile(jar) as archive:
+                expected = [match.group(1) for name in archive.namelist()
+                    if (match := re.fullmatch(r'BOOT-INF/classes/db/migration/V([0-9]+)__[^/]+\.sql', name))]
+            if not expected or len(set(expected)) != len(expected) or migrations != sorted(expected, key=int):
+                raise SmokeFailure('migration_history_mismatch')
             # Reattach the proxy after Docker recreates CORE's network namespace.
             command('docker', 'rm', '-f', edge)
             containers.remove(edge)
