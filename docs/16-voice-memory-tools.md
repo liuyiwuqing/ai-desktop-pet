@@ -1,6 +1,6 @@
 # 语音公开记忆工具与接入（2026-11-12）
 
-本页保留接口交付与该轮验证快照。2026-11-13 已补齐固定桥接、最小依赖、受控启动与本地 TLS 全链回归；当前桥接准备/运行及部署路径以 [17](17-voice-bridge-regression.md) 为准。
+本页保留接口交付与该轮验证快照。当前平滑凭据轮换见 [20](20-credential-rotation.md)，远程 OTA 见 [19](19-remote-ota.md)。2026-11-13 已补齐固定桥接、最小依赖、受控启动与本地 TLS 全链回归；当前桥接准备/运行及部署路径以 [17](17-voice-bridge-regression.md) 为准。
 
 在长期记忆检索与副本生命周期的基础上，CORE 新增独立凭据保护的 MCP 入口，以及标准库 stdio 适配器。已验证本地进程→真实 CORE HTTP→隔离 PostgreSQL 与上游 HTTP 夹具的调用链；没有修改真实配置、启动常驻桥接、迁移真实库或连接语音云端。
 
@@ -51,7 +51,7 @@ CORE 不转发音频，设备不持有 CORE 管理令牌、Halo 密钥或 OpenVi
 ## 停用、轮换与故障定位
 
 - 停止记忆增强：先停 `nexus-memory-voice`，再关闭 CORE 的 MCP 开关并重启 CORE。若凭据已泄露，立即关闭入口或轮换；单纯停桥接不能撤销已泄露令牌的访问。
-- 轮换工具令牌：当前只支持一个静态令牌，维护窗口内同时更新两份受保护 env 并重启 CORE/桥接；不支持双令牌无缝轮换。复用管理员令牌会使 CORE 启动失败。该令牌与 OpenViking 身份/副本所有权独立。
+- 轮换工具令牌：环境模式仍需维护窗口；新增受保护文件模式支持 current/previous 过渡、过期/撤销与每次 RPC 重载，见 [20](20-credential-rotation.md)。初次切换模式需正常重启一次，之后更新无需重启；不得向桥接暴露 CORE 整个凭据文件。该令牌与 OpenViking 身份/副本所有权独立。
 - 接口 404 查 CORE 开关及精确路径；401 查是否拿错令牌；403 查意外 Origin；400 查版本/请求形状；406 查 Accept。合法 RPC 中的 `memory_not_configured`、`memory_search_busy`、`memory_search_unavailable` 分别查配置、共享并发和源站/记忆服务健康。
 - stdio `memory_endpoint_unavailable` 不含上游错误，先用受保护的本机诊断核对 HTTP/TLS/状态，不自动重发旧查询。`partial=true` 表示有结果无法核验，空结果不构成“不存在该评论”的证明。
 - 不通过更换 OpenViking account/user/peer 或手改身份指纹解决旧副本隔离；沿用 V10 维护流程。关闭 MCP 不会停止已经启用的副本复核/删除后台任务，暂停该任务需要按既有记忆服务开关与维护流程处理。

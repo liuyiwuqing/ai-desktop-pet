@@ -23,7 +23,7 @@ class Endpoint(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         message = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
         self.server.events.append(message)
-        if self.path != '/mcp/memory' or self.headers.get('Authorization') != 'Bearer ' + TOKEN:
+        if self.path != '/mcp/memory' or self.headers.get('Authorization') != 'Bearer ' + self.server.token:
             self.send_response(401); self.end_headers(); return
         if message['method'] == 'tools/call' and self.server.unavailable:
             self.send_response(503); self.end_headers(); self.wfile.write(TOKEN.encode()); return
@@ -56,6 +56,7 @@ class BridgeTest(unittest.IsolatedAsyncioTestCase):
         self.server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Endpoint)
         self.server.events = []
         self.server.unavailable = False
+        self.server.token = TOKEN
         self.thread = threading.Thread(target=lambda: self.server.serve_forever(poll_interval=.05), daemon=True)
         self.thread.start()
         self.url = f'http://127.0.0.1:{self.server.server_port}/mcp/memory'
@@ -117,6 +118,22 @@ class BridgeTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(sum(event['method'] == 'tools/call' for event in self.server.events), 1)
             self.assertEqual((await request(websocket, 'ping', 'alive'))['result'], {})
         await self.assert_stopped_and_private(fixture)
+    async def test_client_file_rotation_keeps_the_same_tls_bridge_and_stdio_session(self):
+        next_token='next-isolated-bridge-memory-credential-long-enough'
+        with tempfile.TemporaryDirectory(prefix='pet-bridge-rotation-') as temporary:
+            file=Path(temporary)/'client.json'
+            def replace(revision,token):
+                staged=file.with_suffix('.new');staged.write_text(json.dumps({'format':1,'revision':revision,'id':'memory-client','token':token}));staged.chmod(0o600);staged.replace(file)
+            replace(1,TOKEN)
+            async with VoiceFixture(DIRECTORY,self.url,'',extra_env={'NEXUS_MEMORY_MCP_TOKEN_FILE':str(file)}) as fixture:
+                websocket=await fixture.connection();await discover(websocket);await query(websocket,'before-rotation')
+                self.server.token=next_token;replace(2,next_token)
+                result=await query(websocket,'after-rotation')
+                self.assertEqual(result['result']['structuredContent']['items'],[{'content':'public-original-body'}])
+                self.assertFalse(websocket.state.name=='CLOSED');self.assertIsNone(fixture.process.returncode)
+                self.assertEqual([event['id'] for event in self.server.events if event['method']=='tools/call'],['before-rotation','after-rotation'])
+            await self.assert_stopped_and_private(fixture)
+            self.assertNotIn(next_token.encode(),fixture.output+fixture.errors)
 
     async def test_an_untrusted_tls_certificate_does_not_reach_stdio_or_core(self):
         self.expected_tls_reset = True

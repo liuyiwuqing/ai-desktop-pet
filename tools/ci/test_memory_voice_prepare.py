@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import select
 import sys
 import tempfile
 import unittest
@@ -96,6 +97,24 @@ class PreparationTest(unittest.TestCase):
         finally:
             if process.poll() is None:
                 process.terminate(); process.wait(timeout=15)
+    def test_reloadable_client_file_reaches_the_stdio_preflight_without_an_env_secret(self):
+        stdio=ROOT.parent/'nexus-core/tools/memory_mcp_stdio.py'
+        if not stdio.is_file():self.skipTest('paired nexus-core checkout required for stdio preflight')
+        with tempfile.TemporaryDirectory(prefix='pet-voice-client-') as temporary:
+            file=Path(temporary)/'memory.json';secret='isolated-reloadable-memory-credential-long-enough'
+            file.write_text(json.dumps({'format':1,'revision':1,'id':'memory-fixture','token':secret}));file.chmod(0o600)
+            env={'PATH':os.environ.get('PATH',os.defpath),'MCP_ENDPOINT':'wss://127.0.0.1:9/mcp?token=isolated-provider-secret',
+                'NEXUS_MEMORY_MCP_URL':'http://127.0.0.1:9/mcp/memory','NEXUS_MEMORY_MCP_TOKEN_FILE':str(file)}
+            process=subprocess.Popen([sys.executable,str(CLI),'run','--directory',str(self.directory),'--stdio',str(stdio)],
+                env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+            try:
+                self.assertTrue(select.select([process.stdout],[],[],5)[0],'bridge did not finish preflight')
+                line=process.stdout.readline();self.assertTrue(line,'bridge rejected the protected credential file')
+                self.assertEqual(json.loads(line)['status'],'running')
+                process.terminate();output,errors=process.communicate(timeout=15)
+                self.assertEqual(process.returncode,0,errors);self.assertNotIn(secret,line+output+errors);self.assertNotIn('isolated-provider-secret',errors)
+            finally:
+                if process.poll() is None:process.terminate();process.communicate(timeout=15)
 
 
 if __name__ == '__main__':

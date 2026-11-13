@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import select
+import tempfile
 import threading
 import unittest
 
@@ -88,5 +90,35 @@ class StdioTest(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stderr);self.assertNotIn('Traceback',result.stderr)
         responses=[json.loads(line) for line in result.stdout.splitlines()]
         self.assertEqual(responses[-1]['error']['code'],-32600);self.assertEqual(len(EVENTS),1)
+    def test_protected_client_file_reloads_per_call_and_never_replays_or_falls_back(self):
+        next_token='next-isolated-memory-credential-long-enough'
+        with tempfile.TemporaryDirectory(prefix='pet-mcp-rotation-') as directory:
+            path=Path(directory)/'memory.json'
+            def replace(revision,token):
+                temporary=path.with_suffix('.new');temporary.write_text(json.dumps({'format':1,'revision':revision,'id':'memory-current','token':token}));temporary.chmod(0o600);temporary.replace(path)
+            replace(1,TOKEN)
+            env=os.environ.copy();env.update(NEXUS_MEMORY_MCP_TOKEN='',NEXUS_MEMORY_MCP_TOKEN_FILE=str(path),NEXUS_MEMORY_MCP_URL=f'http://127.0.0.1:{self.server.server_port}/mcp/memory')
+            process=subprocess.Popen(['python3',str(SCRIPT)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env)
+            output=[]
+            def call(wire):
+                process.stdin.write(wire);process.stdin.flush()
+                self.assertTrue(select.select([process.stdout],[],[],4)[0],'stdio did not respond')
+                line=process.stdout.readline();self.assertTrue(line,'stdio exited before response');output.append(line);return json.loads(line)
+            try:
+                self.assertIn('result',call(self.initialize()))
+                replace(2,next_token)
+                self.assertIn('result',call('{"jsonrpc":"2.0","id":2,"method":"ping"}\n'))
+                self.assertEqual([event[1]['Authorization'] for event in EVENTS],['Bearer '+TOKEN,'Bearer '+next_token])
+                path.write_text('{"token":"untrusted"}')
+                self.assertEqual(call('{"jsonrpc":"2.0","id":3,"method":"ping"}\n')['error']['message'],'memory_endpoint_unavailable')
+                self.assertEqual(len(EVENTS),2)
+                replace(3,next_token)
+                self.assertIn('result',call('{"jsonrpc":"2.0","id":4,"method":"ping"}\n'))
+                self.assertIsNone(process.poll());self.assertEqual(len(EVENTS),3)
+                process.stdin.close();process.stdin=None
+                remaining,errors=process.communicate(timeout=5);self.assertEqual(process.returncode,0)
+                self.assertNotIn(TOKEN,''.join(output)+remaining+errors);self.assertNotIn(next_token,''.join(output)+remaining+errors)
+            finally:
+                if process.poll() is None:process.terminate();process.communicate(timeout=5)
 
 if __name__=='__main__':unittest.main()

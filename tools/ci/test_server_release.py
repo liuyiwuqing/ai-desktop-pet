@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import zipfile
 
@@ -31,7 +32,7 @@ class ServerReleaseTest(unittest.TestCase):
         core = self.directory / 'core'
         core.mkdir()
         for name in ('compose.yml', 'tools/init_local.py', 'tools/broker_policy.py',
-                     'tools/upgrade_broker_policy.py', 'tools/memory_mcp_stdio.py'):
+                     'tools/upgrade_broker_policy.py', 'tools/memory_mcp_stdio.py', 'tools/credential_store.py'):
             path = core / name
             path.parent.mkdir(exist_ok=True)
             path.write_text('# isolated packaging boundary fixture\n')
@@ -65,6 +66,9 @@ class ServerReleaseTest(unittest.TestCase):
         bundle = self.directory / 'server.zip'
         result = self.run_cli('create', '--core', core, '--jar', jar, '--output', bundle)
         self.assertTrue(result['ok'])
+        with zipfile.ZipFile(bundle) as archive:
+            self.assertIn('core/tools/credential_store.py',archive.namelist())
+            self.assertEqual(json.loads(archive.read('manifest.json'))['format'],2)
         verified = self.run_cli('verify', '--bundle', bundle)
         self.assertEqual(verified['coreCommit'], result['coreCommit'])
         self.run_cli('create', '--core', core, '--jar', jar, '--output', bundle, ok=False)
@@ -91,6 +95,17 @@ class ServerReleaseTest(unittest.TestCase):
         output = self.directory / 'bad.zip'
         self.run_cli('create', '--core', core, '--jar', jar, '--output', output, ok=False)
         self.assertFalse(output.exists())
+    def test_current_verifier_still_accepts_the_known_v1_bundle_members(self):
+        core,jar=self.core_fixture();bundle=self.directory/'current.zip'
+        self.run_cli('create','--core',core,'--jar',jar,'--output',bundle)
+        legacy=self.directory/'legacy.zip'
+        with zipfile.ZipFile(bundle) as source,zipfile.ZipFile(legacy,'w') as target:
+            manifest=json.loads(source.read('manifest.json'));manifest['format']=1
+            del manifest['files']['core/tools/credential_store.py']
+            for item in source.infolist():
+                if item.filename=='core/tools/credential_store.py':continue
+                target.writestr(item,json.dumps(manifest).encode() if item.filename=='manifest.json' else source.read(item))
+        self.assertTrue(self.run_cli('verify','--bundle',legacy)['ok'])
 
     def test_bundle_refuses_private_files_even_when_committed(self):
         core, jar = self.core_fixture()
@@ -129,6 +144,15 @@ class ServerReleaseTest(unittest.TestCase):
         with env.open('a') as output:
             output.write('NEXUS_ADMIN_TOKEN=duplicate-must-not-be-printed\n')
         self.run_cli('preflight', '--env-file', env, ok=False)
+    def test_protected_auth_file_is_used_by_preflight_and_probe_without_legacy_token(self):
+        store=self.directory/'credentials.json'
+        store.write_text(json.dumps({'format':1,'revision':1,'adminActor':'0'*64,'admin':{'current':{'id':'admin-fixture','token':TOKEN}}}));store.chmod(0o600)
+        env=self.env_fixture(NEXUS_ADMIN_TOKEN='',NEXUS_AUTH_TOKEN_FILE=str(store))
+        result=self.run_cli('preflight','--env-file',env);self.assertEqual(result['authMode'],'protected_file')
+        self.assertTrue(self.run_cli('probe','--env-file',env,'--url',self.start_http('ready'))['ok'])
+        store.chmod(0o644);self.run_cli('preflight','--env-file',env,ok=False)
+        store.chmod(0o600);store.write_text('{"format":1,"format":1}')
+        self.run_cli('preflight','--env-file',env,ok=False)
 
     def test_voice_preflight_requires_matching_restricted_credentials_and_wss(self):
         machine = 'isolated-machine-token-for-server-preflight-2026'
@@ -152,6 +176,20 @@ class ServerReleaseTest(unittest.TestCase):
         env.write_text(env.read_text().replace(machine, TOKEN))
         result = self.run_cli('preflight', '--env-file', env, ok=False)
         self.assertEqual(result['reason'], 'machine_token_reuses_admin')
+    def test_voice_client_file_must_match_an_active_memory_credential(self):
+        machine='isolated-machine-token-for-server-preflight-2026';old='previous-machine-credential-for-preflight-2026'
+        store=self.directory/'server-tokens.json';client=self.directory/'client-tokens.json';voice=self.directory/'voice.env'
+        value={'format':1,'revision':1,'adminActor':'a'*64,'admin':{'current':{'id':'admin','token':TOKEN}},
+            'memory':{'current':{'id':'memory','token':machine},'previous':{'id':'previous','token':old,'expiresAt':int(time.time())+60}}}
+        store.write_text(json.dumps(value));store.chmod(0o600)
+        client.write_text(json.dumps({'format':1,'revision':1,'id':'previous','token':old}));client.chmod(0o600)
+        voice.write_text('NEXUS_MEMORY_MCP_TOKEN_FILE='+str(client)+'\nNEXUS_MEMORY_MCP_URL=http://127.0.0.1:8088/mcp/memory\nMCP_ENDPOINT=wss://voice.example.org/mcp/\n');voice.chmod(0o600)
+        env=self.env_fixture(NEXUS_ADMIN_TOKEN='',NEXUS_AUTH_TOKEN_FILE=str(store),NEXUS_HALO_ENABLED='true',NEXUS_HALO_URL='https://blog.example.org',
+            NEXUS_HALO_TOKEN='fixture-halo',NEXUS_MEMORY_ENABLED='true',NEXUS_MEMORY_URL='http://127.0.0.1:1933',NEXUS_MEMORY_API_KEY='fixture-memory',
+            NEXUS_MEMORY_ACCOUNT='default',NEXUS_MEMORY_USER='default',NEXUS_MEMORY_PEER='nexus-pet',NEXUS_MEMORY_MCP_ENABLED='true')
+        self.assertTrue(self.run_cli('preflight','--env-file',env,'--voice-env-file',voice)['ok'])
+        value['memory']['previous']['expiresAt']=int(time.time())-1;store.write_text(json.dumps(value))
+        self.assertEqual(self.run_cli('preflight','--env-file',env,'--voice-env-file',voice,ok=False)['reason'],'voice_token_mismatch')
 
     def start_http(self, mode):
         self.calls = []

@@ -131,12 +131,18 @@ def runtime_environment():
     except ValueError:
         raise ValueError('invalid_voice_endpoint') from None
     token = os.environ.get('NEXUS_MEMORY_MCP_TOKEN', '')
-    if not 32 <= len(token) <= 256 or any(ord(character) < 33 or ord(character) > 126 for character in token):
+    token_file = os.environ.get('NEXUS_MEMORY_MCP_TOKEN_FILE', '')
+    if token_file:
+        if not Path(token_file).is_absolute() or any(ord(character) < 32 for character in token_file):
+            raise ValueError('invalid_memory_token')
+    elif not 32 <= len(token) <= 256 or any(ord(character) < 33 or ord(character) > 126 for character in token):
         raise ValueError('invalid_memory_token')
     url = os.environ.get('NEXUS_MEMORY_MCP_URL', 'http://127.0.0.1:8088/mcp/memory')
     # The stdio adapter performs its own complete HTTP endpoint validation.
     result = clean_environment()
-    result.update(MCP_ENDPOINT=endpoint, NEXUS_MEMORY_MCP_URL=url, NEXUS_MEMORY_MCP_TOKEN=token)
+    result.update(MCP_ENDPOINT=endpoint, NEXUS_MEMORY_MCP_URL=url)
+    if token_file:result['NEXUS_MEMORY_MCP_TOKEN_FILE']=token_file
+    else:result['NEXUS_MEMORY_MCP_TOKEN']=token
     return result
 
 

@@ -16,6 +16,7 @@ import ssl
 import stat
 import subprocess
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -23,7 +24,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 CORE_FILES = ('compose.yml', 'tools/init_local.py', 'tools/broker_policy.py',
-              'tools/upgrade_broker_policy.py', 'tools/memory_mcp_stdio.py')
+              'tools/upgrade_broker_policy.py', 'tools/memory_mcp_stdio.py', 'tools/credential_store.py')
 PET_FILES = ('deployment/core.env.example', 'deployment/memory-voice.env.example',
              'deployment/nexus-core.service', 'deployment/nexus-memory-voice.service',
              'deployment/Caddyfile', 'deployment/memory-voice.lock.json',
@@ -31,6 +32,7 @@ PET_FILES = ('deployment/core.env.example', 'deployment/memory-voice.env.example
 MEMBERS = {'README.md', 'core/nexus-core.jar', 'core-source.tar', 'core-tools/memory_mcp_stdio.py'}
 MEMBERS.update('core/' + name for name in CORE_FILES if name != 'tools/memory_mcp_stdio.py')
 MEMBERS.update('desktop-pet/' + name for name in PET_FILES)
+LEGACY_MEMBERS=MEMBERS-{'core/tools/credential_store.py'}
 MANIFEST_KEYS = {'format', 'version', 'coreCommit', 'petCommit', 'petDirty', 'files'}
 
 
@@ -86,7 +88,8 @@ def verify(bundle):
     with zipfile.ZipFile(bundle) as archive:
         entries = archive.infolist()
         names = [item.filename for item in entries]
-        require(len(names) == len(set(names)) and set(names) == MEMBERS | {'manifest.json'}, 'unexpected_bundle_members')
+        members=set(names)-{'manifest.json'}
+        require(len(names) == len(set(names)) and 'manifest.json' in names and members in (MEMBERS,LEGACY_MEMBERS), 'unexpected_bundle_members')
         for item in entries:
             limit = 128 * 1024 * 1024 if item.filename == 'core/nexus-core.jar' else 16 * 1024 * 1024
             require(0 < item.file_size <= limit and stat.S_IFMT(item.external_attr >> 16) in (0, stat.S_IFREG),
@@ -94,11 +97,12 @@ def verify(bundle):
         require(archive.getinfo('manifest.json').file_size <= 65536, 'invalid_bundle_manifest')
         manifest = load_json(archive.read('manifest.json'))
         require(isinstance(manifest, dict) and set(manifest) == MANIFEST_KEYS and type(manifest['format']) is int
-                and manifest['format'] == 1 and type(manifest['petDirty']) is bool, 'invalid_bundle_manifest')
+                and manifest['format'] in (1,2) and type(manifest['petDirty']) is bool, 'invalid_bundle_manifest')
+        require(members==(LEGACY_MEMBERS if manifest['format']==1 else MEMBERS),'bundle_format_member_mismatch')
         for key in ('coreCommit', 'petCommit'):
             require(isinstance(manifest[key], str) and re.fullmatch(r'[0-9a-f]{40,64}', manifest[key]),
                     'invalid_source_commit')
-        require(isinstance(manifest['files'], dict) and set(manifest['files']) == MEMBERS, 'incomplete_bundle_manifest')
+        require(isinstance(manifest['files'], dict) and set(manifest['files']) == members, 'incomplete_bundle_manifest')
         for name, record in manifest['files'].items():
             require(isinstance(record, dict) and set(record) == {'bytes', 'sha256'}
                     and type(record['bytes']) is int and isinstance(record['sha256'], str), 'invalid_member_record')
@@ -131,7 +135,7 @@ def create(core, jar, output):
     # Recheck the source after copying, so a concurrent edit cannot acquire clean provenance.
     require(not git(core, 'status', '--porcelain') and git(core, 'rev-parse', 'HEAD').decode().strip() == core_commit,
             'core_changed_during_packaging')
-    manifest = {'format': 1, 'version': version, 'coreCommit': core_commit,
+    manifest = {'format': 2, 'version': version, 'coreCommit': core_commit,
                 'petCommit': git(ROOT, 'rev-parse', 'HEAD').decode().strip(),
                 'petDirty': bool(git(ROOT, 'status', '--porcelain')),
                 'files': {name: {'bytes': len(raw), 'sha256': sha(raw)} for name, raw in sorted(data.items())}}
@@ -189,6 +193,53 @@ def credential(value):
     require(32 <= len(value) <= 256 and all(33 <= ord(c) <= 126 for c in value), 'invalid_machine_credential')
 
 
+def private_json(filename):
+    path=Path(filename)
+    require(path.is_absolute() and not path.parent.stat().st_mode & 0o022, 'private_token_directory_required')
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+    with os.fdopen(fd,'rb') as source:
+        info=os.fstat(source.fileno())
+        require(stat.S_ISREG(info.st_mode) and stat.S_IMODE(info.st_mode) in (0o400,0o600), 'private_token_file_required')
+        raw=source.read(16385);require(0<len(raw)<=16384,'invalid_token_file_size')
+    return load_json(raw)
+
+
+def token_fields(value,required,optional=()):
+    require(isinstance(value,dict) and set(required)<=set(value)<=set(required)|set(optional), 'invalid_token_file_fields')
+
+
+def server_tokens(env):
+    """Only configuration validation: runtime owns revision history and authorization."""
+    if not env.get('NEXUS_AUTH_TOKEN_FILE'):
+        credential(env.get('NEXUS_ADMIN_TOKEN',''))
+        return {'admin':[env['NEXUS_ADMIN_TOKEN']], 'memory':[env.get('NEXUS_MEMORY_MCP_TOKEN','')]}
+    value=private_json(env['NEXUS_AUTH_TOKEN_FILE']);token_fields(value,{'format','revision','adminActor','admin'},{'memory'})
+    require(type(value['format']) is int and value['format']==1 and type(value['revision']) is int and 1<=value['revision']<1<<63, 'invalid_token_file_format')
+    require(isinstance(value['adminActor'],str) and re.fullmatch('[0-9a-f]{64}',value['adminActor']), 'invalid_token_file_identity')
+    ids=set();secrets=set();scopes={'admin':[],'memory':[]};now=int(time.time())
+    for name in scopes:
+        if name not in value:continue
+        scope=value[name];token_fields(scope,{'current'},{'previous'})
+        for slot in ('current','previous'):
+            if slot not in scope:continue
+            entry=scope[slot];token_fields(entry,{'id','token'}|({'expiresAt'} if slot=='previous' else set()))
+            require(isinstance(entry['id'],str) and re.fullmatch('[a-zA-Z0-9_-]{1,40}',entry['id']) and entry['id'] not in ids, 'invalid_token_file_id')
+            credential(entry['token']);require(entry['token'] not in secrets,'credential_reuse')
+            ids.add(entry['id']);secrets.add(entry['token'])
+            if slot=='previous':require(type(entry['expiresAt']) is int and 1<=entry['expiresAt']<=now+86400,'invalid_token_overlap')
+            if slot=='current' or entry['expiresAt']>now:scopes[name].append(entry['token'])
+    return scopes
+
+
+def voice_token(env):
+    if not env.get('NEXUS_MEMORY_MCP_TOKEN_FILE'):
+        credential(env.get('NEXUS_MEMORY_MCP_TOKEN',''));return env['NEXUS_MEMORY_MCP_TOKEN']
+    value=private_json(env['NEXUS_MEMORY_MCP_TOKEN_FILE']);token_fields(value,{'format','revision','id','token'})
+    require(type(value['format']) is int and value['format']==1 and type(value['revision']) is int and 1<=value['revision']<1<<63, 'invalid_token_file_format')
+    require(isinstance(value['id'],str) and re.fullmatch('[a-zA-Z0-9_-]{1,40}',value['id']), 'invalid_token_file_id')
+    credential(value['token']);return value['token']
+
+
 def enabled(env, name):
     value = env.get(name, 'false')
     require(value in ('true', 'false'), 'invalid_feature_switch')
@@ -203,9 +254,10 @@ def required_fields(env, names):
 
 def preflight(env_file, voice_file, check_host):
     env = read_env(env_file)
-    required_fields(env, ('NEXUS_ADMIN_TOKEN', 'NEXUS_DB_URL', 'NEXUS_DB_USER', 'NEXUS_DB_PASSWORD',
+    required_fields(env, ('NEXUS_DB_URL', 'NEXUS_DB_USER', 'NEXUS_DB_PASSWORD',
                          'NEXUS_MQTT_URI', 'NEXUS_MQTT_USERNAME', 'NEXUS_MQTT_PASSWORD', 'NEXUS_MQTT_CA_CERT'))
-    credential(env.get('NEXUS_ADMIN_TOKEN', ''))
+    if not env.get('NEXUS_AUTH_TOKEN_FILE'):required_fields(env,('NEXUS_ADMIN_TOKEN',))
+    tokens=server_tokens(env)
     require(env.get('NEXUS_BIND_ADDRESS', '127.0.0.1') in ('127.0.0.1', '::1'), 'core_must_bind_loopback')
     require(env.get('NEXUS_PORT', '8088').isdigit() and 1 <= int(env.get('NEXUS_PORT', '8088')) <= 65535, 'invalid_core_port')
     require(env['NEXUS_DB_URL'].startswith('jdbc:postgresql://'), 'invalid_database_url')
@@ -225,12 +277,13 @@ def preflight(env_file, voice_file, check_host):
             endpoint(env[key], ('https', 'http'))
     if features['MEMORY_MCP']:
         require(features['MEMORY'] and features['HALO'], 'memory_mcp_requires_memory_and_halo')
-        credential(env.get('NEXUS_MEMORY_MCP_TOKEN', ''))
-        require(env['NEXUS_MEMORY_MCP_TOKEN'] != env['NEXUS_ADMIN_TOKEN'], 'machine_token_reuses_admin')
+        require(bool(tokens['memory']),'machine_token_missing')
+        for token in tokens['memory']:credential(token)
+        require(not set(tokens['memory']) & set(tokens['admin']), 'machine_token_reuses_admin')
     if voice_file:
         voice = read_env(voice_file)
         require(features['MEMORY_MCP'], 'voice_requires_memory_mcp')
-        require(voice.get('NEXUS_MEMORY_MCP_TOKEN') == env['NEXUS_MEMORY_MCP_TOKEN'], 'voice_token_mismatch')
+        require(voice_token(voice) in tokens['memory'], 'voice_token_mismatch')
         url = endpoint(voice.get('NEXUS_MEMORY_MCP_URL', ''), ('https', 'http'))
         require(url.path == '/mcp/memory', 'wrong_memory_tool_path')
         endpoint(voice.get('MCP_ENDPOINT', ''), ('wss',), query=True)
@@ -254,6 +307,7 @@ def preflight(env_file, voice_file, check_host):
             require(result.returncode == 0 and version and (int(version[1]), int(version[2])) >= (3, 9),
                     'service_python_39_required')
     return {'hostChecked': check_host, 'voiceConfigured': bool(voice_file), 'features': features,
+            'authMode':'protected_file' if env.get('NEXUS_AUTH_TOKEN_FILE') else 'environment',
             'warnings': [name.lower() + '_enabled_requires_operational_review'
                          for name in ('RETENTION', 'BRIDGE') if features[name]], **host}
 
@@ -265,7 +319,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def probe(env_file, url, ca):
     env = read_env(env_file)
-    token = env.get('NEXUS_ADMIN_TOKEN', '')
+    token = server_tokens(env)['admin'][0]
     credential(token)
     parsed = endpoint(url, ('https', 'http'))
     require(parsed.path in ('', '/'), 'core_base_url_required')

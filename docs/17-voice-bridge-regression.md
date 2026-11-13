@@ -30,7 +30,7 @@ python3 tools/memory_voice.py verify --directory build/memory-voice
 
 第一条下载公开固定源码与两个 wheel，只写指定目录，不读取真实 env，也不连接供应商或 CORE。可添加 `--source-file /path/to/mcp_pipe.py` 使用已取得的原始源码；依赖安装仍需 wheel 可用。`verify` 不访问网络。未知的非空目录、不同锁文件、已有脚本或配置被改动时均拒绝覆盖，更新版本应选新目录并保留旧版。
 
-配置仍只有 `MCP_ENDPOINT`、`NEXUS_MEMORY_MCP_URL`、`NEXUS_MEMORY_MCP_TOKEN`，通过受保护环境注入，参见 [env 模板](../deployment/memory-voice.env.example)。供应商地址必须为 `wss://`；CORE 可走同机回环 HTTP，远端必须可信 HTTPS。启动命令不含凭据：
+环境模式使用 `MCP_ENDPOINT`、`NEXUS_MEMORY_MCP_URL`、`NEXUS_MEMORY_MCP_TOKEN`；新增受保护客户端文件模式使用 `NEXUS_MEMORY_MCP_TOKEN_FILE` 代替 token，支持每次 RPC 重载，见 [20](20-credential-rotation.md)。配置通过受保护环境注入，参见 [env 模板](../deployment/memory-voice.env.example)。供应商地址必须为 `wss://`；CORE 可走同机回环 HTTP，远端必须可信 HTTPS。启动命令不含凭据：
 
 ```bash
 python3 tools/memory_voice.py run --directory build/memory-voice --stdio ../nexus-core/tools/memory_mcp_stdio.py
@@ -87,4 +87,4 @@ CORE JAR 仍为 [16](16-voice-memory-tools.md) 中的 `cbe51464…3caea`，stdio
 
 本轮未修改固件、前端、CORE 业务实现或数据库迁移，未重新打包 JAR。默认关闭、独立鉴权、来源权限和显式保存策略不变。真实供应商版本协商、工具采用与最终语音回答、真实 Halo/OpenViking 权限及删除、Linux 托管和生产 TLS、设备语音/声学验收仍待推进；本地 WSS 夹具通过不能替代这些验收。
 
-成长跨端同步、凭据轮换、远程 OTA 管理、资源/语言及其他平台仍属后续能力；本轮完成的是记忆工具的桥接软件闭环。真实联调沿用 [12](12-cloud-interop.md) 和 [16](16-voice-memory-tools.md) 的步骤。
+本页原快照之后，远程 OTA 与 CORE/记忆工具凭据轮换已完成软件交付，分别见 [19](19-remote-ota.md)/[20](20-credential-rotation.md)。成长跨端同步、资源/语言及其他平台仍属后续能力；本轮完成的是记忆工具的桥接软件闭环。真实联调沿用 [12](12-cloud-interop.md) 和 [16](16-voice-memory-tools.md) 的步骤。

@@ -11,9 +11,9 @@ python3 tools/server_release.py create --core ../nexus-core --output build/nexus
 python3 tools/server_release.py verify --bundle build/nexus-server.zip
 ```
 
-生成前完成 CORE 的标准构建并保持 CORE Git 工作区干净。工具检查可执行 JAR 的应用标识、管理台及 V10 迁移结构，打包 JAR、当前 Git 源码快照、stdio 适配器、固定桥接准备工具、依赖锁、systemd/TLS 模板和新装依赖初始化脚本。JAR 结构检查不替代 Maven/前端构建，也不能证明 JAR 一定来自声明的源码提交；交付者须保留配套构建记录。`core-source.tar` 不含 `.git` 历史，完整版本历史仍保留在原 CORE 仓库。
+生成前完成 CORE 的标准构建并保持 CORE Git 工作区干净。工具检查可执行 JAR 的应用标识、管理台及 V10 迁移结构，打包 JAR、当前 Git 源码快照、凭据轮换 CLI、stdio 适配器、固定桥接准备工具、依赖锁、systemd/TLS 模板和新装依赖初始化脚本。JAR 结构检查不替代 Maven/前端构建，也不能证明 JAR 一定来自声明的源码提交；交付者须保留配套构建记录。`core-source.tar` 不含 `.git` 历史，完整版本历史仍保留在原 CORE 仓库。
 
-`manifest.json` 记录两仓基线、04 是否有未提交修改，以及每个文件的大小/SHA256。校验拒绝缺失、额外、重复、特殊文件和哈希不匹配。SHA256 用于完整性核对，不代替来源认证；应从可信通道取得本工具及交付方记录的包哈希。输出为新 ZIP，拒绝覆盖既有文件。准备阶段可打包 04 未提交修改，`petDirty=true` 如实记录；准确交付内容由文件清单确定，不将 HEAD 当作全部包内容。
+当前新包 `manifest.json` format=2，纳入 `core/tools/credential_store.py`；verifier 仍接受已知 format=1 文件集合。清单记录两仓基线、04 是否有未提交修改，以及每个文件的大小/SHA256。校验拒绝缺失、额外、重复、特殊文件和哈希不匹配。SHA256 用于完整性核对，不代替来源认证；应从可信通道取得本工具及交付方记录的包哈希。输出为新 ZIP，拒绝覆盖既有文件。准备阶段可打包 04 未提交修改，`petDirty=true` 如实记录；准确交付内容由文件清单确定，不将 HEAD 当作全部包内容。
 
 在目标机先用可信工作区中的同版工具校验 ZIP，再解压到新的暂存目录：
 
@@ -53,3 +53,5 @@ python3 tools/server_release.py probe --env-file /etc/nexus/core.env --url https
 后续仍需逐项验证设备 ACL、MQTT 消息/回执、真实供应商协议及工具采用、公开评论源核验/删除、重启恢复和长期稳定性。记忆检索可能按既定政策排队清理失效副本，不属于本只读探测。物理设备、语音/声学、生产数据库迁移及 systemd 实际托管的验收不能由此包替代。
 
 从完整源码工作区可重复运行 `python3 tools/ci/test_server_release.py` 验证 CLI 边界。可选的 `python3 tools/ci/test_server_linux.py --bundle build/nexus-server.zip --evidence /new/path/linux-smoke.json` 使用 Docker、OpenSSL 和已有镜像 `eclipse-temurin:21-jre-jammy`、`postgres:17-alpine`、`eclipse-mosquitto:2.0.22`、`caddy:2.10.2-alpine`，只在新临时目录生成测试凭据。它运行包内实际 JAR、TLS Broker、数据库和代理，检查启动/重启、V1–V10、鉴权和管理台配套资源；随后删除本轮容器、网络及临时数据。证据记录实际镜像 digest，不代表 systemd 托管、生产 TLS 或真实供应商验收。
+
+受保护凭据文件模式、current/previous 过渡和客户端导出见 [凭据轮换](../docs/20-credential-rotation.md)。预检和 probe 从 `NEXUS_AUTH_TOKEN_FILE` 读取管理员当前值，桥接预检验证独立客户端 token 仍有效；不回退旧环境变量，不输出秘密。配置文件只保留在 `/etc/nexus/`，发布 ZIP 不带真实凭据。
