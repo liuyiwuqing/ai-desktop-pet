@@ -12,7 +12,7 @@ from pathlib import Path
 import socket
 import threading
 import time
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 TOKEN='ui-regression-fixture-token-at-least-32-characters'
 CONTROL='isolated-ui-fixture-control'
@@ -26,7 +26,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
     lock=threading.Lock()
     state={'mode':'empty','config':copy.deepcopy(CONFIG),'revision':1,'requests':[],'submissions':[],'dropNext':False,
         'otaMode':'disabled','otaRequests':[],'otaSubmissions':[],'otaDrop':False,'otaBoot':'1'*32,'otaLastError':'','growthMode':'disabled',
-        'messageSubmissions':[],'manualMessages':[],'messageNext':'success','deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success'}
+        'messageSubmissions':[],'manualMessages':[],'messageNext':'success','deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success',
+        'listMode':False,'listMessages':[],'listDeliveries':[],'listRequests':[],'listError':'','listDelay':0}
     def log_message(self,*args):pass
     def json_response(self,status,value):
         payload=json.dumps(value,ensure_ascii=False).encode()
@@ -47,6 +48,15 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 delay=state['deviceReadDelay'];state['deviceReadDelay']=0
                 if delay:time.sleep(delay)
                 value={'items':[{'deviceId':'dodo-ui-fixture','name':state['deviceName'],'enabled':True,'online':True,'lastSeen':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]}
+            elif state['listMode'] and path in ('/api/v1/messages','/api/v1/deliveries'):
+                state['listRequests'].append(self.path)
+                if state['listDelay']:time.sleep(state['listDelay'])
+                if path.endswith('/'+state['listError']):return self.json_response(503,{'error':'unavailable'})
+                query=parse_qs(urlparse(self.path).query);page=int(query.get('page',['1'])[0]);size=int(query.get('size',['30'])[0])
+                messages=path.endswith('/messages');key='readStatus' if messages else 'status';status=query.get(key,[''])[0]
+                rows=state['listMessages' if messages else 'listDeliveries']
+                rows=[row for row in rows if not status or row[key]==status]
+                value={'items':copy.deepcopy(rows[(page-1)*size:page*size]),'total':len(rows),'page':page,'size':size}
             elif path in ('/api/v1/connectors','/api/v1/deliveries'):value={'items':[],'total':0,'page':1,'size':30}
             elif path=='/api/v1/memory':value={'configured':state['memoryMode']!='disabled','storedCopies':1,'pendingDeletions':2,'deletedCopies':3,'deletionErrors':1,'invalidationPolicy':'stop_retrieval_and_delete'}
             elif path=='/api/v1/status':value={'database':'ready','mqtt':'ready','mqttError':'','schemaVersion':9}
@@ -97,8 +107,22 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if self.headers.get('X-QA-Key')!=CONTROL:return self.json_response(401,{'error':'unauthorized'})
                 if value.get('reset'):
                     state.update(mode='empty',config=copy.deepcopy(CONFIG),revision=1,requests=[],submissions=[],dropNext=False,
-                        deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',growthMode='disabled')
+                        deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',growthMode='disabled',
+                        listMode=False,listMessages=[],listDeliveries=[],listRequests=[],listError='',listDelay=0)
                 if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success')
+                if value.get('listReset'):
+                    stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+                    state.update(listMode=True,listError='',listDelay=0,listRequests=[],listMessages=[{
+                        'messageId':'list-'+str(i),'connectorId':'fixture','source':'manual','eventType':'manual.test',
+                        'title':('未读消息 ' if i<31 else '已读消息 ')+str(i),'content':'列表筛选回归正文','summary':'列表筛选回归',
+                        'sender':'','originalUrl':'','priority':'normal','receivedAt':stamp,'createdAt':stamp,'expiresAt':stamp,
+                        'readAt':None if i<31 else stamp,'readStatus':'unread' if i<31 else 'read','dataClass':'internal'} for i in range(33)],
+                        listDeliveries=[{'eventId':'delivery-'+str(i),'messageId':'list-'+str(i),'deviceId':'dodo-ui-fixture',
+                            'title':'投递消息 '+str(i),'status':status,'attempts':1,'lastError':'ack_timeout' if status=='failed' else None,
+                            'nextAttemptAt':stamp,'readAt':None} for i,status in enumerate(['failed']*31+['pending','sent','received','displayed','read','expired'])])
+                if 'listError' in value:state['listError']=value['listError']
+                if 'listDelay' in value:state['listDelay']=min(max(float(value['listDelay']),0),2)
+                if value.get('listEmpty'):state['listMessages']=[];state['listDeliveries']=[]
                 if 'messageNext' in value:state['messageNext']=value['messageNext']
                 if value.get('otaReset'):state.update(otaMode='disabled',otaRequests=[],otaSubmissions=[],otaDrop=False,otaBoot='1'*32,otaLastError='')
                 if 'otaMode' in value:state['otaMode']=value['otaMode']
@@ -119,6 +143,14 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     state['revision']+=1;state['config']=copy.deepcopy(request['requestedConfig'])
                 return self.json_response(200,{'ok':True})
             if self.headers.get('Authorization')!='Bearer '+TOKEN:return self.json_response(401,{'error':'unauthorized'})
+            if state['listMode'] and path.startswith('/api/v1/messages/') and path.endswith('/read'):
+                for row in state['listMessages']:
+                    if row['messageId']==path.split('/')[-2]:row['readStatus']='read';row['readAt']=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+                self.send_response(204);self.end_headers();return
+            if state['listMode'] and path.startswith('/api/v1/deliveries/') and path.endswith('/retry'):
+                for row in state['listDeliveries']:
+                    if row['eventId']==path.split('/')[-2]:row['status']='pending';row['lastError']=None
+                self.send_response(204);self.end_headers();return
             if path=='/api/v1/messages':
                 state['messageSubmissions'].append(value)
                 outcome=state['messageNext'];state['messageNext']='success'

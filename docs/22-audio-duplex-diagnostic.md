@@ -61,6 +61,8 @@ python tools/build_matrix.py --profile duplex \
 | tones | 2,925,984 |
 | duplex | 2,909,776 |
 
-证据保留在忽略目录 `firmware/build-duplex-matrix/<profile>/build-evidence.json`，`flashExecuted=false`、`signedRelease=false`。default 仍不启动 AI/诊断，full 不开诊断，tones 仍只开通知音频；duplex 独占音频且关闭普通 AI/通知拥有者。此前不含初始化后复核的构建不作为最终产物证据；推送后的新 CI 仍须另行核对。
+证据保留在忽略目录 `firmware/build-duplex-matrix/<profile>/build-evidence.json`，`flashExecuted=false`、`signedRelease=false`。default 仍不启动 AI/诊断，full 不开诊断，tones 仍只开通知音频；duplex 独占音频且关闭普通 AI/通知拥有者。此前不含初始化后复核的构建不作为最终产物证据。
+
+实现 `9376eda` 已推送，后续管理台配套提交 `82edd36` 对应的 [CI 43389006975](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43389006975) 已核对完成，五个固件预设及交付/桥接共七个 job 全部 success，含 full 的主机/协议/DSP/LVGL。`9376eda` 的先前执行被新提交取消，不计作成功。该结果仍不提供真实 I2S/声学或设备验收结论。
 
 SW-07 的剩余条件：先取得真实 RX/TX 同时运行的 DMA/堆/栈/欠载和静音证据，再设计参考帧的采样率转换、播放时间戳、时钟漂移、延迟校准和丢帧降级，最后接入播放中唤醒/取消状态机。当前 `pet_ai_dsp_reference` 只接受新鲜 16 kHz/320 样本参考，不能用未校准的 24 kHz TTS 强行填入；缺少参考仍回退降噪与半双工。
