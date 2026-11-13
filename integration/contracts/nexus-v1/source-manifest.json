@@ -5,7 +5,7 @@
   "sources": {
     "src/main/java/dev/nexus/core/delivery/DeliveryWorker.java": "eeb3b33afb44e8e82bfaadc7a18e35d6b7df6ea3f7c923196c9e06783e0400d7",
     "src/main/java/dev/nexus/core/delivery/DeviceText.java": "c031dd6f5fb4548e6738d7bd60bb276ff7ac5377052d71e4d5046779530309a1",
-    "src/main/java/dev/nexus/core/delivery/DeliveryService.java": "c163694ee2b92791f427ca9c3f8d01aecd08895ca7ea4e8361a80591bf5fe895",
+    "src/main/java/dev/nexus/core/delivery/DeliveryService.java": "1f7555ffb5630e3d270bc6a3df68c82c8af956761520e13be7cb935830be05a8",
     "src/main/java/dev/nexus/core/delivery/MqttTransport.java": "9fde74b37a224b6d3bf2c3826759ddfd796d48f9437b0c80be88109aa5e05eff",
     "src/main/java/dev/nexus/core/inbox/MessageInput.java": "ec9803cf48979caefb56a122b43276f2b6d4020a6a7bc748ed2e14a4bd38b8b5",
     "src/main/resources/db/migration/V1__inbox_and_delivery.sql": "4cd29fada39046a6001c5e8bda9c875a30b800dae347e4c3e0ef34cc00a779e6"

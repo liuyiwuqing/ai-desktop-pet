@@ -96,10 +96,13 @@ public final class ContractProbe {
         db.status = "sent";
         service.acknowledge("dodo-01", mapper.readTree(lines.get(4)));
         check(db.status.equals("expired") && db.transitions == 4, "expired rejection accepted");
+        db.status = "cancelled";
+        service.acknowledge("dodo-01", received);
+        check(db.status.equals("cancelled") && db.transitions == 4, "cancelled delivery cannot be revived by an ACK");
         service.state("dodo-01", mapper.readTree(lines.get(5)));
         check(Boolean.TRUE.equals(db.online), "online observedAt accepted");
         service.state("dodo-01", mapper.readTree(lines.get(6)));
         check(Boolean.FALSE.equals(db.online), "offline LWT accepted");
-        System.out.println("nexus source: received/displayed/read/replay/expired and online/offline accepted");
+        System.out.println("nexus source: received/displayed/read/replay/expired/cancelled and online/offline accepted");
     }
 }
