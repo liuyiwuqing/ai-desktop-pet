@@ -27,6 +27,7 @@
 - `crash_dump.py`：默认只输出读取/离线解码计划，`--execute` 才执行；ROM 读取固定崩溃分区且不自动复位，解码须绑定 ELF SHA256。敏感输出排他创建为 600，不自动上传。
 - `ci/test_build_matrix.py`、`ci/test_crash_dump.py`：公开 CLI 的只读计划、隔离路径与非法输入拒绝；已纳入 `test_host.sh`。恢复状态机同入口覆盖早期崩溃阈值、健康窗口、RTC 损坏、冷上电及手工清锁。
 - `ci/test_management_ui.sh`：构建真实 Vue 管理台，通过 ego-browser 运行 38 项固定浏览器回归。loopback HTTP 夹具仅模拟边界状态，不使用 CORE、数据库或 Broker；覆盖草稿/冲突/未知结果同 ID 重试、只读/过期禁用、清理提示与窄屏溢出。服务退出时自动停止，页面在成功后关闭，失败时保留以便诊断。
+- `ci/test_message_compose_ui.sh`：真实 Vue 的测试发送专项 33 项；注入保存后/保存前断线、明确拒绝、503 和无效确认，检查同 ID/正文重试、导航恢复、退出清理与 390px 布局。使用同一回环 HTTP 夹具的独立端口，不代表真实消息投递；见 [管理台验收记录](../docs/23-console-completion.md)。
 
 ## 计划内容
 

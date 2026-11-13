@@ -26,7 +26,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
     lock=threading.Lock()
     state={'mode':'empty','config':copy.deepcopy(CONFIG),'revision':1,'requests':[],'submissions':[],'dropNext':False,
         'otaMode':'disabled','otaRequests':[],'otaSubmissions':[],'otaDrop':False,'otaBoot':'1'*32,'otaLastError':'','growthMode':'disabled',
-        'deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success'}
+        'messageSubmissions':[],'manualMessages':[],'messageNext':'success','deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success'}
     def log_message(self,*args):pass
     def json_response(self,status,value):
         payload=json.dumps(value,ensure_ascii=False).encode()
@@ -67,6 +67,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     'title':'','content':'','summary':'','sender':'','originalUrl':'','priority':'normal','receivedAt':stamp,'createdAt':stamp,
                     'expiresAt':stamp,'readAt':None,'readStatus':'unread','dataClass':'public_comment','contentPurgedAt':stamp}],
                     'total':1,'page':1,'size':30}
+                value['items']=copy.deepcopy(state['manualMessages'])+value['items'];value['total']=len(value['items'])
             elif path=='/api/v1/ota/releases':value={'enabled':state['otaMode']!='disabled','items':[] if state['otaMode']=='no_releases' else [{'releaseId':'release-ui','target':OTA_TARGET,'identity':OTA_IDENTITY,'createdAt':'2026-11-13T00:00:00Z'}]}
             elif path.endswith('/ota'):
                 mode=state['otaMode'];requests=state['otaRequests'];request=requests[0] if requests else None
@@ -97,6 +98,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if value.get('reset'):
                     state.update(mode='empty',config=copy.deepcopy(CONFIG),revision=1,requests=[],submissions=[],dropNext=False,
                         deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',growthMode='disabled')
+                if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success')
+                if 'messageNext' in value:state['messageNext']=value['messageNext']
                 if value.get('otaReset'):state.update(otaMode='disabled',otaRequests=[],otaSubmissions=[],otaDrop=False,otaBoot='1'*32,otaLastError='')
                 if 'otaMode' in value:state['otaMode']=value['otaMode']
                 if 'growthMode' in value:state['growthMode']=value['growthMode']
@@ -116,6 +119,23 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     state['revision']+=1;state['config']=copy.deepcopy(request['requestedConfig'])
                 return self.json_response(200,{'ok':True})
             if self.headers.get('Authorization')!='Bearer '+TOKEN:return self.json_response(401,{'error':'unauthorized'})
+            if path=='/api/v1/messages':
+                state['messageSubmissions'].append(value)
+                outcome=state['messageNext'];state['messageNext']='success'
+                if outcome=='reject':return self.json_response(400,{'error':'invalid_request'})
+                if outcome=='unauthorized':return self.json_response(401,{'error':'unauthorized'})
+                existing=next((row for row in state['manualMessages'] if row['eventId']==value.get('eventId') and row['connectorId']==value.get('connectorId')),None)
+                created=existing is None
+                if outcome!='drop_before_save' and existing is None:
+                    stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+                    existing={**value,'messageId':'manual-'+str(len(state['manualMessages'])+1),'receivedAt':stamp,'createdAt':stamp,
+                        'summary':value['content'],'sender':'','originalUrl':'','expiresAt':stamp,'readAt':None,'readStatus':'unread','dataClass':'internal'}
+                    state['manualMessages'].insert(0,existing)
+                if outcome in ('save_then_drop','drop_before_save'):
+                    self.close_connection=True;self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();return
+                if outcome=='save_then_500':return self.json_response(503,{'error':'unavailable'})
+                if outcome=='invalid_ack':return self.json_response(201,{'invalid':'acknowledgment'})
+                return self.json_response(201 if created else 200,{'messageId':existing['messageId']})
             if path=='/api/v1/ota/releases':
                 state['otaSubmissions'].append(value)
                 return self.json_response(201,{'created':True})

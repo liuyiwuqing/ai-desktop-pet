@@ -22,6 +22,8 @@
 
 并行音频 HAL 与有限维护诊断见 [22](docs/22-audio-duplex-diagnostic.md)；普通 AI 会话仍半双工，声学 AEC/打断尚待验收。
 
+管理台测试发送的断线重试修复与当前验收记录见 [23](docs/23-console-completion.md)；完整管理台规划仍有待补功能。
+
 完整架构与分模块方案在 [`docs/README.md`](docs/README.md)。评审顺序：
 
 1. `00-architecture.md`：总体架构、目录规范、事件总线、契约与部署拓扑。
@@ -47,6 +49,7 @@
 21. `20-credential-rotation.md`：CORE/记忆工具双令牌、受保护文件重载、CLI 与验收边界。
 22. `21-growth-sync.md`：设备成长只读镜像、顺序隔离、管理台及 V12 配套离线包。
 23. `22-audio-duplex-diagnostic.md`：并行音频 HAL、一次诊断、隐私门控及后续声学验收条件。
+24. `23-console-completion.md`：管理台完成度、测试消息断线重试与验收边界。
 
 ## 仓库与版本
 
