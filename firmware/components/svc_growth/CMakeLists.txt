@@ -5,6 +5,7 @@ idf_component_register(
         "src/growth_store.c"
         "src/growth_service.c"
         "src/growth_runtime.c"
+        "src/growth_sync.c"
     INCLUDE_DIRS
         "include"
     PRIV_INCLUDE_DIRS

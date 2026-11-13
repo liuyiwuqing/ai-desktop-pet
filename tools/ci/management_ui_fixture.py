@@ -25,7 +25,7 @@ CONFIG={'schemaVersion':1,'timezone':'Asia/Shanghai','language':'zh-CN','volume'
 class Fixture(http.server.SimpleHTTPRequestHandler):
     lock=threading.Lock()
     state={'mode':'empty','config':copy.deepcopy(CONFIG),'revision':1,'requests':[],'submissions':[],'dropNext':False,
-        'otaMode':'disabled','otaRequests':[],'otaSubmissions':[],'otaDrop':False,'otaBoot':'1'*32,'otaLastError':'',
+        'otaMode':'disabled','otaRequests':[],'otaSubmissions':[],'otaDrop':False,'otaBoot':'1'*32,'otaLastError':'','growthMode':'disabled',
         'deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success'}
     def log_message(self,*args):pass
     def json_response(self,status,value):
@@ -50,6 +50,17 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
             elif path in ('/api/v1/connectors','/api/v1/deliveries'):value={'items':[],'total':0,'page':1,'size':30}
             elif path=='/api/v1/memory':value={'configured':state['memoryMode']!='disabled','storedCopies':1,'pendingDeletions':2,'deletedCopies':3,'deletionErrors':1,'invalidationPolicy':'stop_retrieval_and_delete'}
             elif path=='/api/v1/status':value={'database':'ready','mqtt':'ready','mqttError':'','schemaVersion':9}
+            elif path=='/api/v1/pet':value={'level':1,'levelProgress':0,'experience':0,'coins':0,'bond':0,'completedFocus':0,'activeSession':None}
+            elif path=='/api/v1/pet/focus':value={'items':[]}
+            elif path=='/api/v1/pet/devices':
+                growth_mode=state['growthMode']
+                if growth_mode=='error':return self.json_response(503,{'error':'unavailable'})
+                if growth_mode=='delayed':time.sleep(1)
+                growth={'level':2,'experience':15,'experienceToNext':128,'coins':72,'intimacy':10,'mood':20,'energy':80,'hunger':60,'health':100,
+                    'state':'idle','timeReady':growth_mode!='time_unavailable','unsaved':growth_mode=='unsaved','storageReady':growth_mode!='readonly','saveRecovered':growth_mode=='recovered'}
+                snapshot=None if growth_mode=='waiting' else {'observedAt':now-(120 if growth_mode=='stale' else 0),'growth':growth}
+                value={'enabled':growth_mode!='disabled','items':[] if growth_mode=='empty' else [{'deviceId':'dodo-ui-fixture','name':state['deviceName'],
+                    'deviceEnabled':growth_mode!='device_disabled','fresh':growth_mode not in ('stale','waiting'),'snapshot':snapshot}]}
             elif path=='/api/v1/messages':
                 stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
                 value={'items':[{'messageId':'purged-ui-fixture','connectorId':'fixture','source':'halo','eventType':'comment.created',
@@ -85,9 +96,10 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if self.headers.get('X-QA-Key')!=CONTROL:return self.json_response(401,{'error':'unauthorized'})
                 if value.get('reset'):
                     state.update(mode='empty',config=copy.deepcopy(CONFIG),revision=1,requests=[],submissions=[],dropNext=False,
-                        deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success')
+                        deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',growthMode='disabled')
                 if value.get('otaReset'):state.update(otaMode='disabled',otaRequests=[],otaSubmissions=[],otaDrop=False,otaBoot='1'*32,otaLastError='')
                 if 'otaMode' in value:state['otaMode']=value['otaMode']
+                if 'growthMode' in value:state['growthMode']=value['growthMode']
                 if 'otaDrop' in value:state['otaDrop']=value['otaDrop']
                 if 'otaBoot' in value:state['otaBoot']=value['otaBoot']
                 if 'otaLastError' in value:state['otaLastError']=value['otaLastError']

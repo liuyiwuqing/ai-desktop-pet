@@ -30,6 +30,7 @@ EXAMPLE_SCHEMAS = {
     "ota-command.example.json": "PetOtaCommand",
     "ota-ack.example.json": "PetOtaAck",
     "ota-status.example.json": "PetOtaStatus",
+    "growth-status.example.json": "PetGrowthStatus",
 }
 
 

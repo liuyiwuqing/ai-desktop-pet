@@ -113,6 +113,40 @@ export interface ExtensionManifest {
   description: string;
 }
 
+export interface PetGrowthStatusGrowth {
+  revision: number;
+  level: number;
+  experience: number;
+  experienceToNext: number;
+  coins: number;
+  intimacy: number;
+  mood: number;
+  energy: number;
+  hunger: number;
+  health: number;
+  state: "idle" | "happy" | "excited" | "sad" | "sleepy" | "hungry" | "sick" | "sleeping";
+  sleeping: boolean;
+  taskDay: number;
+  taskProgress: number[];
+  taskClaimed: number;
+  achievements: number;
+  timeReady: boolean;
+  unsaved: boolean;
+  storageReady: boolean;
+  saveRecovered: boolean;
+  environment: "none" | "cold" | "hot" | "dry" | "humid";
+}
+
+export interface PetGrowthStatus {
+  schemaVersion: 1;
+  deviceId: string;
+  bootId: string;
+  reportSequence: number;
+  observedAt: number;
+  growthSchema: 4;
+  growth: PetGrowthStatusGrowth;
+}
+
 export interface MessageAck {
   schemaVersion: 1;
   deviceId: string;

@@ -24,6 +24,7 @@
 #include "svc_ota/api.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "app_growth_sync.h"
 #if CONFIG_PET_MODULE_AI_ENABLED && CONFIG_PET_MODULE_AUDIO_ENABLED
 #include "svc_ai_agent/api.h"
 #endif
@@ -238,6 +239,7 @@ static void message_ack_task(void *arg)
             pet_message_hub_flush_acks();
             uint32_t epoch=app_epoch_now();
             app_ota_remote_poll(epoch);
+            app_growth_sync_poll(epoch);
             if(epoch&&(!last_summary||epoch<last_summary||epoch-last_summary>=30)) {
                 char summary[1536];
                 if(app_summary_json(s_device_id,epoch,summary,sizeof(summary))==ESP_OK&&
@@ -450,6 +452,7 @@ esp_err_t app_start(void)
 
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
     const esp_err_t growth_err = pet_growth_start();
+    app_growth_sync_init(s_device_id);
     if (growth_err != ESP_OK)
         ESP_LOGW(TAG, "growth unavailable: %s", esp_err_to_name(growth_err));
 #endif

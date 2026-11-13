@@ -157,6 +157,14 @@ config PET_MODULE_GROWTH_ENABLED
       Local growth rules, transactional saves and periodic settlement. Disable to verify the
       composition root builds without it.
 
+config PET_GROWTH_SYNC_ENABLED
+    bool "Publish read-only growth snapshots to CORE"
+    depends on PET_MODULE_GROWTH_ENABLED && PET_MODULE_NET_ENABLED
+    default n
+    help
+      Publish non-retained growth display data every 15 seconds after time synchronization.
+      This does not merge CORE rewards or replace the local save.
+
 config PET_GROWTH_UTC_OFFSET_MINUTES
     int "Growth calendar UTC offset in minutes"
     depends on PET_MODULE_GROWTH_ENABLED

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pet.local/contracts/growth-sync-v1/PetGrowthStatus.schema.json",
+  "title": "PetGrowthStatus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "deviceId", "bootId", "reportSequence", "observedAt", "growthSchema", "growth"],
+  "properties": {
+    "schemaVersion": {"type": "integer", "const": 1},
+    "deviceId": {"type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[a-zA-Z0-9_-]+$"},
+    "bootId": {"type": "string", "minLength": 32, "maxLength": 32, "pattern": "^[0-9a-f]{32}$"},
+    "reportSequence": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+    "observedAt": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+    "growthSchema": {"type": "integer", "const": 4},
+    "growth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "level", "experience", "experienceToNext", "coins", "intimacy", "mood", "energy", "hunger", "health", "state", "sleeping", "taskDay", "taskProgress", "taskClaimed", "achievements", "timeReady", "unsaved", "storageReady", "saveRecovered", "environment"],
+      "properties": {
+        "revision": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "level": {"type": "integer", "minimum": 1, "maximum": 99},
+        "experience": {"type": "integer", "minimum": 0, "maximum": 80831},
+        "experienceToNext": {"type": "integer", "minimum": 80, "maximum": 80832},
+        "coins": {"type": "integer", "minimum": 0, "maximum": 999999},
+        "intimacy": {"type": "integer", "minimum": 0, "maximum": 100},
+        "mood": {"type": "integer", "minimum": -100, "maximum": 100},
+        "energy": {"type": "integer", "minimum": 0, "maximum": 100},
+        "hunger": {"type": "integer", "minimum": 0, "maximum": 100},
+        "health": {"type": "integer", "minimum": 0, "maximum": 100},
+        "state": {"type": "string", "enum": ["idle", "happy", "excited", "sad", "sleepy", "hungry", "sick", "sleeping"], "maxLength": 8},
+        "sleeping": {"type": "boolean"},
+        "taskDay": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "taskProgress": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 0, "maximum": 3}},
+        "taskClaimed": {"type": "integer", "minimum": 0, "maximum": 7},
+        "achievements": {"type": "integer", "minimum": 0, "maximum": 7},
+        "timeReady": {"type": "boolean"},
+        "unsaved": {"type": "boolean"},
+        "storageReady": {"type": "boolean"},
+        "saveRecovered": {"type": "boolean"},
+        "environment": {"type": "string", "enum": ["none", "cold", "hot", "dry", "humid"], "maxLength": 5}
+      }
+    }
+  }
+}

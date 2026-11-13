@@ -8,6 +8,7 @@ idf_component_register(
         "app/app_diagnostics.c"
         "app/app_backup.c"
         "app/app_ota_remote.c"
+        "app/app_growth_sync.c"
         "app/app_recovery.c"
         "app/recovery_engine.c"
     INCLUDE_DIRS

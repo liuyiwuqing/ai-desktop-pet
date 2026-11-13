@@ -139,9 +139,9 @@ SICK > HUNGRY > SLEEPY > SAD > FOCUS > EXCITED > HAPPY > IDLE
 
 ### 5.3 服务端同步（二期）
 
-- 每 5 min 或重要事件上传 `growth_snapshot`，带 `deviceId`、`sequence`、`checksum`。
-- 冲突：设备本地数值优先；服务端只校验奖励合法性并记录，不回写覆盖。
-- 离线奖励/活动由服务端下发，设备幂等领取；首版不做。
+2026-11-13 已实现只读快照上传和 CORE 展示，当前协议与验证见 [21](21-growth-sync.md)。实际主题为 `growth_status`，每 15 秒、非 retained，带 `deviceId`、随机 `bootId`、启动内递增 `reportSequence` 与存储状态；沿用 TLS/身份校验，不将历史草案中的 `checksum` 当作鉴权。
+
+设备本地数值优先，CORE 展示设备档案，原有 CORE 专注档案继续独立结算，不回写覆盖。离线奖励/活动下发及跨端奖励去重仍为二期，首版不做。
 
 ## 6. 实现步骤
 

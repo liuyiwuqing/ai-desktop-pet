@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "deviceId": "dodo-s3",
+  "bootId": "11111111111111111111111111111111",
+  "reportSequence": 1,
+  "observedAt": 1800000000,
+  "growthSchema": 4,
+  "growth": {
+    "revision": 7, "level": 2, "experience": 15, "experienceToNext": 128,
+    "coins": 72, "intimacy": 10, "mood": 20, "energy": 80, "hunger": 60, "health": 100,
+    "state": "idle", "sleeping": false,
+    "taskDay": 20770, "taskProgress": [1, 2, 0], "taskClaimed": 0, "achievements": 0,
+    "timeReady": true, "unsaved": true, "storageReady": true, "saveRecovered": false, "environment": "none"
+  }
+}

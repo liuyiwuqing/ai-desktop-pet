@@ -27,6 +27,7 @@ typedef enum {
     PET_NET_TOPIC_OTA,
     PET_NET_TOPIC_OTA_ACK,
     PET_NET_TOPIC_OTA_STATUS,
+    PET_NET_TOPIC_GROWTH_STATUS,
     PET_NET_TOPIC_COUNT,
 } pet_net_topic_t;
 

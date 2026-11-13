@@ -129,6 +129,13 @@ build_and_run test_growth \
     "${repo_root}/firmware/components/svc_growth/src/growth_engine.c" \
     "${repo_root}/firmware/tests/host/test_growth.c"
 
+build_and_run test_growth_sync \
+    -I "${contracts_inc}" -I "${growth_priv_inc}" \
+    -I "${repo_root}/firmware/components/svc_growth/include" \
+    "${repo_root}/firmware/components/svc_growth/src/growth_engine.c" \
+    "${repo_root}/firmware/components/svc_growth/src/growth_sync.c" \
+    "${repo_root}/firmware/tests/host/test_growth_sync.c"
+
 build_and_run test_growth_service \
     -pthread -I "${repo_root}/firmware/tests/host/support" \
     -I "${contracts_inc}" -I "${growth_priv_inc}" \

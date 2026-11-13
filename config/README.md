@@ -2,9 +2,11 @@
 
 非敏感配置以 `schemas/` 为事实源，生成 C/TS 类型。NEXUS v1 消息、回执、在线状态保留在 `integration/contracts/nexus-v1/`，本目录镜像由 CI 检查漂移。新增设备配置/遥测契约见 [device-management-v1](../integration/contracts/device-management-v1/README.md)。
 
-- `schemas/`：设备配置、板型、扩展、消息、成功/拒绝回执、在线状态、遥测，共八个 Schema。
+- `schemas/`：设备配置、板型、扩展、消息/回执、在线状态、遥测、OTA 与成长镜像；数量以检查输出为准。
 - `profiles/`：boardId 与功能开关；不放引脚和凭据。
 - `examples/`：非敏感配置与协议样例。
+
+成长镜像是默认关闭的只读扩展，Schema/示例与启动序号规则见 [growth-sync-v1](../integration/contracts/growth-sync-v1/README.md)；不把镜像作为恢复包或跨端奖励依据。
 
 ```bash
 python3 tools/schema_codegen.py
