@@ -40,6 +40,7 @@
 | CONSOLE-01 | 测试消息未知结果重试 | CORE `07e3c53` 已推送；固定逻辑提交 ID/正文、导航恢复、确认后释放、拒绝/退出清理。新增浏览器 33 项与既有 78 项通过，CORE 59 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md) | 页面刷新/关闭后不恢复正文，应先核对列表；不是跨浏览器或设备展示保证。04 配套检查/文档同项提交 |
 | CONSOLE-02 | 管理台完成度与验收清单 | `65eb2ef` 已推送；已按八导航、原完整规划及真实控制器核对；当前功能/验证/缺项见 [23](23-console-completion.md#console-02--当前实现与完整规划的差距) | 完整规划尚未全部实现；文档核对不算缺项完成。状态筛选已单独交付 CONSOLE-03 |
 | CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；来源/设备/时间筛选、导出/取消/时间线仍待后续 |
+| CONSOLE-05 | 只读运行概览 | CORE `af916aa` 已推送并核对远程；CORE HTTP/隔离 PostgreSQL 2 项、真实 Vue/回环 HTTP 17 项、完整构建 64 通过/5 跳过，JAR 资源一致；见 [23](23-console-completion.md#console-05--只读运行概览) | 04 配套页面检查/使用说明/台账同项提交；推送与远端 CI 单独核对，不代替生产/设备验收 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 | ACC-01 | 真实云端与常在线部署 | 等待接入条件；尚无目标服务器/域名及供应商桥接凭据 | [部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | 未开始，当前不烧录 | P1–P7、NVS 掉电、真实 OTA/回滚、24h/7d，见 [07](07-roadmap-acceptance.md) |
@@ -120,3 +121,7 @@ DOC-01（2026-11-13）：产品介绍采用“栖团 Qitomo”，Logo 从现有�
 本项实际执行：`bash tools/simulate_growth.sh --state-dir "$PWD/build/brand-check/growth-state"` 按新文档完成照料、任务领取、成就、睡眠和唤醒；`bash tools/simulate_voice.sh` 以合成 PCM / 注入事件走通 listening → thinking → speaking → idle 及静音/恢复；两者退出 0。`bash tools/ci/test_ui_host.sh` 10/10 通过，`python3 tools/export_pet_preview.py` 成功输出真实 LVGL 帧的本地预览。`check_contracts.py` 验证 14 schema / 1 profile / 12 example / 2 extension，`check_deps.py` 验证 19 组件无环，`board_codegen.py --check` 通过。新文档及根 README 的本地链接、SVG XML/路径与外部引用、PNG 尺寸/透明角及 `git diff --check` 均已核对；已查看实际 PNG 的浅深色、单色与小尺寸效果。
 
 品牌 PNG 通过 `node docs/assets/brand/render.mjs <已有 sharp 模块绝对路径>` 从入库 SVG 导出，使用宿主已有 sharp 0.35.5，无新增运行依赖。修改仅在根 README 与 docs，当前 workflow 的 push 路径不匹配，不将先前 CI 结果计作本项结果。未改固件逻辑、构建身份、唤醒词、协议、存档或其他仓库；没有部署、真实消息、烧录或擦除设备。提交推送另以本项 Git/远端核对。
+
+CONSOLE-05：按当前缺项推进只读运行概览，明确 UTC 收件窗口、90 秒在线规则、当前失败比例和全部保留投递积压；单条数据库查询保持计数同一快照。先复现公开接口 404 与页面缺少导航，再完成接口 2 项和页面 17 项验证；完整 CORE build 退出 0（69 条中 64 通过/5 条可选环境跳过，0 失败/错误），JAR 内三份静态资源与当前前端哈希一致。管理脚本的末位导航假设改为按语义定位，既有测试发送 33/管理记忆 38/OTA 22/成长 18/筛选 63 共 174 项再次通过，连同本项共 191 项页面检查；各任务空间均成功关闭。没有真实部署、消息发送、数据库迁移或设备操作。
+
+CONSOLE-05 的 CORE `af916aa` 已正常推送至 `codex/core-baseline` 并核对远端；04 配套检查、按语义定位的既有管理回归与本页记录同项提交。新增 17 项与既有 174 项浏览器检查、2 项 HTTP/真实数据库、64 通过/5 跳过的 Maven 结果均为本地证据；本项推送触发的 CI 另行核对。

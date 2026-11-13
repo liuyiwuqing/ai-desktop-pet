@@ -107,7 +107,7 @@ await expect("document.body.innerText.includes('状态已过期') && document.qu
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
 await expect("window.innerWidth===390 && document.documentElement.scrollWidth<=390",'390 CSS px has no horizontal overflow');
 await cdp('Emulation.clearDeviceMetricsOverride');
-await js("document.querySelector('.sidebar nav button:last-child').click()");
+await js("[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith('记忆')).click()");
 await expect("!!document.querySelector('.memory-search input') && document.body.innerText.includes('待删除')",'memory query and deletion queue are visible');
 await fillInput('.memory-search input','公开评论');await tap('检索');
 await expect("document.querySelectorAll('.memory-results article').length===1 && document.querySelector('.memory-results').innerText.includes('<img src=x') && !document.querySelector('.memory-results img') && !document.querySelector('.memory-results a')",'memory uses plain text and rejects unsafe source links');
