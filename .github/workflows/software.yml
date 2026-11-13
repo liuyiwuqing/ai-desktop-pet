@@ -1,5 +1,15 @@
 name: Software checks
 on:
+  push:
+    branches: [main]
+    paths:
+      - firmware/**
+      - extensions/**
+      - resources/**
+      - config/**
+      - tools/**
+      - deployment/**
+      - .github/workflows/software.yml
   pull_request:
   workflow_dispatch:
 permissions:

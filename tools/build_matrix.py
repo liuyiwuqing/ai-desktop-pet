@@ -47,8 +47,13 @@ def inventory():
         'licenseSha256':digest(Path(os.environ['IDF_PATH'])/'LICENSE')},'fonts':{'declaredLicense':font['license'],
         'licenseSha256':digest(ROOT/'resources/fonts/OFL.txt')}}
 
+def source_git(*args,**options):
+    # Container runners can use another UID/HOME after checkout. Trust only this
+    # already-executing workspace, without changing global Git configuration.
+    return invoke(['git','-c','safe.directory='+str(ROOT),*args],cwd=ROOT,capture_output=True,**options)
+
 def source_manifest():
-    result=invoke(['git','ls-files','--cached','--others','--exclude-standard','-z','--','.'],cwd=ROOT,capture_output=True)
+    result=source_git('ls-files','--cached','--others','--exclude-standard','-z','--','.')
     files=[]
     for name in sorted(set(result.stdout.decode().split('\0'))-{''}):
         path=ROOT/name
@@ -58,12 +63,12 @@ def source_manifest():
 
 def source_state():
     """Record reviewable names/statuses, without copying working-tree contents."""
-    base=invoke(['git','rev-parse','HEAD'],cwd=ROOT,capture_output=True,text=True).stdout.strip()
-    fields=invoke(['git','diff','--name-status','--no-renames','-z','HEAD','--'],cwd=ROOT,capture_output=True).stdout.decode().split('\0')
+    base=source_git('rev-parse','HEAD',text=True).stdout.strip()
+    fields=source_git('diff','--name-status','--no-renames','-z','HEAD','--').stdout.decode().split('\0')
     if fields[-1]=='':fields.pop()
     if len(fields)%2:raise ValueError('unexpected Git change listing')
     tracked=[{'status':fields[i],'path':fields[i+1]} for i in range(0,len(fields),2)]
-    untracked=invoke(['git','ls-files','--others','--exclude-standard','-z'],cwd=ROOT,capture_output=True).stdout.decode().split('\0')
+    untracked=source_git('ls-files','--others','--exclude-standard','-z').stdout.decode().split('\0')
     return {'baseCommit':base,'tracked':tracked,'untracked':sorted(set(untracked)-{''})}
 
 def main():

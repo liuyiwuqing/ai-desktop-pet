@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the public build CLI; planning cannot write a config or invoke ESP-IDF."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -9,6 +10,28 @@ import unittest
 ROOT=Path(__file__).resolve().parents[2]
 
 class MatrixPlanTests(unittest.TestCase):
+    def test_source_evidence_works_with_an_explicitly_owned_container_checkout(self):
+        # Exercise the exact provenance boundary with real Git, not a simulated successful build.
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve();(root/'firmware').mkdir()
+            (root/'firmware/ownership.c').write_text('int container_checkout;\n')
+            for args in (['init','-q'],['add','.'],['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','fixture']):
+                subprocess.run(['git','-C',str(root),*args],check=True,capture_output=True)
+            env=os.environ.copy();env.update(GIT_TEST_ASSUME_DIFFERENT_OWNER='1',GIT_CONFIG_COUNT='1',
+                GIT_CONFIG_KEY_0='safe.directory',GIT_CONFIG_VALUE_0='')
+            control=subprocess.run(['git','-C',str(root),'ls-files'],env=env,capture_output=True,text=True)
+            self.assertEqual(control.returncode,128,control.stderr)
+            self.assertIn('dubious ownership',control.stderr)
+            script='import sys,json,importlib.util;from pathlib import Path;'+\
+                'spec=importlib.util.spec_from_file_location("matrix",sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);'+\
+                'm.ROOT=Path(sys.argv[2]);print(json.dumps({"files":m.source_manifest(),"state":m.source_state()}))'
+            checked=subprocess.run([sys.executable,'-c',script,str(ROOT/'tools/build_matrix.py'),str(root)],env=env,capture_output=True,text=True)
+            self.assertEqual(checked.returncode,0,checked.stderr)
+            evidence=json.loads(checked.stdout)
+            self.assertEqual([p['path'] for p in evidence['files']],['firmware/ownership.c'])
+            self.assertEqual(evidence['state']['tracked'],[])
+            self.assertEqual(evidence['state']['untracked'],[])
+
     def test_planning_is_isolated_and_does_not_touch_an_existing_config(self):
         with tempfile.TemporaryDirectory() as directory:
             output=Path(directory)/'output'
