@@ -50,4 +50,20 @@ class MatrixPlanTests(unittest.TestCase):
             result=subprocess.run([sys.executable,str(ROOT/'tools/build_matrix.py'),*arguments],capture_output=True,text=True)
             self.assertNotEqual(result.returncode,0)
 
+    def test_duplex_plan_is_an_explicit_isolated_diagnostic(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/'output'
+            result=subprocess.run([sys.executable,str(ROOT/'tools/build_matrix.py'),'--profile','duplex',
+                '--build-root',str(output)],text=True,capture_output=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            plan=json.loads(result.stdout)
+            self.assertFalse(plan['executed'])
+            self.assertEqual([entry['profile'] for entry in plan['builds']],['duplex'])
+            command=plan['builds'][0]['command']
+            self.assertIn('-DSDKCONFIG='+str((output/'duplex/sdkconfig').resolve()),command)
+            self.assertIn(str(ROOT/'firmware/profiles/duplex.defaults'),next(
+                value for value in command if value.startswith('-DSDKCONFIG_DEFAULTS=')))
+            self.assertNotIn('flash',command)
+            self.assertFalse(output.exists())
+
 if __name__=='__main__':unittest.main()

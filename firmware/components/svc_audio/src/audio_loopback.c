@@ -35,6 +35,7 @@ esp_err_t pet_audio_loopback_run(const pet_audio_device_t *device,
     owned = true;
     err = device->init();
     if (err != ESP_OK) goto cleanup;
+    if (cancelled(config)) { err = PET_AUDIO_ERR_CANCELLED; goto cleanup; }
 
     report->phase = PET_AUDIO_CHECK_CAPTURE;
     err = device->capture_start();

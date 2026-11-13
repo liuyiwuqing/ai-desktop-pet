@@ -20,6 +20,7 @@ typedef enum { NONE, NEW_RX, RX_CONFIG, NEW_TX, TX_CONFIG, CALLBACK, ENABLE_RX, 
 static fault_t fault;
 static int64_t now_us;
 static bool suppress_dma;
+static bool retain_rx_after_tx_failure;
 static unsigned sent_callbacks;
 static int16_t transmitted[PET_AUDIO_PLAYBACK_SAMPLES * 2];
 static size_t override_bytes = SIZE_MAX;
@@ -76,6 +77,7 @@ esp_err_t i2s_channel_enable(i2s_chan_handle_t channel)
 esp_err_t i2s_channel_disable(i2s_chan_handle_t channel)
 {
     assert(channel->enabled);
+    if (!channel->tx && retain_rx_after_tx_failure) return ESP_FAIL;
     if (fail(channel->tx ? DISABLE_TX : DISABLE_RX)) return ESP_FAIL;
     channel->enabled = false;
     channel->preloaded = 0;
@@ -215,5 +217,56 @@ int main(void)
         assert(audio->init() == ESP_ERR_INVALID_STATE);
         assert(audio->deinit() == ESP_OK);
     }
-    puts("BSP audio: I2S format, half-duplex, DMA drain, timeout, retry and cleanup passed");
+    /* Parallel I/O requires a separate explicit entry; the two original starts
+     * above must continue rejecting an already active opposite direction. */
+    assert(audio->duplex_start != NULL);
+    assert(audio->duplex_start(24000) == ESP_ERR_INVALID_STATE);
+    for (uint32_t rate = 16000; rate <= 24000; rate += 8000) {
+        assert(audio->init() == ESP_OK);
+        assert(audio->duplex_start(22050) == ESP_ERR_INVALID_ARG);
+        assert(!channels[0].enabled && !channels[1].enabled);
+        assert(audio->duplex_start(rate) == ESP_OK);
+        assert(channels[0].enabled && channels[1].enabled);
+        assert(channels[0].config.clk_cfg.sample_rate_hz == 16000);
+        assert(channels[1].config.clk_cfg.sample_rate_hz == rate);
+        assert(channels[1].preloaded == 3 * 480 * 4);
+        assert(audio->duplex_start(rate) == ESP_ERR_INVALID_STATE);
+        assert(audio->capture_start() == ESP_ERR_INVALID_STATE);
+        assert(audio->playback_start(rate) == ESP_ERR_INVALID_STATE);
+        assert(audio->capture_read(samples, 4, &count, 100) == ESP_OK && count == 4);
+        assert(samples[0] == 32767 && samples[1] == -32768);
+        const int16_t pcm[] = {1000, -1000, 2000, -2000};
+        assert(audio->playback_write(pcm, 4, &count, 100) == ESP_OK && count == 4);
+        for (size_t i = 0; i < 4; ++i)
+            assert(transmitted[2 * i] == pcm[i] && transmitted[2 * i + 1] == pcm[i]);
+        if (rate == 16000) {
+            assert(audio->capture_stop() == ESP_OK);
+            assert(!channels[0].enabled && channels[1].enabled);
+            assert(audio->playback_write(pcm, 4, &count, 100) == ESP_OK);
+            assert(audio->playback_drain(250) == ESP_OK);
+            assert(audio->playback_stop() == ESP_OK);
+        } else {
+            assert(audio->playback_stop() == ESP_OK);
+            assert(channels[0].enabled && !channels[1].enabled);
+            assert(audio->capture_read(samples, 4, &count, 100) == ESP_OK);
+            assert(audio->capture_stop() == ESP_OK);
+        }
+        assert(audio->deinit() == ESP_OK);
+    }
+    const fault_t duplex_faults[] = {RECLOCK, PRELOAD, ENABLE_RX, ENABLE_TX};
+    for (size_t i = 0; i < sizeof(duplex_faults) / sizeof(duplex_faults[0]); ++i) {
+        assert(audio->init() == ESP_OK);
+        fault = duplex_faults[i];
+        assert(audio->duplex_start(24000) != ESP_OK);
+        assert(!channels[0].enabled && !channels[1].enabled);
+        assert(audio->deinit() == ESP_OK);
+    }
+    assert(audio->init() == ESP_OK);
+    fault = ENABLE_TX; retain_rx_after_tx_failure = true;
+    assert(audio->duplex_start(24000) == ESP_FAIL);
+    assert(channels[0].enabled && !channels[1].enabled);
+    assert(audio->deinit() == ESP_FAIL && channels[0].enabled);
+    retain_rx_after_tx_failure = false;
+    assert(audio->deinit() == ESP_OK);
+    puts("BSP audio: half-duplex compatibility, explicit parallel I/O, DMA drain and failure cleanup passed");
 }

@@ -410,6 +410,18 @@ static void recovery_maintenance(void *arg)
 }
 #endif
 
+#if CONFIG_PET_AUDIO_DIAGNOSTIC_ON_BOOT
+static bool audio_diagnostic_allowed(void *context)
+{
+    (void)context;
+    pet_config_snapshot_t settings;
+    if (pet_config_snapshot(&settings) != ESP_OK || !settings.writable || settings.config.muted)
+        return false;
+    const uint32_t epoch = app_epoch_now();
+    return !pet_config_dnd_active(&settings.config, epoch, epoch != 0);
+}
+#endif
+
 esp_err_t app_start(void)
 {
     const bool recovery=app_recovery_start();
@@ -460,7 +472,7 @@ esp_err_t app_start(void)
     if (app_behavior_start()!=ESP_OK) ESP_LOGW(TAG,"behavior worker unavailable");
 
 #if CONFIG_PET_AUDIO_DIAGNOSTIC_ON_BOOT
-    const esp_err_t audio_err = pet_audio_diagnostic_start();
+    const esp_err_t audio_err = pet_audio_diagnostic_start(audio_diagnostic_allowed, NULL);
     if (audio_err != ESP_OK)
         ESP_LOGW(TAG, "audio diagnostic unavailable: %s", esp_err_to_name(audio_err));
 #endif

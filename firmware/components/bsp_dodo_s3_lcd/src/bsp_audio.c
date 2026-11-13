@@ -175,11 +175,8 @@ static esp_err_t capture_read(int16_t *pcm, size_t capacity, size_t *samples, ui
     return err;
 }
 
-static esp_err_t playback_start(uint32_t sample_rate)
+static esp_err_t prepare_playback(uint32_t sample_rate)
 {
-    if (sample_rate != PET_AUDIO_CAPTURE_RATE && sample_rate != PET_AUDIO_PLAYBACK_RATE)
-        return ESP_ERR_INVALID_ARG;
-    if (!s_ready || s_capturing || s_playing) return ESP_ERR_INVALID_STATE;
     const i2s_std_clk_config_t clock = I2S_STD_CLK_DEFAULT_CONFIG(sample_rate);
     esp_err_t err = i2s_channel_reconfig_std_clock(s_tx, &clock);
     if (err != ESP_OK) return err;
@@ -191,8 +188,36 @@ static esp_err_t playback_start(uint32_t sample_rate)
         if (err != ESP_OK) return err;
         if (loaded != sizeof(s_stereo)) return ESP_ERR_INVALID_SIZE;
     }
+    return ESP_OK;
+}
+
+static esp_err_t playback_start(uint32_t sample_rate)
+{
+    if (sample_rate != PET_AUDIO_CAPTURE_RATE && sample_rate != PET_AUDIO_PLAYBACK_RATE)
+        return ESP_ERR_INVALID_ARG;
+    if (!s_ready || s_capturing || s_playing) return ESP_ERR_INVALID_STATE;
+    esp_err_t err = prepare_playback(sample_rate);
+    if (err != ESP_OK) return err;
     err = i2s_channel_enable(s_tx);
     if (err == ESP_OK) s_playing = true;
+    return err;
+}
+
+static esp_err_t duplex_start(uint32_t sample_rate)
+{
+    if (sample_rate != PET_AUDIO_CAPTURE_RATE && sample_rate != PET_AUDIO_PLAYBACK_RATE)
+        return ESP_ERR_INVALID_ARG;
+    if (!s_ready || s_capturing || s_playing) return ESP_ERR_INVALID_STATE;
+    if (PET_BOARD_MIC_I2S == PET_BOARD_SPEAKER_I2S) return ESP_ERR_NOT_SUPPORTED;
+    /* 先准备静音 TX 环，准备失败时不开麦。两个独立控制器仍各用自己的时钟；
+     * 这里没有把写入 DMA 的时间冒充播放参考时间。 */
+    esp_err_t err = prepare_playback(sample_rate);
+    if (err != ESP_OK) return err;
+    err = capture_start();
+    if (err != ESP_OK) return err;
+    err = i2s_channel_enable(s_tx);
+    if (err == ESP_OK) s_playing = true;
+    else (void)capture_stop(); /* 保留原错误和未清理的句柄，供调用方 deinit 重试。 */
     return err;
 }
 
@@ -234,6 +259,7 @@ static const pet_audio_device_t s_audio = {
     .capture_start = capture_start, .capture_read = capture_read, .capture_stop = capture_stop,
     .playback_start = playback_start, .playback_write = playback_write,
     .playback_drain = playback_drain, .playback_stop = playback_stop,
+    .duplex_start = duplex_start,
 };
 
 const pet_audio_device_t *pet_bsp_audio(void)

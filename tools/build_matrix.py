@@ -12,7 +12,7 @@ import sys
 
 ROOT=Path(__file__).resolve().parents[1]
 FW=ROOT/'firmware'
-PROFILES=('default','full','off','tones')
+PROFILES=('default','full','off','tones','duplex')
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def invoke(command,**options):return subprocess.run(command,check=True,**options)
@@ -137,6 +137,8 @@ def main():
         if values.get('CONFIG_APP_REPRODUCIBLE_BUILD')!='y':raise ValueError('reproducible build flag was not applied')
         expected={'off':{'CONFIG_PET_MODULE_NET_ENABLED':'n','CONFIG_PET_MODULE_AUDIO_ENABLED':'n'},
             'tones':{'CONFIG_PET_MESSAGE_TONES_ON_BOOT':'y','CONFIG_PET_AI_XIAOZHI_ON_BOOT':'n'},
+            'duplex':{'CONFIG_PET_AUDIO_DIAGNOSTIC_ON_BOOT':'y','CONFIG_PET_AUDIO_DIAGNOSTIC_DUPLEX':'y',
+                'CONFIG_PET_MODULE_AI_ENABLED':'n'},
             'default':{'CONFIG_PET_AI_XIAOZHI_ON_BOOT':'n'},
             'full':{'CONFIG_PET_AI_ESP_SR_ENABLED':'y','CONFIG_PET_OTA_ENABLED':'y','CONFIG_PET_EXT_SERVO':'y'}}[entry['profile']]
         for default in (FW/'sdkconfig.defaults',FW/'profiles'/f"{entry['profile']}.defaults"):

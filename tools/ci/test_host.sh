@@ -100,6 +100,33 @@ build_and_run test_audio_fake \
     "${repo_root}/firmware/components/pet_hal/src/fake_audio.c" \
     "${repo_root}/firmware/tests/host/test_audio_fake.c" -lm
 
+build_and_run test_audio_duplex \
+    -I "${repo_root}/firmware/tests/host/support" \
+    -I "${contracts_inc}" -I "${hal_inc}" \
+    -I "${repo_root}/firmware/components/svc_audio/include" \
+    "${repo_root}/firmware/components/svc_audio/src/audio_duplex.c" \
+    "${repo_root}/firmware/components/pet_hal/src/audio_pcm.c" \
+    "${repo_root}/firmware/tests/host/test_audio_duplex.c" -lm
+
+for mode in 0 1; do
+    build_and_run "test_audio_diagnostic_${mode}" \
+        -DCONFIG_PET_AUDIO_DIAGNOSTIC_DUPLEX="${mode}" \
+        -I "${repo_root}/firmware/tests/host/support/audio_diagnostic" \
+        -I "${repo_root}/firmware/tests/host/support/ai_agent" \
+        -I "${repo_root}/firmware/tests/host/support" \
+        -I "${contracts_inc}" -I "${hal_inc}" \
+        -I "${repo_root}/firmware/components/svc_audio/include" \
+        "${repo_root}/firmware/components/svc_audio/src/audio_diagnostic.c" \
+        "${repo_root}/firmware/components/svc_audio/src/audio_loopback.c" \
+        "${repo_root}/firmware/components/svc_audio/src/audio_duplex.c" \
+        "${repo_root}/firmware/components/pet_hal/src/audio_pcm.c" \
+        "${repo_root}/firmware/components/pet_hal/src/audio_buffer.c" \
+        "${repo_root}/firmware/tests/host/test_audio_diagnostic.c" -lm
+    for scenario in before init mid allocation task; do
+        "${out_dir}/test_audio_diagnostic_${mode}" "${scenario}"
+    done
+done
+
 for variant in default pin-conflict; do
     audio_flags=()
     if [[ "${variant}" == pin-conflict ]]; then

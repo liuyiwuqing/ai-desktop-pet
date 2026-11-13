@@ -10,7 +10,7 @@
 - `ci/build_firmware.sh`：依赖图检查 → 契约校验 → 主机测试 → `idf.py build` → `idf.py size` → 小智协议/codec、WSS 与模型前端边界主机测试。
 - `ci/check_deps.py`：组件依赖图无环。
 - `ci/check_contracts.py`：schema、profiles、examples、扩展 manifest、生成产物一致性。
-- `ci/test_host.sh`：契约、温湿度、消息解析/队列/存储、展示状态机、成长规则/事务/时钟、动画调度、音频 PCM/FIFO/录放音与 I²S 边界故障、AI 会话/CLI 及扩展的主机测试。
+- `ci/test_host.sh`：契约、温湿度、消息解析/队列/存储、展示状态机、成长规则/事务/时钟、动画调度、音频 PCM/FIFO/录放音、显式并行诊断/隐私取消与 I²S 边界故障、AI 会话/CLI 及扩展的主机测试。
 - `simulate_growth.sh`：用主机 C 编译器运行同一套成长服务；可互动、推进时间、查看成就、注入环境（`climate 温度 湿度`）、模拟失效/断流（`climate-off` / `climate-loss`）、持久保存和重启恢复，不需要 ESP-IDF 或硬件。用法见 `docs/04-growth-game.md` G1/G3/G5/G6。
 - `simulate_voice.sh`：用主机 C 编译器运行同一套 AI 会话引擎；注入唤醒、合成 PCM、响应/播放完成与错误，演练端点、手动打断、静音及旧轮次。`wait` 不生成静音，输出 actions 仅为控制意图，无实际录音、网络或播放。用法见 `docs/01-ai-agent.md` A2；`ci/test_voice_simulator.py` 已纳入主机测试。
 - `ci/test_host.sh` 中的 `test_ai_runtime`：运行单一拥有者边界测试，验证 sink 动作顺序、WakeNet/VAD 注入、旧帧预检与音频/传输端口失败回送；替身不代表真实模型、FreeRTOS 或 I²S。
@@ -23,14 +23,14 @@
 - `generate_fonts.py`：用固定 `lv_font_conv@1.5.3` 从 Noto Sans SC 生成 16/24 px 字体（仅重新生成需要 Node/npm），产物与哈希入库。
 - `ci/test_ui_host.sh`：使用固件锁定的 LVGL 与字体运行消息/成长视图、八种动画与恢复 UI 的主机检查；含真实恢复适配任务的 8 个失败/确认场景，产出 PPM 供布局检查。
 - `export_pet_preview.py`：运行 UI 测试后执行 `python3 tools/export_pet_preview.py`，将八种状态和四种环境的真实 LVGL 帧导出为自包含 `firmware/build-ui-preview/pet-animation.html`，可切换状态/暂停；只依赖 Python 标准库，预览为 10 fps 抽样。
-- `build_matrix.py`：default/full/off/tones 隔离预设，默认只输出计划；`--execute` 使用 ESP-IDF 6.1 构建并记录配置、源码/产物哈希与依赖许可证。full 需显式提供 OTA 公钥，测试镜像不自动发布；见 [运行维护记录](../docs/13-operational-software.md)。
+- `build_matrix.py`：default/full/off/tones/duplex 隔离预设，默认只输出计划；`--execute` 使用 ESP-IDF 6.1 构建并记录配置、源码/产物哈希与依赖许可证。full 需显式提供 OTA 公钥，duplex 是显式启动的有限音频诊断，测试镜像不自动发布；见 [运行维护记录](../docs/13-operational-software.md)及[音频诊断](../docs/22-audio-duplex-diagnostic.md)。
 - `crash_dump.py`：默认只输出读取/离线解码计划，`--execute` 才执行；ROM 读取固定崩溃分区且不自动复位，解码须绑定 ELF SHA256。敏感输出排他创建为 600，不自动上传。
 - `ci/test_build_matrix.py`、`ci/test_crash_dump.py`：公开 CLI 的只读计划、隔离路径与非法输入拒绝；已纳入 `test_host.sh`。恢复状态机同入口覆盖早期崩溃阈值、健康窗口、RTC 损坏、冷上电及手工清锁。
 - `ci/test_management_ui.sh`：构建真实 Vue 管理台，通过 ego-browser 运行 38 项固定浏览器回归。loopback HTTP 夹具仅模拟边界状态，不使用 CORE、数据库或 Broker；覆盖草稿/冲突/未知结果同 ID 重试、只读/过期禁用、清理提示与窄屏溢出。服务退出时自动停止，页面在成功后关闭，失败时保留以便诊断。
 
 ## 计划内容
 
-- 更多板型与语言预设；当前四种功能组合已实现，UI 仍仅支持中文。
+- 更多板型与语言预设；当前有四种常规功能组合和一种维护用并行音频诊断，UI 仍仅支持中文。
 - 资源打包：字体子集、图片转 RGB565、动画精灵表、LittleFS 镜像。
 - 旧工程迁移：02 格式核对与受控映射，当前仅提供只读方案；实物分区备份与回读待上板阶段。
 - 更多硬件诊断：I2C/SPI 扫描与实物读数；当前快照、崩溃读取/离线解码工具已实现，实际崩溃采集待上板。

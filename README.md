@@ -20,6 +20,8 @@
 
 设备成长只读同步见 [21](docs/21-growth-sync.md)：上传设备快照并在 CORE 展示，保留两端各自的奖励规则和存档所有权。
 
+并行音频 HAL 与有限维护诊断见 [22](docs/22-audio-duplex-diagnostic.md)；普通 AI 会话仍半双工，声学 AEC/打断尚待验收。
+
 完整架构与分模块方案在 [`docs/README.md`](docs/README.md)。评审顺序：
 
 1. `00-architecture.md`：总体架构、目录规范、事件总线、契约与部署拓扑。
@@ -44,6 +46,7 @@
 20. `19-remote-ota.md`：远程 OTA 协议、持久事务、管理 UI、成套启用与本地验证。
 21. `20-credential-rotation.md`：CORE/记忆工具双令牌、受保护文件重载、CLI 与验收边界。
 22. `21-growth-sync.md`：设备成长只读镜像、顺序隔离、管理台及 V12 配套离线包。
+23. `22-audio-duplex-diagnostic.md`：并行音频 HAL、一次诊断、隐私门控及后续声学验收条件。
 
 ## 仓库与版本
 

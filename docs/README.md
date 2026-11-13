@@ -58,3 +58,4 @@
 
 - [20 · CORE 与记忆工具凭据轮换](20-credential-rotation.md)：双令牌、到期/撤销、stdio 重载与交付预检。
 - [21 · 设备成长只读同步](21-growth-sync.md)：设备快照上传、顺序隔离、存档状态与管理台展示。
+- [22 · 并行音频 HAL 与有限诊断](22-audio-duplex-diagnostic.md)：显式并行端口、隐私门控与维护预设；普通 AI 继续半双工。

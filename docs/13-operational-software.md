@@ -28,11 +28,11 @@ python tools/build_matrix.py --profile default
 python tools/build_matrix.py --all --ota-public-key /absolute/path/public.der --execute --jobs 2
 ```
 
-四套预设为 default、full、off、tones；full 编译 SR/DSP、维护、两种扩展、OTA 和诊断/恢复，GPIO=-1 且仍需物理校准授权。full 必须显式提供 RSA-3072 PKCS#1 公钥 DER。默认 OTA 根地址为 `.invalid`，测试钥与测试镜像不得当生产发布。其他预设可加 `--diagnostics` 单独启用崩溃功能。
+预设为 default、full、off、tones，以及 SW-07-A 新增的维护用 duplex；最后一项显式启动有限并行音频诊断，见 [22](22-audio-duplex-diagnostic.md)。full 编译 SR/DSP、维护、两种扩展、OTA 和崩溃诊断/恢复，GPIO=-1 且仍需物理校准授权。full 必须显式提供 RSA-3072 PKCS#1 公钥 DER。默认 OTA 根地址为 `.invalid`，测试钥与测试镜像不得当生产发布。其他预设可加 `--diagnostics` 单独启用崩溃功能；该参数与音频启动诊断是不同开关。
 
 实际构建后生成 `build-evidence.json`（版本、Git 基线/变更文件清单、输入/源码及配套镜像/ELF 哈希、配置、SDK 与编译器）和 `dependency-licenses.json`（锁定依赖、声明许可证和许可证文件哈希）。变更清单描述相对 HEAD 的整个工作区状态，不将本轮修改与原有未提交修改混为一次提交。`NOASSERTION` 表示没有可直接读取的 SPDX 声明，需人工核对列出的许可证文本；清单不是法律结论或漏洞扫描。离线签名发布仍使用现有 `package_release.py`，构建脚本不签名、不烧录、不上传。
 
-`.github/workflows/software.yml` 使用固定的 ESP-IDF 容器 digest 和 Actions commit，四套构建隔离执行；full 运行主机、协议、WSS、DSP 与 LVGL 检查。产物标记为未签名测试输出，保留 7 天。工作流只在本地创建，尚未推送或由 GitHub 执行；不包含同级 CORE、真实云端或硬件验收。
+`.github/workflows/software.yml` 使用固定的 ESP-IDF 容器 digest 和 Actions commit，各预设隔离执行；full 运行主机、协议、WSS、DSP 与 LVGL 检查。产物标记为未签名测试输出，保留 7 天。原四预设已多次远程通过，具体提交与运行见 [18](18-requirements-and-progress.md)；新增第五预设结果单独记录。不包含同级 CORE、真实云端或硬件验收。
 
 ## 崩溃诊断与 USB 恢复
 

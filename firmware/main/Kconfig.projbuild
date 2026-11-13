@@ -35,7 +35,8 @@ config PET_MODULE_AUDIO_ENABLED
     bool "Enable audio HAL and loopback service"
     default y
     help
-      INMP441 I2S RX and MAX98357A I2S TX with a half-duplex PCM interface.
+      INMP441 I2S RX and MAX98357A I2S TX. Normal starts stay half-duplex;
+      a separate explicit diagnostic entry supports parallel RX/TX.
       Enabling this alone does not activate the microphone or speaker.
 
 config PET_AI_XIAOZHI_ENABLED
@@ -78,7 +79,7 @@ config PET_AI_XIAOZHI_ON_BOOT
       existing BOOT menu provides push-to-talk, mute and runtime DND.
       With PET_AI_ESP_SR_ENABLED, idle local wake-word listening starts after
       initialization; only a wake-word or deliberate input starts a cloud turn.
-      Mutually exclusive with loopback and boot DND.
+      Mutually exclusive with boot audio diagnostics and boot DND.
 
 config PET_AI_DSP_ENABLED
     bool "Enable ESP-SR noise-suppression frontend"
@@ -94,8 +95,9 @@ config PET_AI_AEC_REFERENCE_ENABLED
     default n
     help
       AEC only runs with a genuine fresh 16 kHz reference submitted by the same
-      audio owner. Current half-duplex BSP supplies no reference and falls back
-      to noise suppression. This option does not enable duplex playback/capture.
+      audio owner. The normal AI owner supplies no calibrated reference and
+      falls back to noise suppression. This option does not activate the
+      separate parallel I/O diagnostic or enable duplex conversation.
 
 config PET_AI_ESP_SR_ENABLED
     bool "Compile WakeNet/VAD frontend (boot AI listens for wake word)"
@@ -125,13 +127,31 @@ config PET_AUDIO_FAKE
       Logical drain is not evidence of real I2S transmission.
 
 config PET_AUDIO_DIAGNOSTIC_ON_BOOT
-    bool "Record and replay one second on boot (diagnostic)"
+    bool "Run a one-shot boot audio diagnostic"
     depends on PET_MODULE_AUDIO_ENABLED && !PET_UI_DND
     default n
     help
-      Explicit opt-in recording test; runs once in a separate task. Records
-      one second of 16 kHz PCM and plays at the same rate with 25% volume.
-      Does not upload, persist audio or change BOOT button behavior.
+      Explicit opt-in test; runs once in a separate task. Select record/replay
+      or the bounded parallel I/O probe below. Neither uploads or persists
+      audio or changes BOOT button behavior. Excludes the boot AI/tone owner.
+
+choice PET_AUDIO_DIAGNOSTIC_MODE
+    prompt "Boot audio diagnostic mode"
+    depends on PET_AUDIO_DIAGNOSTIC_ON_BOOT
+    default PET_AUDIO_DIAGNOSTIC_LOOPBACK
+
+config PET_AUDIO_DIAGNOSTIC_LOOPBACK
+    bool "Record 16 kHz for one second, then replay at 25%"
+
+config PET_AUDIO_DIAGNOSTIC_DUPLEX
+    bool "Probe parallel 16 kHz capture and 24 kHz synthesized playback"
+    depends on !PET_AUDIO_FAKE
+    help
+      Capture and submit a quiet 400 Hz tone for one second, then stop RX
+      before draining TX. Logs only counts, peak and software timing.
+      Does not provide a calibrated AEC reference or enable acoustic barge-in.
+
+endchoice
 
 config PET_MODULE_UI_ENABLED
     bool "Enable ST7789 message UI and BOOT confirmation"
