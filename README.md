@@ -16,6 +16,8 @@
 
 ## 文档入口
 
+当前需求、已完成任务、后续顺序和逐项交付约定统一见 [18 · 当前需求与任务台账](docs/18-requirements-and-progress.md)。每项工作同步文档、验证、提交并推送后继续下一项；软件验证与真实云端/生产部署/实机验收分别记录。
+
 完整架构与分模块方案在 [`docs/README.md`](docs/README.md)。评审顺序：
 
 1. `00-architecture.md`：总体架构、目录规范、事件总线、契约与部署拓扑。
@@ -36,6 +38,7 @@
 16. `15-memory-lifecycle.md`：长期记忆检索、源评论失效、持久化删除与当前验证。
 17. `16-voice-memory-tools.md`：独立 MCP/stdio 公开记忆接口、运维与真实联调步骤。
 18. `17-voice-bridge-regression.md`：固定桥接准备、受控启动、stdio 退出恢复与本地 TLS 全链回归。
+19. `18-requirements-and-progress.md`：需求映射、当前任务台账与持续交付约定。
 
 ## 仓库与版本
 
@@ -50,7 +53,7 @@
 ```text
 04-ai-desktop-pet/
 ├── README.md                     项目入口与目录说明
-├── docs/                         架构、交付、维护与云端联调（00–15）
+├── docs/                         架构、交付、维护、云端联调与任务台账
 ├── deployment/                   CORE 服务、TLS 代理、升级与恢复模板
 ├── firmware/                     ESP32-S3 固件工程（ESP-IDF）
 │   ├── main/                     组合根：app_main、启动编排、诊断
@@ -118,7 +121,9 @@
 - DHT11/KY-015 温湿度；37 合 1 KY 套件中的光敏、摇杆、触摸、蜂鸣器。
 - 预留 1–2 路舵机扩展（独立 5V 供电）。
 
-## 当前进度（2026-11-12）
+## 当前进度（2026-11-13）
+
+服务端已建立独立本地 Git 基线，离线发布包、配置/主机预检和只读探测已实现，包内实际 JAR 的 Linux 容器启动/重启通过，见 [部署记录](deployment/README.md)。后续任务以 [18](docs/18-requirements-and-progress.md) 为准，以下保留早期切片说明。
 
 S1–S4、S5-A 至 S5-F、G1–G6 成长模块及 A1–A8 音频/会话/WSS/输入/UI/模型接入软件已完成相应代码切片。消息链路现在使用现有 nexus-core v1；v3 消息快照保存完整投递身份，兼容 v1/v2 旧数据。离线已读、重启补发、终态重投和满队列重试已有主机验证；仍需真实 Broker 与上板验收。详细行为与验证见[消息模块](docs/02-message-hub.md#s5-f-nexus-core-v1-协议适配2026-11-11)。
 

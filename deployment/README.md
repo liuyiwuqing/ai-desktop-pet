@@ -2,6 +2,18 @@
 
 这些文件是待绑定真实环境的模板。本次只在独立测试环境验证，没有安装系统服务、修改真实数据库或 Broker，也没有申请公网证书或部署。基础语音直接由 ESP32 连接小智，日常不依赖开发用 Mac；NEXUS 可运行在长期在线服务器。Mac 控制是可选扩展，只有启用它时才需要目标 Mac 与 Bridge 在线。
 
+## 离线交付与预检（2026-11-13）
+
+当前尚无目标服务器，先交付[服务端发布包与预检入口](server-release.md)。`tools/server_release.py` 提供 `create/verify/preflight/probe`，只生成新包、核对完整性、读取配置或发只读状态请求，不安装服务、开启功能或迁移真实数据库。`core.env.example` 已补齐可选 Halo/AI/记忆/Bridge 字段，开关仍默认关闭。
+
+配套 CORE 已独立纳入 Git，分支 `codex/core-baseline`，源码基线 `913b3af40eba70a2dba42ac20de6689b933aa11c`，共 100 个文件。私有 `data/`、凭据/私钥、前端依赖和构建输出保持排除。随后按用户连续交付要求建立私有远程 [nexus-core](https://github.com/liuyiwuqing/nexus-core)，文档提交 `ac9a29a` 已推送并保留该基线；原 ZIP 仍绑定 `913b3af`。前端类型检查/生产构建及 Maven verify 通过：44 项，41 通过、3 条件跳过，0 失败/错误；跳过真实模型、Java/C 管理回环和可选语音桥接，不计为本轮通过。
+
+交付 CLI 的 7 项回归通过，覆盖新包/拒绝覆盖、篡改/额外路径/非法 JAR、误提交私有文件、配置权限与缺项、独立令牌、只读状态检查和重定向拒绝。新增 GitHub `server-delivery-tools` job，当前只在本地执行，未推送或声称 GitHub 已运行。
+
+`tools/ci/test_server_linux.py` 已用包内实际 JAR、Java 21.0.13、PostgreSQL 17、Mosquitto 2.0.22 和 Caddy 2.10.2 完成隔离 Linux 容器验证：非 root/只读文件系统、V1–V10 迁移、首次启动/重启后 database/mqtt ready、无鉴权 401/有效鉴权 200，以及管理台首页和两个资源逐字节匹配。重启用例曾因 Docker 动态端口变化超时；对照确认原地址失败而新地址成功后，修正了测试端口重新发现，临时诊断已清理。所有本轮容器/网络已移除，原 CORE 16 份私有文件哈希未变。
+
+当前产物为 `build/server-release-20261113/nexus-server-0.1.0-SNAPSHOT-913b3af.zip`，SHA256 `d9121f8105ec8644c72777bf1fad71717abcdf56cf0d050ddac4cbd9d3614122`，配套 `linux-smoke.json` 记录实际镜像 digest 与验证边界。ZIP 包含 17 份交付文件及清单；04 本轮工具仍待提交，`petDirty=true` 如实记录，清单标识实际文件内容。该检查没有运行真实 systemd、生产 TLS、供应商/记忆服务或设备，不代表真实数据库升级与部署验收。
+
 ## CORE 与管理台
 
 基准为 Linux/systemd、Java 21、PostgreSQL 17、Mosquitto 2.0.22；沿用 [nexus-core Compose](../../nexus-core/compose.yml) 的数据库/Broker，不新增编排系统。构建使用该项目 `python3 tools/run_local.py build`；它会执行前端检查和真实容器集成测试。将生成的 JAR 以不可变文件名保留，再原子切换 `/opt/nexus/core/nexus-core.jar` 指向选定版本。专用 `nexus` 系统用户只读 JAR/配置/CA，不能写源码或私钥。
