@@ -26,7 +26,10 @@ async function fixture(value){return JSON.parse(await serverFetch(base+'/__qa/op
 async function expect(expression,label){for(let i=0;i<60;i++){if(await js(expression)){results.push(label);return;}await wait(0.1);}cliLog(await snapshotText());cliLog({fixture:await fixture({})});throw new Error('UI assertion failed: '+label);}
 async function tap(text,scope='.content > section'){if(!await js(`(()=>{const b=[...document.querySelectorAll(${JSON.stringify(scope)}+' button')].find(b=>b.innerText.trim()===${JSON.stringify(text)});if(!b||b.disabled)return false;b.click();return true;})()`))throw new Error('Button unavailable: '+text);}
 async function navigate(label){await js(`(()=>{const b=[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith(${JSON.stringify(label)}));if(!b)throw new Error('Navigation missing');b.click();})()`);}
-await fixture({reset:true});await openOrReuseTab(base,{wait:true,timeout:15});await gotoAndWait(base,{timeout:15});
+await fixture({reset:true});await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
+const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
+if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
+
 await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
 await expect("!!document.querySelector('.sidebar')",'login succeeds');await navigate('工具');
 await expect("[...document.querySelectorAll('.content > section button')].some(b=>b.innerText.trim()==='查询' && !b.disabled)",'tool catalog is ready');

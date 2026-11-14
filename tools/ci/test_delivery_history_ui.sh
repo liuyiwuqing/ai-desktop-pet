@@ -29,7 +29,10 @@ async function navigate(label){await js(`(()=>{const b=[...document.querySelecto
 async function history(index=0){await js(`(()=>{const row=document.querySelectorAll('tbody tr')[${index}];const b=[...row.querySelectorAll('button')].find(b=>b.innerText.trim()==='时间线');if(!b)throw new Error('History action missing');b.click();})()`);await expect("!!document.querySelector('.delivery-history-panel .management-status .badge')",'history snapshot loaded');}
 async function filter(value){await js(`(()=>{const s=document.querySelector('select[aria-label=投递状态]');s.value=${JSON.stringify(value)};s.dispatchEvent(new Event('change',{bubbles:true}));})()`);await expect("!document.querySelector('select[aria-label=投递状态]').disabled",'delivery filter is ready');}
 async function reset(){await fixture({reset:true});if(await js("!!document.querySelector('.delivery-history-panel')"))await tap('收起时间线');await filter('');await tap('刷新');await expect("document.querySelectorAll('tbody tr').length===4 && !document.querySelector('select').disabled",'fixture starts with four deliveries');}
-await fixture({reset:true});await openOrReuseTab(base,{wait:true,timeout:15});await gotoAndWait(base,{timeout:15});
+await fixture({reset:true});await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
+const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
+if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
+
 await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
 await expect("!!document.querySelector('.sidebar')",'login succeeds');await navigate('投递');
 await expect("document.querySelectorAll('tbody tr').length===4 && [...document.querySelectorAll('tbody button')].some(b=>b.innerText.trim()==='时间线')",'each delivery exposes a timeline action');

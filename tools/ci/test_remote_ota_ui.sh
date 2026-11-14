@@ -33,7 +33,10 @@ async function state(){return JSON.parse(await serverFetch(base+'/__qa/state',{h
 async function expect(expression,label){for(let i=0;i<60;i++){if(await js(expression)){checks.push(label);return;}await wait(0.1);}throw new Error(label);}
 async function tap(label){for(let i=0;i<60;i++){const ok=await js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()===${JSON.stringify(label)});if(!b||b.disabled)return false;b.click();return true;})()`);if(ok)return;await wait(0.1);}throw new Error('Unavailable '+label);}
 async function selectRelease(){await js("(()=>{const el=document.querySelector('#remote-ota-panel select');el.value='release-ui';el.dispatchEvent(new Event('change',{bubbles:true}));})()");}
-await control({reset:true,otaReset:true});await openOrReuseTab(base,{wait:true,timeout:15});await gotoAndWait(base,{timeout:15});
+await control({reset:true,otaReset:true});await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
+const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
+if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
+
 await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await click('.login-card button.primary');await waitForElement('.sidebar');await click('.sidebar nav button:nth-child(3)');await tap('固件升级');
 await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('远程升级尚未启用') && !document.querySelector('#remote-ota-panel select')",'disabled OTA has no action controls');
 await control({otaMode:'empty'});await tap('刷新状态');await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('尚未收到设备升级状态') && document.querySelector('#remote-ota-panel select')?.disabled",'missing readback disables installation');

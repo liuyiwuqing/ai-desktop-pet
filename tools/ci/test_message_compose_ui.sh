@@ -48,7 +48,10 @@ async function login() {
 }
 async function acknowledged(label) {await expect("!document.querySelector('.inline-form') && document.body.innerText.includes('测试消息已保存')",label);}
 await fixture({reset:true,messageReset:true});
-await openOrReuseTab(base,{wait:true,timeout:15});await gotoAndWait(base,{timeout:15});await login();
+await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
+const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
+if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
+await login();
 await draft('丢失响应后的同一消息','只应保存一次');await fixture({messageNext:'save_then_drop'});await send();
 await expect("document.body.innerText.includes('结果尚未确认') && !!document.querySelector('.inline-form')",'response loss preserves the form');
 await send();await acknowledged('explicit retry is acknowledged');

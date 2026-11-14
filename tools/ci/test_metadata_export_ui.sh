@@ -36,7 +36,10 @@ async function input(label,value){await ready();await js(`(()=>{const e=document
 async function choose(label,value){await ready();await js(`(()=>{const e=document.querySelector('select[aria-label="'+${JSON.stringify(label)}+'"]');e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('change',{bubbles:true}));})()`);await ready();}
 function files(){return downloadDirs.flatMap(dir=>fs.readdirSync(dir).filter(file=>file.endsWith('.csv')).map(file=>path.join(dir,file)));}
 async function downloaded(count,label){for(let i=0;i<70;i++){if(files().length===count){results.push(label);return;}await wait(0.1);}throw new Error('Download missing: '+label);}
-await openOrReuseTab(base,{wait:true,timeout:15});await gotoAndWait(base,{timeout:15});
+await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
+const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
+if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
+
 // A reused tab may poll the new fixture before navigation stops the old app.
 await fixture({reset:true});await cdp('Emulation.clearDeviceMetricsOverride');
 await cdp('Page.setDownloadBehavior',{behavior:'allow',downloadPath:downloadDir});

@@ -42,7 +42,10 @@ async function range(index,value) {
 }
 await fixture({reset:true});
 await openOrReuseTab(base,{wait:true,timeout:15});
-await gotoAndWait(base,{timeout:15});
+await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
+const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
+if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
+
 await expect("!!document.querySelector('.login-card')",'login screen');
 await fillInput('.token-label input','incorrect-fixture-token');
 await click('.login-card button.primary');

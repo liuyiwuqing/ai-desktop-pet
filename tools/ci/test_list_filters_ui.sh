@@ -42,7 +42,10 @@ async function choose(label,value) {
   await js(`(()=>{const s=document.querySelector(${JSON.stringify(selector)});s.value=${JSON.stringify(value)};s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
 }
 await fixture({reset:true,listReset:true});
-await openOrReuseTab(base,{wait:true,timeout:15});await gotoAndWait(base,{timeout:15});
+await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
+const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
+if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
+
 await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
 await expect("!!document.querySelector('.sidebar') && document.querySelectorAll('.message-row').length===30",'default message list is unchanged');
 await expect("!!document.querySelector('select[aria-label=消息状态]')",'message state filter is available');
