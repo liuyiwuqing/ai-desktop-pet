@@ -103,6 +103,8 @@ CONSOLE-13 的 CORE `ea9cb77` / 04 `841f13d` 已推送并核对远端。[CORE CI
 
 新增 7 项真实 HTTP/隔离 PostgreSQL/实际调度专项与既有创建 4 项通过，含八并发、无变化/重放、原创建键、版本与在途保护、旧执行历史/重试、非法值/鉴权，以及新参数入队和同日期不重复。旧接口先复现编辑 404，非法时区先复现 500 后改为 400。高频调度下的测试 `TRUNCATE` 锁竞争已用每例独立规则 ID 消除，没有通过修改生产调度规避。实际 Vue 新增 99/既有 393 项通过，共 492 项，任务空间均关闭；脚本验证加载当前 JS 并复用单一标签页。完整 CORE build 退出 0，92 条中 87 通过/5 条件跳过、0 失败/错误；窄屏布局和取消原因文案复核后再执行前端检查/构建与跳过后端测试的资源重打包，最终 JAR 恰含当前三份前端资源、V1–V14 与源码逐字节一致。逐仓推送与远程 CI 记入[任务台账](18-requirements-and-progress.md)；HTTP/RAM 页面夹具不连接真实规则、CORE、数据库、Broker、供应商或设备。
 
+CONSOLE-09-A 的 CORE `cb18ba2`、测试补充 `2ba3a84` / 04 `e728aeb` 已推送并核对远端。[CORE CI 43576489895](https://github.com/liuyiwuqing/nexus-core/actions/runs/43576489895) Docker 全步骤 success；[04 CI 43576106575](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43576106575) 七个 job success，含 full 主机/协议/DSP/LVGL。测试补充仅将调度断言限定到本规则，11 项 HTTP/隔离库再次通过；492 项浏览器、完整 Maven 及资源核对仍是本地证据。
+
 ## CONSOLE-02 · 当前实现与完整规划的差距
 
 以下按当前源码核对。九个主导航在 CORE `frontend/src/App.vue`；页面通过同仓控制器调用现有业务，功能实现和验收覆盖分别说明。这里整理当前可验收范围，不删改 02 的原始完整需求，也不把缺项重新命名为“已完成”。
