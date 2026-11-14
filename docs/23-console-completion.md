@@ -89,6 +89,8 @@ CORE `28793aa` / 04 `052851f` 均已推送并核对远端。[CORE Docker CI 4341
 
 完整 CORE `python3 tools/run_local.py build` 退出 0：85 条中 80 通过、5 条可选环境跳过、0 失败/错误。Java→固件 C 持久化/回执→Java 源码契约通过：原六项仅 `DeliveryService` 的列表/导出相关差异更新指纹，新读取辅助类加入编译与指纹；原 Schema、消息、回执和其他五项未改。真实数据库证据与该契约的 SQL/传输替身分开记录。既有 349 项页面回归再次通过，连同本项共 393 项，任务空间均关闭；JAR 三资源和 V14 与当前产物/来源逐字节一致。逐仓推送与 CI 见任务台账；原 DEL-04 包保持既有快照。正文导出和真实环境验收仍未提供。
 
+CONSOLE-13 的 CORE `ea9cb77` / 04 `841f13d` 已推送并核对远端。[CORE CI 43553123583](https://github.com/liuyiwuqing/nexus-core/actions/runs/43553123583) 的 CLI、源码镜像/隔离 Compose 全步骤 success；[04 CI 43553167085](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43553167085) 七个 job success，含 full 主机/协议/DSP/LVGL。本地 HTTP/Maven、浏览器和源码契约不改写成远程专项测试，真实部署/供应商/设备仍未验收。
+
 ## CONSOLE-02 · 当前实现与完整规划的差距
 
 以下按当前源码核对。九个主导航在 CORE `frontend/src/App.vue`；页面通过同仓控制器调用现有业务，功能实现和验收覆盖分别说明。这里整理当前可验收范围，不删改 02 的原始完整需求，也不把缺项重新命名为“已完成”。
