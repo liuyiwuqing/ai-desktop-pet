@@ -34,6 +34,9 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
         self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(payload)))
         self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(payload)
     def do_GET(self):
+        if urlparse(self.path).path == "/api/v1/templates":
+            return self.json_response(200, {"items": [], "variables": []})
+
         path=urlparse(self.path).path
         if path=='/__qa/state':
             if self.headers.get('X-QA-Key')!=CONTROL:return self.json_response(401,{'error':'unauthorized'})
