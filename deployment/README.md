@@ -2,7 +2,19 @@
 
 这些文件是待绑定真实环境的模板。本次只在独立测试环境验证，没有安装系统服务、修改真实数据库或 Broker，也没有申请公网证书或部署。基础语音直接由 ESP32 连接小智，日常不依赖开发用 Mac；NEXUS 可运行在长期在线服务器。Mac 控制是可选扩展，只有启用它时才需要目标 Mac 与 Bridge 在线。
 
+## 1Panel 镜像部署（DEL-07）
+
+1Panel 部署使用 CORE 的 [镜像部署说明](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/1panel-deployment.md)：服务器只拉取同次发布的 CORE/初始化镜像，无需上传源码或安装 Python/Java/Node/Maven。初始化容器不挂载 Docker socket，只在明确挂载的新目录生成服务器自己的密码、MQTT CA/证书和完整 `compose.1panel.yml`，拒绝覆盖已有配置；之后直接把生成的编排粘贴到面板。
+
+该编排使用普通 `env_file`，不带旧版 1Panel 不支持的 `format: raw`，不含 `build`、禁止拉取策略、Caddy 或 80/443 映射。CORE 默认只发布 `127.0.0.1:18088`，HTTPS 由 1Panel 的现有反向代理提供；OpenResty 为 bridge 网络时需使用同一 edge 网络的服务地址，不能把容器内回环地址当宿主机。数据库仅内部访问，MQTT/TLS 可按设备上线需要发布 8883。
+
+CORE `043f134` 已推送并核对远端：CLI 11 项、原 Compose 六组、新增镜像部署七组通过；实际本地镜像为 `linux/arm64`，包含无源码/socket 初始化、私有权限/哈希、原样拒绝重复初始化、特殊路径/env、认证/实际 JAR 页面、MQTT TLS、重建持久性。初始化镜像默认网络构建因 Alpine DNS 失败，host 网络构建通过，未修改全局网络或软件源。Actions 的 actionlint 检查通过，未运行无关业务修改或生产迁移。
+
+发布工作流先验证，再以仓库短期 `GITHUB_TOKEN` 发布 amd64/arm64 两种架构，随后在新 job 中按 digest 从 GHCR 回拉并验证实际镜像。私有仓库/包可见性不变；服务器和 1Panel 需一次性配置 GHCR 的读取凭据，不能把令牌写进编排。发布成功后 `published-image-verification` artifact 提供两个实际 digest 和无秘密检查报告。当前发布及远程验证仍待本轮具体运行确认，不把本地构建记为已发布；Debian/1Panel 目标机尚未连接或验收。
+
 ## 管理台 Docker 部署（DEL-06）
+
+本节保留源码构建与独立 Caddy 的历史方案；1Panel 直接拉取镜像使用上面的 DEL-07。
 
 线上管理台采用 CORE 仓库的独立 [Docker Compose 方案](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/docker-deployment.md)：一个非 root/只读 CORE 容器提供 Vue 页面和 API，配套 PostgreSQL、MQTT/TLS、Caddy HTTPS。源码多阶段构建、私有配置初始化、持久化、认证健康检查、日志轮换、备份和升级步骤在该文档维护；根目录开发 Compose 与下文 systemd 方案保留各自用途。
 
