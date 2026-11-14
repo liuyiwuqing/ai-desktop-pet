@@ -153,10 +153,10 @@ CONSOLE-09-A 的 CORE `cb18ba2`、测试补充 `2ba3a84` / 04 `e728aeb` 已推�
 | CONSOLE-09 | 自动化扩展，A 已交付编辑 | A 提供停用/在途保护、版本校验、未知结果核对和旧执行历史；B 已提供保留历史的删除及无动作测试预演；C 已提供消息来源/类型/关键词/优先级 AND 与固定提醒，动作限公开评论分析和设备通知 |
 | CONSOLE-10 | 已交付：角色与统一审计 | 独立 operator/viewer 令牌、服务端鉴权、一次性签发/立即撤销/到期、无秘密审计/保留；用户已确认保留管理员登录方案，见下文 |
 | CONSOLE-11 | 已交付：SSE 与接入引导 | 请求头鉴权、版本/重连/轮询回退、全局设备视图及登记/连接/回执分开核对；草稿保持，生产代理/设备另行验收 |
-| CONSOLE-12 | 验收补齐 | A 提供工具/规则创建与常见页面故障专项；真实环境和新部署包仍待验收，不用夹具或本地构建代替产品验收 |
+| CONSOLE-12 | 软件回归与交付已完成 | A 提供故障专项，B 全量回归，C 发布镜像/干净 ZIP 和实际 Linux 包验证；目标生产/供应商/实机仍待验收 |
 | CONSOLE-13 | 已交付：更多筛选与元数据 CSV | 见上文软件验证；来源/设备/时间与状态可组合、全部匹配元数据最多 5000 行、安全转义与失败反馈；正文导出已由 CONSOLE-13-B 限管理员、显式确认与七天/1000 条范围提供 |
 
-CONSOLE-01–11、13 的本轮软件切片已逐项实现/核对并记录验证，CONSOLE-12 继续汇总最终回归和新版镜像/离线包。完整产品仍保留真实环境/实机验收，设备网络遥测/设备凭据 UI、奖励二期、声学打断和资源/多语言/更多平台按当前台账独立保留，不把这些未完成工作写成全部交付。
+CONSOLE-01–11、13 的本轮软件切片已逐项实现/核对并记录验证，CONSOLE-12 已完成最终回归和新版镜像/离线包，见 B/C。完整产品仍保留真实环境/实机验收，设备网络遥测/设备凭据 UI、奖励二期、声学打断和资源/多语言/更多平台按当前台账独立保留，不把这些未完成工作写成全部交付。
 
 CONSOLE-03 的 CORE 配套 `b85f704`、04 专项/文档 `ff3ce39`、源码指纹补充 `f4c4b7e` 均已推送并核对远端。`ff3ce39` 对应 [CI 43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全部 success，含五种固件预设和 full 主机/协议/DSP/LVGL；174 项浏览器专项与 CORE Maven 是本地证据，该 workflow 不执行这两类检查。
 
@@ -226,3 +226,27 @@ CORE `230c809` 已推送并核对远端。V20 按服务端配置指纹保存默�
 完整构建五项跳过为三个需显式固件 C peer 的配置/OTA/成长联调，以及真实 AI 供应商和固定 TLS 语音桥接；后续独立补跑有自己的命令/结果，不追改这次构建计数。发布镜像、从 GHCR 回拉、离线 ZIP/实际 Linux JAR、远程固件 CI 分别记录在 CONSOLE-12-C。生产迁移、真实清理/消息和烧录均未执行。
 
 本轮规范沉淀于对应 CORE 契约、公开行为测试、当前矩阵和任务台账，无共享 Skill 变更。设备网络遥测/凭据维护 UI、奖励二期、真实声学打断和资源/多语言/更多平台仍按原分期保留。
+
+
+## CONSOLE-12-C · 新版镜像、离线包与 Linux 验证
+
+CORE `230c809670edab3800801d9135fde6465f190623` 的 [发布运行 43620052738](https://github.com/liuyiwuqing/nexus-core/actions/runs/43620052738) 四个 job 全部 success。验证 job 先确认 amd64/arm64 manifest，再从 GHCR 按 digest 拉取实际镜像，7 项无源码初始化/拒绝覆盖/普通 env 的 1Panel 编排/非 root 只读/鉴权与 JAR 资源/MQTT TLS/重建持久性全部通过，隔离资源已清理：
+
+- CORE：`ghcr.io/liuyiwuqing/nexus-core@sha256:bc7e95294d3df8f6f415381240439e828959b93e6c94e43109ca12c79f6cc2d1`
+- INIT：`ghcr.io/liuyiwuqing/nexus-core-init@sha256:f912df8e436084e46793c4f6c23ebd044edadb2279a3df9c6bc0c721021e3ec9`
+
+服务器无需源码包。供已提供域名的部署者直接复制的 [1Panel 步骤](27-1panel-quickstart.md) 已固定两个 digest；首次安装与已有安装升级分开。命令已作 Bash 语法检查，镜像引用与下载的实际验证报告一致。未在用户目标机执行。
+
+离线包 `build/server-release-20261115/nexus-server-0.1.0-SNAPSHOT-230c809.zip` 绑定 CORE `230c809` / 04 `1fe497c`，创建时两仓干净（petDirty=false），format=2、18 文件，SHA256 `302b244eaef849ef58e191e2a21e69b82805cb3e817d5b537a310b9242771cb1`。create/verify 均退出 0，旧包未覆盖，新包/运行报告保留忽略目录。
+
+```sh
+python3 tools/server_release.py create --core ../nexus-core --output build/server-release-20261115/nexus-server-0.1.0-SNAPSHOT-230c809.zip
+python3 tools/server_release.py verify --bundle build/server-release-20261115/nexus-server-0.1.0-SNAPSHOT-230c809.zip
+python3 tools/ci/test_server_linux.py --bundle build/server-release-20261115/nexus-server-0.1.0-SNAPSHOT-230c809.zip --memory-rotation --evidence build/server-release-20261115/linux-smoke-230c809.json
+```
+
+最后一条以 ZIP 内实际 JAR 在隔离 Linux Java21/PostgreSQL/Mosquitto/Caddy 中通过首次启动/重启、鉴权、实际页面资源及 V1–V20。admin 与 Memory 文件的过渡/撤销/到期/异常权限/原子替换/不重启修复，以及同一 stdio 进程不重新初始化的文件热重载/失败不转发或重放均通过；非 root、只读文件系统验证通过。报告明确 `productionTlsTested=false`、`realProvidersTested=false`、`systemdTested=false`。
+
+完整构建中跳过的三个 C peer 已分别用 `PET_HOST_SANITIZE=1 python3 tools/ci/test_management_contract.py`、`test_remote_ota_contract.py`、`test_growth_sync_contract.py` 各补跑 1 项通过，真实 HTTP/PostgreSQL/MQTT 和固件 C 服务参与，OS/Flash 在主机托管。另以 `NEXUS_VOICE_BRIDGE_TEST=true` / JDK21 单跑 `MemoryLifecycleFlowTest#thePinnedVoiceBridgeRevalidatesPublicContentAcrossTlsReconnects`，1 项通过，实际固定桥接/stdio/WSS 与临时 TLS 服务参与。真实 AI 供应商未调用；不修改原完整构建的 111/5 计数。
+
+04 后续 CI 独立记录；此前被后续 push 取消的运行不算成功。生产数据库、真实消息、清理、HTTPS/设备/烧录与长期验收尚未执行。原二期/后续范围保持台账定义；没有将其静默标记完成。

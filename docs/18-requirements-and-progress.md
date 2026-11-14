@@ -53,14 +53,15 @@
 | CONSOLE-11 | 实时更新与首次接入引导 | CORE `21ecb79` 已推送并核对远端；认证请求头 SSE、版本化变化提示/撤销检查/有界连接/轮询回退；顶部设备视图与只读接入引导，登记/凭据/连接/接收/展示分开；HTTP/隔离 PostgreSQL 2 项、实际 Vue+SSE 20 次检查通过，完整 CORE 104 通过/5 跳过、最终 JAR 三资源逐字节一致；见 [CORE 契约](../../nexus-core/docs/console-events-and-setup.md) | 逐仓提交；生产 1Panel 代理、真实连接/凭据和设备验收未执行 |
 | CONSOLE-12-A | 工具/规则创建与页面故障处理 | CORE `28793aa` / 04 `052851f` 已推送并核对远端；HTTP/隔离 PostgreSQL 4 项、实际 Vue 新增 96/既有 253 项；完整构建 74 通过/5 跳过、JAR 三资源/V14 一致；见 [23](23-console-completion.md#console-12-a--工具规则创建与页面故障处理) | CORE [43414082430 第二次运行](https://github.com/liuyiwuqing/nexus-core/actions/runs/43414082430/attempts/2) Docker 全步骤 success、04 [43414283771](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43414283771) 七个 job success；真实工具/提醒、供应商与设备仍待验收 |
 | CONSOLE-12-B | 管理台最终软件回归 | CORE `230c809` 完整构建 116 条中 111 通过/5 条条件跳过；实际 Vue 19 组共 750 次检查全部通过，CORE CLI 11/交付 CLI 10、Schema 14 份/12 示例及 Java→固件 C→Java 消息契约通过；见 [23](23-console-completion.md#console-12-b--最终软件回归) | 新版镜像/离线包独立记录，真实供应商与实机未验收；三个可选 C peer 另行补跑，不将跳过写成通过 |
+| CONSOLE-12-C | 新镜像与干净离线包 | CORE `230c809` 的 [发布 43620052738](https://github.com/liuyiwuqing/nexus-core/actions/runs/43620052738) 四个 job success；amd64/arm64 manifest、GHCR digest 回拉及 7 组真实隔离 1Panel 编排通过；18 文件 ZIP 绑定两仓干净提交，实际 Linux JAR 的 V1–V20、启动/重启、admin/Memory/同一 stdio 进程热轮换通过；[复制部署命令](27-1panel-quickstart.md) | 已发布镜像不等于已部署用户服务器；三个 C peer/语音桥补跑通过，远程固件 CI 单独核对 |
 | CONSOLE-13 | 更多筛选与元数据 CSV | CORE `ea9cb77` / 04 `841f13d` 已推送并核对远端；本地 HTTP/隔离 PostgreSQL 新增 6 项、实际 Vue 新增 44/既有 349 项通过；完整构建 80 通过/5 跳过、JAR 三资源/V14 一致、Java→固件 C→Java 源码契约通过；见 [23](23-console-completion.md#console-13--更多筛选与元数据-csv) | CORE [43553123583](https://github.com/liuyiwuqing/nexus-core/actions/runs/43553123583) Docker 全步骤、04 [43553167085](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43553167085) 七个 job success；正文导出已由 CONSOLE-13-B 提供；生产与实机仍待验收 |
 | CONSOLE-13-B | 管理员正文导出 | CORE `d07bce8` 已推送并核对远端；管理员显式确认、已应用条件与最近七天未清正文交集、1000 行上限和 CSV 公式/引号保护；真实 HTTP 新增 1/元数据 6 项、实际 Vue 正文 15/原元数据 44 检查通过，完整 CORE 105 通过/5 跳过、路径变体/1000 条最终 verify 通过；见 [正文导出契约](../../nexus-core/docs/content-export.md) | 逐仓提交；只导出隔离测试数据，没有读取生产消息 |
 | CONSOLE-09-C | 消息条件与限定动作组合 | CORE `f39ecec` 已推送并核对远端；来源/类型/关键词/优先级 AND、新消息固定提醒、公开分析原授权保护、自动提醒回环排除；HTTP/隔离库新增 3 项与原编辑/创建共 17 项 verify 通过，实际 Vue 新增 17/原编辑 99/删除 52 检查通过；见 [CORE 契约](../../nexus-core/docs/automation-conditions.md) | 同步契约/页面/专项；不开放任意动作，真实规则/消息与生产库未操作 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
-| ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；镜像交付见 DEL-07，尚未连接目标机或配置真实供应商 | [1Panel 部署](../deployment/README.md#1panel-镜像部署del-07)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
+| ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | 未开始，当前不烧录 | P1–P7、NVS 掉电、真实 OTA/回滚、24h/7d，见 [07](07-roadmap-acceptance.md) |
 
-04 当前版本 `0.4.0-dev`、CORE `0.1.0-SNAPSHOT`，均为开发版本，尚无生产发布或整机验收结论。误回退的 22 文件已恢复；覆盖来源未查明，见 [17](17-voice-bridge-regression.md)，不把恢复成功写成原因调查完成。
+04 当前版本 `0.4.0-dev`、CORE `0.1.0-SNAPSHOT`，均为开发版本；当前已有可拉取的私有部署镜像发布，尚无目标机生产部署或整机验收结论。误回退的 22 文件已恢复；覆盖来源未查明，见 [17](17-voice-bridge-regression.md)，不把恢复成功写成原因调查完成。
 
 ## 每项工作必须闭环
 

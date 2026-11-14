@@ -1,0 +1,49 @@
+# 1Panel：直接拉取镜像部署管理台
+
+2026-11-15 已验证版本：CORE `230c809`，支持 `linux/amd64`、`linux/arm64`。发布与按 digest 回拉的 [运行 43620052738](https://github.com/liuyiwuqing/nexus-core/actions/runs/43620052738) 全部成功，7 项无源码初始化/编排/鉴权/静态资源/TLS/重建持久性检查通过。以下供部署者在自己的 Debian/1Panel 执行；本项目未连接或部署该服务器。
+
+## 首次安装
+
+GHCR 当前为私有镜像。在终端登录，并在 1Panel 的镜像仓库配置相同 GHCR 读取账号；登录密码使用有包读取权限的 `read:packages` PAT，不要放进命令、编排或聊天：
+
+```sh
+docker login ghcr.io -u liuyiwuqing
+```
+
+确认 `/etc/nexus/docker` 尚不存在，执行以下命令。已有目录不能覆盖或重新初始化，按下节升级。域名沿用已提供的 `pet.muyin.site` / `mqtt.muyin.site`：
+
+```sh
+(
+set -e
+NEXUS_CORE_IMAGE='ghcr.io/liuyiwuqing/nexus-core@sha256:bc7e95294d3df8f6f415381240439e828959b93e6c94e43109ca12c79f6cc2d1'
+NEXUS_INIT_IMAGE='ghcr.io/liuyiwuqing/nexus-core-init@sha256:f912df8e436084e46793c4f6c23ebd044edadb2279a3df9c6bc0c721021e3ec9'
+install -d -m 700 /etc/nexus
+docker pull "$NEXUS_CORE_IMAGE"
+docker pull "$NEXUS_INIT_IMAGE"
+docker run --rm --read-only --cap-drop ALL \
+  --security-opt no-new-privileges:true --tmpfs /tmp \
+  --mount type=bind,source=/etc/nexus,target=/etc/nexus \
+  "$NEXUS_INIT_IMAGE" \
+  --data-dir /etc/nexus/docker \
+  --domain pet.muyin.site \
+  --mqtt-host mqtt.muyin.site \
+  --device dodo-1 \
+  --image "$NEXUS_CORE_IMAGE"
+)
+```
+
+无需源码包、宿主 Python/Java/Node/Maven。初始化镜像只生成自己的凭据、证书、设备配置与编排，不连接设备或供应商，已有/残留目录会原样拒绝覆盖。
+
+在 1Panel「容器 → 编排」创建 `nexus-production`，粘贴 `/etc/nexus/docker/compose.1panel.yml` 内容。该编排已经包含三个服务、镜像 digest 和绝对文件路径，不依赖源码、`compose.env` 或 `env_file.format`。`postgres.env/core.env` 此时已由初始化镜像生成，勿手工创建空文件凑数。
+
+为 `pet.muyin.site` 配置 HTTPS 反向代理。若 OpenResty 为 host 网络，上游为 `http://127.0.0.1:18088`；若为 bridge 网络，需让 OpenResty 加入 CORE 的 edge 网络后用 `http://core:8088`，不能将 OpenResty 自身的 127.0.0.1 当作宿主机。CORE/数据库不直接公开。MQTT 8883 是否开放按是否接入设备配置；DNS、防火墙、证书和实际代理网络须在目标机核对。
+
+通过安全编辑器读取私有 `/etc/nexus/docker/core.env` 的 `NEXUS_ADMIN_TOKEN` 登录。管理员可在“权限”签发 operator/viewer 独立令牌。首次引导区分登记、凭据、连接、接收与展示；登记成功不代表设备已联网。SSE 若被代理缓冲，按 [实时更新说明](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/console-events-and-setup.md) 关闭该接口的代理缓冲并保留合理读取超时；页面同时保留轮询回退。
+
+## 已有安装升级
+
+先备份原私有目录与 PostgreSQL 卷/数据库，并在独立库验证恢复。保留原项目名、卷、凭据、CA、设备配置和原编排；只把 CORE 的 image 改为上述 CORE digest，然后拉取/重新创建 CORE。**不再运行初始化镜像，不混用新密码与旧数据库卷。** 新 JAR 会补齐到 V20；旧镜像回退前必须确认数据库兼容，换镜像不等于回退数据库。
+
+RSS/Atom 和室外天气默认关闭。按 [拉取来源配置](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/pull-connectors.md) 修改私有 `core.env` 的 `NEXUS_PULL_FEEDS_JSON` 后重新创建 CORE，再在接入页测试/启用；单纯 restart 不重新读取 env。Webhook 来源凭据在管理台创建后仅显示一次。Halo/AI/记忆/Bridge/清理/OTA/成长同步仍遵循各自默认开关，不因本次升级自动接入真实服务。
+
+完整使用、备份及恢复见 [CORE 镜像部署](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/1panel-deployment.md)。真实部署、生产迁移/HTTPS、供应商、设备与长期稳定性验收尚未执行。
