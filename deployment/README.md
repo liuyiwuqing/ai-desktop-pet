@@ -44,7 +44,7 @@ CORE `043f134` 已推送并核对远端：CLI 11 项、原 Compose 六组、新�
 
 下列保留的替代方案为 Linux/systemd、Java 21、PostgreSQL 17、Mosquitto 2.0.22；沿用 [nexus-core 开发 Compose](../../nexus-core/compose.yml) 的数据库/Broker。Docker 线上部署使用上节独立配置，不能混用这两套启动命令。systemd 构建使用该项目 `python3 tools/run_local.py build`；它会执行前端检查和真实容器集成测试。将生成的 JAR 以不可变文件名保留，再原子切换 `/opt/nexus/core/nexus-core.jar` 指向选定版本。专用 `nexus` 系统用户只读 JAR/配置/CA，不能写源码或私钥。
 
-将 [core.env.example](core.env.example) 复制到 `/etc/nexus/core.env`，由部署者填写独立管理员、数据库、MQTT 凭据和有效 Broker 域名，权限 `600`。CA 是公开证书文件，须允许服务用户读取；检查证书 SAN、有效期和设备端信任链。MQTT 保持 TLS/主机名校验；不得用 `allow-insecure` 绕过。当前管理员是单一共享令牌，审计 actor 为 admin，尚无多用户/RBAC；管理入口应限制到可信网络或 VPN。
+将 [core.env.example](core.env.example) 复制到 `/etc/nexus/core.env`，由部署者填写独立管理员、数据库、MQTT 凭据和有效 Broker 域名，权限 `600`。CA 是公开证书文件，须允许服务用户读取；检查证书 SAN、有效期和设备端信任链。MQTT 保持 TLS/主机名校验；不得用 `allow-insecure` 绕过。管理员继续使用受保护 Bearer；现支持服务端独立 operator/viewer 令牌及 HTTP 结果审计，签发/撤销由管理员操作，具体见 [角色契约](../../nexus-core/docs/roles-and-audit.md)。管理入口仍由部署者配置可信访问与 HTTPS。
 
 [nexus-core.service](nexus-core.service) 的 `/usr/bin/java`、JAR 路径、用户及数据库端口需按主机核对。先用 `systemd-analyze verify deployment/nexus-core.service` 检查目标机支持，再安装并启用；没有在 macOS 上假称 systemd 验收。服务停止等待 30 秒；后台队列/事务由已有持久化机制恢复，进程启动会运行 Flyway。
 
@@ -60,7 +60,7 @@ systemd-analyze verify deployment/nexus-core.service
 
 ## 远程配置升级
 
-新库自动应用 V1–V10，已有库在新 JAR 启动时补齐缺失迁移；V8 为远程管理，V9 为消息保留，V10 为长期记忆副本账本与删除队列。须先停 CORE 并 `pg_dump -Fc` 备份，恢复到独立数据库验证可读后再升级。保留旧 JAR、部署配置和证书备份。V8/V9/V10 已在隔离 PostgreSQL 验证，尚未迁移真实库。
+当前新库自动应用 V1–V20，已有库在新 JAR 启动时补齐缺失迁移；V8 为远程管理，V9 为消息保留，V10 为长期记忆副本账本与删除队列。须先停 CORE 并 `pg_dump -Fc` 备份，恢复到独立数据库验证可读后再升级。保留旧 JAR、部署配置和证书备份。V1–V20 已在隔离 PostgreSQL 验证，尚未迁移真实库。V15–V20 分别提供规则删除、路由、Webhook 来源、角色/审计、模板快照与拉取连接器；先核对备份与兼容性，不把镜像回滚等同数据库回滚。
 
 消息保留默认关闭，不因升级自动删除历史。启用前读取 `GET /api/v1/retention` 核对预览；7 天正文/30 天元数据、每批上限、外部副本边界与手工执行见 [运行维护记录](../docs/13-operational-software.md)。
 
