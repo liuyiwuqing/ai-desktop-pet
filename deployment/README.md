@@ -10,7 +10,7 @@
 
 CORE `043f134` 已推送并核对远端：CLI 11 项、原 Compose 六组、新增镜像部署七组通过；实际本地镜像为 `linux/arm64`，包含无源码/socket 初始化、私有权限/哈希、原样拒绝重复初始化、特殊路径/env、认证/实际 JAR 页面、MQTT TLS、重建持久性。初始化镜像默认网络构建因 Alpine DNS 失败，host 网络构建通过，未修改全局网络或软件源。Actions 的 actionlint 检查通过，未运行无关业务修改或生产迁移。
 
-发布工作流先验证，再以仓库短期 `GITHUB_TOKEN` 发布 amd64/arm64 两种架构，随后在新 job 中按 digest 从 GHCR 回拉并验证实际镜像。私有仓库/包可见性不变；服务器和 1Panel 需一次性配置 GHCR 的读取凭据，不能把令牌写进编排。发布成功后 `published-image-verification` artifact 提供两个实际 digest 和无秘密检查报告。当前发布及远程验证仍待本轮具体运行确认，不把本地构建记为已发布；Debian/1Panel 目标机尚未连接或验收。
+发布工作流先验证，再以仓库短期 `GITHUB_TOKEN` 发布 amd64/arm64 两种架构，随后在新 job 中按 digest 从 GHCR 回拉并验证实际镜像。私有仓库/包可见性不变；服务器和 1Panel 需一次性配置 GHCR 的读取凭据，不能把令牌写进编排。CORE `043f134` 的发布运行 [43584412344](https://github.com/liuyiwuqing/nexus-core/actions/runs/43584412344) 已成功，最终 digest 为 `ghcr.io/liuyiwuqing/nexus-core@sha256:2653a588d45b7e46fdf3c8e9672d62bb8be2223a7d5058b7292b01820dbe259c` 与 `ghcr.io/liuyiwuqing/nexus-core-init@sha256:6195bb0732f248eaf6c43cda4778bbe115c67c69f0633c165461bb55c460759c`；发布后回拉验证 7 项通过。Debian/1Panel 目标机尚未连接或验收。
 
 ## 管理台 Docker 部署（DEL-06）
 
