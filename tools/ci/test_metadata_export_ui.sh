@@ -83,20 +83,20 @@ await js("[...document.querySelectorAll('button')].find(b=>b.innerText==='正在
 if((await state()).exportRequests.length!==before+1)throw new Error('Repeated click sent another export');results.push('repeated export click sends once');
 await freshDownloadDir();await fixture({exportDelay:1});await tap('导出元数据');await expect("!![...document.querySelectorAll('button')].find(b=>b.innerText==='正在导出…')",'export is pending before navigation');await navigate('投递');await wait(1.2);
 if(files().length!==3)throw new Error('Abandoned export downloaded after navigation');results.push('navigation discards a delayed export');
-await expect("document.querySelector('input[aria-label=\"设备 ID\"]')?.value==='device-a' && document.querySelector('select')?.value==='failed'",'delivery facets survive a return visit');await ready();
+await expect("document.querySelector('input[aria-label=\"设备 ID\"]')?.value==='device-a' && document.querySelector('.list-filters select')?.value==='failed'",'delivery facets survive a return visit');await ready();
 await fixture({exportDelay:0,queryDelay:1});await input('设备 ID','device-b');await tap('应用筛选');
 await expect("document.querySelector('.empty-state[role=status]')?.innerText==='正在加载投递…' && document.querySelector('.list-filters input').disabled",'filter loading clears old delivery rows');
 await expect("document.querySelector('.section-heading p')?.innerText.startsWith('1 条投递')",'delayed delivery filter finishes');await ready();await fixture({queryDelay:0});
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
 await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.list-filters input,.list-filters select,.filter-actions button')].every(e=>e.getBoundingClientRect().right<=390)",'all delivery facets and actions fit 390 CSS pixels');
 cliLog({mobileScreenshot:await captureScreenshot()});await navigate('消息');await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.list-filters input,.filter-actions button')].every(e=>e.getBoundingClientRect().right<=390)",'all message facets and actions fit 390 CSS pixels');
-await cdp('Emulation.clearDeviceMetricsOverride');await tap('清空筛选');await ready();await expect("document.querySelector('select').value==='' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='') && document.querySelector('.section-heading p')?.innerText==='34 条消息'",'clear resets state, facets and page together');
+await cdp('Emulation.clearDeviceMetricsOverride');await tap('清空筛选');await ready();await expect("document.querySelector('.list-filters select').value==='' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='') && document.querySelector('.section-heading p')?.innerText==='34 条消息'",'clear resets state, facets and page together');
 await freshDownloadDir();await fixture({exportDelay:1});await tap('导出元数据');await expect("!![...document.querySelectorAll('button')].find(b=>b.innerText==='正在导出…')",'export is pending before logout');await tap('退出登录');await wait(1.2);
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.sidebar') && document.querySelector('.token-label input').value===''",'logout discards credentials and delayed export');
 if(files().length!==3)throw new Error('Logged out export downloaded');results.push('late export cannot create a file after logout');
 await fixture({exportDelay:0,exportMode:'unauthorized'});await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await ready();
-await expect("document.querySelector('select').value==='' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='')",'new session starts with no message filters');
-await navigate('投递');await expect("document.querySelector('select').value==='' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='')",'new session starts with no delivery filters');
+await expect("document.querySelector('.list-filters select').value==='' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='')",'new session starts with no message filters');
+await navigate('投递');await expect("document.querySelector('.list-filters select').value==='' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='')",'new session starts with no delivery filters');
 await tap('导出元数据');await expect("!!document.querySelector('.login-card') && document.querySelector('.inline-error')?.innerText.includes('管理令牌无效')",'export 401 ends the session');
 cliLog({passed:results.length,checks:results,downloadDirs,downloadedFiles:files(),scope:'actual Vue and real browser CSV download; RAM HTTP boundary only'});
 EOF
