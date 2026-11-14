@@ -66,6 +66,7 @@ def main() -> None:
     run(javac, "--release", "21", "-cp", classpath, "-d", classes,
         source / "delivery/DeliveryWorker.java", source / "delivery/DeviceText.java",
         source / "delivery/DeliveryService.java", source / "web/ApiRows.java",
+        source / "web/ConsoleListQuery.java", source / "web/MetadataCsv.java",
         *sorted((ROOT / "integration/tests/nexus-v1").glob("*.java")))
     classpath = str(classes) + os.pathsep + classpath
     envelope = build / "server-envelope.json"

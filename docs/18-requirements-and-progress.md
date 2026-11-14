@@ -1,6 +1,6 @@
 # 18 · 当前需求、任务台账与交付约定
 
-更新：2026-11-13。本页是后续工作的状态入口；各模块设计仍在 01–06，产品验收标准仍在 [07](07-roadmap-acceptance.md)。历史交付记录 09–17 保留当时证据，不覆盖本页的当前判断。
+更新：2026-11-14。本页是后续工作的状态入口；各模块设计仍在 01–06，产品验收标准仍在 [07](07-roadmap-acceptance.md)。历史交付记录 09–17 保留当时证据，不覆盖本页的当前判断。
 
 ## 需求与范围
 
@@ -39,10 +39,11 @@
 | SW-08 | 资源/多语言/更多平台 | 后续范围；中文 UI 和 Mac 扩展已实现 | 当前优先运维闭环，不擅自引入新基础设施 |
 | CONSOLE-01 | 测试消息未知结果重试 | CORE `07e3c53` 已推送；固定逻辑提交 ID/正文、导航恢复、确认后释放、拒绝/退出清理。新增浏览器 33 项与既有 78 项通过，CORE 59 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md) | 页面刷新/关闭后不恢复正文，应先核对列表；不是跨浏览器或设备展示保证。04 配套检查/文档同项提交 |
 | CONSOLE-02 | 管理台完成度与验收清单 | `65eb2ef` 已推送；已按八导航、原完整规划及真实控制器核对；当前功能/验证/缺项见 [23](23-console-completion.md#console-02--当前实现与完整规划的差距) | 完整规划尚未全部实现；文档核对不算缺项完成。状态筛选已单独交付 CONSOLE-03 |
-| CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；来源/设备/时间筛选与导出仍待后续，取消/时间线见 CONSOLE-04 |
+| CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；更多筛选/元数据导出见 CONSOLE-13，取消/时间线见 CONSOLE-04 |
 | CONSOLE-04 | 投递状态时间线与受限取消 | CORE `109b83f` / 04 `0dec4b6` 已推送并核对远程；HTTP/worker/隔离 SQL 6 项，实际 Vue 新增 62/既有 191 项，Java→固件 C→Java 契约通过；完整构建 70 通过/5 跳过、JAR 一致；见 [23](23-console-completion.md#console-04--事务状态时间线与受限取消) | CORE [43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) Docker job、04 [43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job 全绿；V13 只在隔离库验证，旧行历史未知，无设备撤回或生产迁移 |
 | CONSOLE-05 | 只读运行概览 | CORE `af916aa` / 04 `24df6d9` 已推送并核对远程；HTTP/隔离 PostgreSQL 2 项、实际 Vue 17 项、完整构建 64 通过/5 跳过及 JAR 一致；见 [23](23-console-completion.md#console-05--只读运行概览) | CORE [43408287857](https://github.com/liuyiwuqing/nexus-core/actions/runs/43408287857) Docker job、04 [43408341106](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43408341106) 七个 job 全绿；生产/设备另行验收 |
 | CONSOLE-12-A | 工具/规则创建与页面故障处理 | CORE `28793aa` / 04 `052851f` 已推送并核对远端；HTTP/隔离 PostgreSQL 4 项、实际 Vue 新增 96/既有 253 项；完整构建 74 通过/5 跳过、JAR 三资源/V14 一致；见 [23](23-console-completion.md#console-12-a--工具规则创建与页面故障处理) | CORE [43414082430 第二次运行](https://github.com/liuyiwuqing/nexus-core/actions/runs/43414082430/attempts/2) Docker 全步骤 success、04 [43414283771](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43414283771) 七个 job success；真实工具/提醒、供应商与设备仍待验收 |
+| CONSOLE-13 | 更多筛选与元数据 CSV | CORE `ea9cb77` 已推送并核对远端；本地 HTTP/隔离 PostgreSQL 新增 6 项、实际 Vue 新增 44/既有 349 项通过；完整构建 80 通过/5 跳过、JAR 三资源/V14 一致、Java→固件 C→Java 源码契约通过；见 [23](23-console-completion.md#console-13--更多筛选与元数据-csv) | 来源/设备/收件窗口组合筛选、管理员元数据导出最多 5000 行；正文导出仍规划。逐仓推送与本项 CI 另行核对 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 | ACC-01 | 真实云端与常在线部署 | 等待接入条件；尚无目标服务器/域名及供应商桥接凭据 | [部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | 未开始，当前不烧录 | P1–P7、NVS 掉电、真实 OTA/回滚、24h/7d，见 [07](07-roadmap-acceptance.md) |
@@ -143,3 +144,11 @@ CONSOLE-12-A：旧工具页保存后丢响应稳定产生第二条请求；固�
 CONSOLE-12-A 的 CORE `28793aa` 已正常推送至 `codex/core-baseline`，`ls-remote` 核对一致；04 专项、HTTP 边界与本页配套记录同项提交。原 Docker/固件 CI 只覆盖此前切片，本次推送使用新运行单独核对；规范留在项目契约，不写通用 Skill 或替换旧交付包。
 
 CONSOLE-12-A 的 CORE `28793aa` / 04 `052851f` 均已推送并核对远端。[CORE CI 43414082430 第二次运行](https://github.com/liuyiwuqing/nexus-core/actions/runs/43414082430/attempts/2) 全步骤 success，含 CLI 11 项、源码镜像和真实隔离 Compose。第一次在 Maven 解析 Spring Boot `4.1.2` 父 POM 时报告不存在；随后中央仓库直连返回 200，文件 SHA-256 与本地缓存一致，且同 POM 的前项远程构建已成功。未改依赖/源码，重跑同一提交后通过；临时仓库/网络故障是合理推断，具体原因未确认。04 [43414283771](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43414283771) 七个 job success，含五预设与 full 主机/协议/DSP/LVGL。本地 Maven/浏览器证据不据此改写成远程测试；本次仅回填 CI 文档，不替换旧交付包。
+
+CONSOLE-13：旧接口先复现来源/时间/设备筛选无效及导出 404，新增 6 项 HTTP/独立 PostgreSQL 与既有列表 3 项通过。公开参数绑定同一筛选条件，收件窗口包含开始、不含截止；管理员元数据 CSV 明确列白名单和公式转义，5001 行拒绝、恰好 5000 行成功，不新增迁移或正文导出。
+
+实际 Vue 新增 44 项及既有发送 33/管理记忆 38/OTA 22/成长 18/筛选 63/概览 17/时间线 62/工具规则 96 项全部退出 0，合计 393 项，任务空间均成功关闭。真实浏览器下载并读取消息/投递 CSV，核对跨页完整筛选结果；重复同名下载覆盖、带空格选择器和复用旧页轮询污染初始请求记录的脚本问题已修正并完整重跑。下载权限提示经用户处理并明确回复继续后接回验证；已查看 390px 截图。夹具只用回环 HTTP/RAM，不冒充真实 CORE/数据库/Broker/设备。
+
+最终完整 `python3 tools/run_local.py build` 退出 0：85 条中 80 通过、5 条可选环境跳过，0 失败/错误；JAR 三份静态资源与当前前端、V14 与源码逐字节一致。`JAVA_HOME` 显式选择 JDK 21 的 Java→固件 C 持久化/回执→Java 契约退出 0；原六份源码仅 `DeliveryService` 的列表/导出差异更新指纹，两份新增读取辅助类纳入编译与指纹，其他五项和消息 Schema/ACK 未改。Schema 14/1 profile/12 examples/2 extensions、Python/Bash 语法和差异检查通过。没有真实库迁移、清理、真实消息、部署或设备操作；旧离线包保持原快照。本项逐仓提交推送与远程 CI 单独记录。
+
+CONSOLE-13 的 CORE `ea9cb77` 已正常推送至 `codex/core-baseline`，`ls-remote` 核对一致；04 配套检查、源码指纹与文档同项提交。推送后的 Docker/固件 CI 使用本项新运行分别核对，不沿用前一项结果；本次事实沉淀在项目契约，无需更新通用 Skill。
