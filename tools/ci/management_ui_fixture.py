@@ -97,6 +97,11 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
             else:return self.json_response(404,{'error':'not_found'})
             self.json_response(200,value)
     def do_POST(self):
+        if urlparse(self.path).path == "/api/v1/session":
+            if self.headers.get("Authorization") != "Bearer " + TOKEN:
+                return self.json_response(401, {"error": "unauthorized"})
+            return self.json_response(200, {"role": "admin", "actor": "fixture-admin"})
+
         path=urlparse(self.path).path
         raw=self.rfile.read(int(self.headers.get('Content-Length','0')))
         try:value=json.loads(raw) if raw else {}

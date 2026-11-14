@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+nexus_dir="${NEXUS_CORE_DIR:-${repo_root}/../nexus-core}"
+output_dir="${repo_root}/firmware/build-ui-roles"
+mkdir -p "$output_dir"
+npm --prefix "$nexus_dir/frontend" run check
+npm --prefix "$nexus_dir/frontend" run build
+python3 "$repo_root/tools/ci/roles_ui_fixture.py" --frontend "$nexus_dir/target/frontend" >"$output_dir/fixture.log" 2>&1 &
+fixture_pid=$!
+trap 'kill "$fixture_pid" 2>/dev/null || true; wait "$fixture_pid" 2>/dev/null || true' EXIT
+for attempt in {1..50}; do
+ if ! kill -0 "$fixture_pid" 2>/dev/null; then cat "$output_dir/fixture.log"; exit 1; fi
+ if rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"; then break; fi
+ sleep .1
+done
+ego-browser nodejs <<'EOF'
+const name='NEXUS role access',base='http://127.0.0.1:18817';const prior=(await listTaskSpaces()).find(s=>s.name===name);if(prior&&prior.ownership!=='agent')throw new Error('Space requires confirmation');await useOrCreateTaskSpace(name);await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});const checks=[];
+async function qa(body={}){return JSON.parse(await serverFetch(base+'/__qa/operations',{method:'POST',headers:{'Content-Type':'application/json','X-QA-Key':'isolated-ui-fixture-control'},body:JSON.stringify(body)}));}
+async function expect(e,label){for(let i=0;i<100;i++){if(await js(e)){checks.push(label);return;}await wait(.1);}cliLog(await snapshotText());throw new Error(label);}
+async function tap(label){await expect(`(()=>{const b=[...document.querySelectorAll('.content button')].find(b=>b.textContent.trim()===${JSON.stringify(label)});if(!b||b.disabled)return false;b.click();return true;})()`,'click '+label);}
+async function nav(label){await js(`(()=>{const b=[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith(${JSON.stringify(label)}));if(!b)throw new Error('Navigation missing');b.click();})()`);}
+async function login(role){await gotoAndWait(base+'/?t='+Date.now(),{timeout:15});await qa({reset:true,role});await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",role+' login');}
+await login('viewer');await expect("document.querySelector('.topbar').textContent.includes('只读访问')",'viewer role visible');await expect("![...document.querySelectorAll('.sidebar nav button')].some(b=>b.textContent.endsWith('权限')||b.textContent.endsWith('工具'))",'privileged pages hidden');await expect("![...document.querySelectorAll('.content button')].some(b=>b.textContent==='发送测试消息')",'viewer cannot compose');await nav('设备');await expect("![...document.querySelectorAll('.content button')].some(b=>b.textContent==='登记设备'||b.textContent==='修改名称')",'viewer has no device mutation entry');await expect("[...document.querySelectorAll('.content .switch-row input')].every(e=>e.disabled)",'device toggles disabled');await nav('自动化');await expect("[...document.querySelectorAll('.content button')].find(b=>b.textContent==='创建规则').disabled",'viewer rule creation blocked');await nav('路由');await expect("![...document.querySelectorAll('.content button')].some(b=>b.textContent==='创建路由'||b.textContent==='发送到选择设备')",'viewer routing is read-only');await nav('接入');await expect("![...document.querySelectorAll('.content button')].some(b=>b.textContent==='新增来源')",'viewer cannot create source credentials');
+await login('operator');await expect("document.querySelector('.topbar').textContent.includes('操作员')",'operator role visible');await expect("[...document.querySelectorAll('.content button')].some(b=>b.textContent==='发送测试消息')",'operator may compose messages');await nav('路由');await expect("[...document.querySelectorAll('.content button')].some(b=>b.textContent==='创建路由')",'operator may manage routes');await nav('设备');await expect("![...document.querySelectorAll('.content button')].some(b=>b.textContent==='登记设备')",'operator cannot register device');await nav('接入');await expect("![...document.querySelectorAll('.content button')].some(b=>b.textContent==='新增来源')",'operator cannot issue source credentials');
+await login('admin');await nav('权限');await expect("document.querySelector('.content').textContent.includes('签发角色令牌')",'admin access page');await fillInput('.content form input','值班操作员');await tap('签发令牌');await expect("document.querySelector('[aria-label=本次角色令牌]')?.type==='password'",'issued token masked');await tap('已保存，隐藏角色令牌');await expect("!document.querySelector('[aria-label=本次角色令牌]')",'one-time token cleared');await expect("document.querySelector('.content').textContent.includes('/api/v1/messages') && document.querySelector('.content').textContent.includes('403')",'audit shows request and result');await tap('撤销令牌');await expect("[...document.querySelectorAll('.content button')].find(b=>b.textContent==='确认撤销令牌').disabled",'revoke requires name');await js("(()=>{const e=[...document.querySelectorAll('label')].find(l=>l.textContent.includes('输入名称')).querySelector('input');e.value='值班操作员';e.dispatchEvent(new Event('input',{bubbles:true}));})()");await tap('确认撤销令牌');await expect("document.querySelector('.record-card').textContent.includes('已撤销')",'revocation shown');await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await expect("document.documentElement.scrollWidth<=390",'390px access page fits');cliLog(await captureScreenshot());cliLog({passed:checks.length,checks});
+EOF
+ego-browser nodejs <<'EOF'
+cliLog(await completeTaskSpace('NEXUS role access',{keep:false}));
+EOF
