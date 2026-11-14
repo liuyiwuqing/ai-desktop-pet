@@ -250,3 +250,6 @@ python3 tools/ci/test_server_linux.py --bundle build/server-release-20261115/nex
 完整构建中跳过的三个 C peer 已分别用 `PET_HOST_SANITIZE=1 python3 tools/ci/test_management_contract.py`、`test_remote_ota_contract.py`、`test_growth_sync_contract.py` 各补跑 1 项通过，真实 HTTP/PostgreSQL/MQTT 和固件 C 服务参与，OS/Flash 在主机托管。另以 `NEXUS_VOICE_BRIDGE_TEST=true` / JDK21 单跑 `MemoryLifecycleFlowTest#thePinnedVoiceBridgeRevalidatesPublicContentAcrossTlsReconnects`，1 项通过，实际固定桥接/stdio/WSS 与临时 TLS 服务参与。真实 AI 供应商未调用；不修改原完整构建的 111/5 计数。
 
 04 后续 CI 独立记录；此前被后续 push 取消的运行不算成功。生产数据库、真实消息、清理、HTTPS/设备/烧录与长期验收尚未执行。原二期/后续范围保持台账定义；没有将其静默标记完成。
+
+
+CONSOLE-12-C 远程收口：04 软件回归提交 `1fe497c` 的 [CI 43620611463](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43620611463) 七个 job 全部 success，包含五固件预设与 full 主机/协议/DSP/LVGL。交付说明 `a9e7604` 只含 docs，与该提交的源码、配置、工具和部署模板相同。前一 `e15692a` 运行被后续 push 取消，不计作成功。CORE `230c809` 的发布四 job success 与本地完整 Maven/750 次浏览器检查分别有证据，不互相替代；没有生产部署或实机验收结论。
