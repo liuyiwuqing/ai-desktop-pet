@@ -122,6 +122,7 @@ class OperationsFixture(Fixture):
                 else:
                     rule = {'ruleId': str(uuid.uuid4()), 'name': body['name'], 'trigger': body['trigger'], 'action': body['action'], 'enabled': False, 'version': 1,
                             'arguments': {k: body[k] for k in ('localTime', 'zone', 'title', 'content') if k in body}}
+                    rule['arguments'].update({k+'Filter': v for k, v in body.get('conditions', {}).items() if v})
                     state['rules'].insert(0, rule)
                     if key:
                         state['rule_keys'][key] = rule['ruleId']

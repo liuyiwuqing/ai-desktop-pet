@@ -78,7 +78,8 @@ class AutomationEditFixture(OperationsFixture):
                 return self.json_response({'error': 503, 'deny': 400, 'unauthorized': 401, 'conflict': 409}[mode],
                     {'error': 'unauthorized' if mode == 'unauthorized' else 'automation_version_conflict' if mode == 'conflict' else 'invalid_request'})
             rule = next(r for r in state['rules'] if r['ruleId'] == path.split('/')[-1])
-            args = {key: body[key] for key in ('localTime', 'zone', 'title', 'content') if key in body} if rule['trigger'] == 'schedule.daily' else {}
+            args = {key: body[key] for key in ('localTime', 'zone', 'title', 'content') if key in body} if rule['action'] == 'notify_device' else {}
+            args.update({k+'Filter': v for k, v in body.get('conditions', {}).items() if v})
             same = body['name'] == rule['name'] and args == rule['arguments']
             if rule['version'] != body['expectedVersion'] and not (same and rule['version'] == body['expectedVersion'] + 1 and not rule['enabled']):
                 return self.json_response(409, {'error': 'automation_version_conflict'})
