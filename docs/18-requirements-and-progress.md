@@ -1,6 +1,6 @@
 # 18 · 当前需求、任务台账与交付约定
 
-更新：2026-11-14。本页是后续工作的状态入口；各模块设计仍在 01–06，产品验收标准仍在 [07](07-roadmap-acceptance.md)。历史交付记录 09–17 保留当时证据，不覆盖本页的当前判断。
+更新：2026-11-15。本页是后续工作的状态入口；各模块设计仍在 01–06，产品验收标准仍在 [07](07-roadmap-acceptance.md)。历史交付记录 09–17 保留当时证据，不覆盖本页的当前判断。
 
 ## 需求与范围
 
@@ -44,6 +44,7 @@
 | CONSOLE-04 | 投递状态时间线与受限取消 | CORE `109b83f` / 04 `0dec4b6` 已推送并核对远程；HTTP/worker/隔离 SQL 6 项，实际 Vue 新增 62/既有 191 项，Java→固件 C→Java 契约通过；完整构建 70 通过/5 跳过、JAR 一致；见 [23](23-console-completion.md#console-04--事务状态时间线与受限取消) | CORE [43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) Docker job、04 [43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job 全绿；V13 只在隔离库验证，旧行历史未知，无设备撤回或生产迁移 |
 | CONSOLE-05 | 只读运行概览 | CORE `af916aa` / 04 `24df6d9` 已推送并核对远程；HTTP/隔离 PostgreSQL 2 项、实际 Vue 17 项、完整构建 64 通过/5 跳过及 JAR 一致；见 [23](23-console-completion.md#console-05--只读运行概览) | CORE [43408287857](https://github.com/liuyiwuqing/nexus-core/actions/runs/43408287857) Docker job、04 [43408341106](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43408341106) 七个 job 全绿；生产/设备另行验收 |
 | CONSOLE-09-A | 停用后规则编辑 | CORE `cb18ba2`、测试补充 `2ba3a84` / 04 `e728aeb` 均已推送并核对远端；本地 HTTP/隔离 PostgreSQL 新增 7 项与既有创建 4 项通过；页面新增 99/既有 393 项、完整 CORE 构建 87 通过/5 条件跳过、最终 JAR 三资源/V1–V14 一致；见 [23](23-console-completion.md#console-09-a--停用后规则编辑) | CORE [43576489895](https://github.com/liuyiwuqing/nexus-core/actions/runs/43576489895) Docker 全步骤、04 [43576106575](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43576106575) 七个 job success；删除/测试运行及真实环境仍待验收 |
+| CONSOLE-09-B | 规则删除与测试预演 | CORE `5086c91` 已推送并核对远端；V15 保留删除规则及执行历史、固定版本/停用/在途保护、原创建键不复活；只读预演无入队动作；新增 HTTP 3 项与既有编辑/创建共 14 项通过，完整 CORE 90 通过/5 条件跳过；实际 Vue 新增 52/编辑回归 99/工具规则回归 96 项通过，见 [CORE 契约](../../nexus-core/docs/console-automation-lifecycle.md) | 源码/文档配套逐仓提交；生产迁移、实际规则/设备及目标机未执行；通用条件/动作仍待后续 |
 | CONSOLE-12-A | 工具/规则创建与页面故障处理 | CORE `28793aa` / 04 `052851f` 已推送并核对远端；HTTP/隔离 PostgreSQL 4 项、实际 Vue 新增 96/既有 253 项；完整构建 74 通过/5 跳过、JAR 三资源/V14 一致；见 [23](23-console-completion.md#console-12-a--工具规则创建与页面故障处理) | CORE [43414082430 第二次运行](https://github.com/liuyiwuqing/nexus-core/actions/runs/43414082430/attempts/2) Docker 全步骤 success、04 [43414283771](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43414283771) 七个 job success；真实工具/提醒、供应商与设备仍待验收 |
 | CONSOLE-13 | 更多筛选与元数据 CSV | CORE `ea9cb77` / 04 `841f13d` 已推送并核对远端；本地 HTTP/隔离 PostgreSQL 新增 6 项、实际 Vue 新增 44/既有 349 项通过；完整构建 80 通过/5 跳过、JAR 三资源/V14 一致、Java→固件 C→Java 源码契约通过；见 [23](23-console-completion.md#console-13--更多筛选与元数据-csv) | CORE [43553123583](https://github.com/liuyiwuqing/nexus-core/actions/runs/43553123583) Docker 全步骤、04 [43553167085](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43553167085) 七个 job success；正文导出、生产与实机仍待验收 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
