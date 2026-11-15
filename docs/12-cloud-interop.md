@@ -34,6 +34,10 @@ CORE 提供独立 `/mcp/memory` 与 stdio 适配器，只允许检索显式保�
 
 HW-07 起，WSS 拥有者同步调用真实 vendor Opus，任务栈从历史的 8 KiB 调整为 40 KiB，并在 `voiceTransport.ownerStackFree` 返回 ESP-IDF 的最小剩余字节。依据锁定 `esp_audio_codec` README 的编解码预算选择初始余量，须结合实际编码/解码后的水位核验；主机 codec 替身不能验证该栈需求。N16R8 默认 `MBEDTLS_EXTERNAL_MEM_ALLOC=y`，TLS 动态缓冲使用 PSRAM，为 I²S 和任务栈保留片内内存；不关闭 TLS 证书或主机名验证。复用旧 SDKCONFIG 时 defaults 不会覆盖既有内存选项，应在隔离配置中明确选择 External SPIRAM 再构建。实机过程和剩余验收见 [18](18-requirements-and-progress.md) 的 HW-07。
 
+HW-08 继续处理多轮时的片内内存压力：仅将 TLS 缓冲放 PSRAM，并不能消除硬件 AES 的片内 DMA 临时分配。普通 malloc 的片内优先阈值由 SDK 缺省 16 KiB 调整为 4 KiB，让较大的普通分配优先使用 PSRAM；显式要求片内/DMA 的分配仍保持原限制。诊断新增 `dmaFree/dmaLargest`，配合 `internalFree/internalLargest` 记录总量和连续块，不能只凭剩余 PSRAM 或单轮成功判断资源充足。复用旧 SDKCONFIG 时须明确更新 `SPIRAM_MALLOC_ALWAYSINTERNAL=4096` 后重建。
+
+发行固件同时使用 `COMPILER_OPTIMIZATION_PERF=y`（`-O2`），避免在共享 CPU 上用调试级 `-Og` 承担中文绘制、录音和 TLS。语音页仅在文字或颜色实际改变时更新，静态菜单不反复重绘；100 ms 显示/输入预算、显示异常停止录音及断言保持启用。编译通过和待机余量不能替代连续实机语音验收。
+
 公网单次发送预算为 1 秒；短写/超时仍关闭本轮，不重放已编码 PCM。云端 `tts.start` 只表示开始合成，收到并解码首包音频后才向 A4 发送 `RESPONSE_BEGIN`；此前界面保持“正在思考”，沿用从输入结束起算的 15 秒回复期限。没有首包时仍会超时退出，不因合成信号无期限等待。进入播放后的队列背压、实际 DMA 停滞和隐私取消保护保持原有预算。
 
 本次没有执行以上实机步骤。可先重复本地主机检查：

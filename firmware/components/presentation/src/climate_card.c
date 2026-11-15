@@ -37,7 +37,7 @@ static void format_trend(char *out, size_t size, float delta, const char *unit)
         return;
     }
 
-    char value[16];
+    char value[24];
     format_tenths(value, sizeof(value), delta > 0.0f ? delta : -delta, unit);
     snprintf(out, size, "%s %s", delta > 0.0f ? "↑" : "↓", value);
 }

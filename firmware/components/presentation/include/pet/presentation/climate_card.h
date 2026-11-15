@@ -6,10 +6,10 @@
 
 typedef struct {
     pet_climate_status_t status;
-    char temperature[16];
-    char humidity[16];
+    char temperature[24];
+    char humidity[24];
     char comfort[24];
-    char trend[24];
+    char trend[32];
     char updated[32];
 } pet_climate_card_t;
 

@@ -79,6 +79,8 @@ esp_err_t app_diagnostics_json(char *out,size_t capacity)
     cJSON_AddNumberToObject(r,"minFreeHeap",esp_get_minimum_free_heap_size());
     cJSON_AddNumberToObject(r,"internalFree",heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
     cJSON_AddNumberToObject(r,"internalLargest",heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+    cJSON_AddNumberToObject(r,"dmaFree",heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_DMA));
+    cJSON_AddNumberToObject(r,"dmaLargest",heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_DMA));
     cJSON_AddNumberToObject(r,"psramFree",heap_caps_get_free_size(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
 #if CONFIG_PET_SETUP_PORTAL_ENABLED
     pet_setup_snapshot_t setup;

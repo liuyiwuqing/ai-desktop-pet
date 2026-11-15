@@ -9,11 +9,15 @@ CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_MALLOC=y
+# Reserve internal RAM for task stacks, I2S and AES DMA scratch buffers.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
 
 # Keep TLS buffers out of the internal heap used by I2S and task stacks.
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+# Rendering, capture and TLS share the CPU; keep the production timing budget.
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
 
 # UART0 primary console, USB Serial/JTAG secondary for diagnostics.
 CONFIG_ESP_CONSOLE_UART_DEFAULT=y

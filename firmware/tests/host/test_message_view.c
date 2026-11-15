@@ -13,9 +13,11 @@
 
 static uint16_t pixels[240 * 320];
 static uint16_t draw_buffer[240 * 20];
+static unsigned flush_count;
 
 static void flush(lv_display_t *display, const lv_area_t *area, uint8_t *data)
 {
+    ++flush_count;
     const int width = area->x2 - area->x1 + 1;
     for (int y = area->y1; y <= area->y2; ++y) {
         memcpy(pixels + y * 240 + area->x1, data + (y - area->y1) * width * 2, width * 2);
@@ -258,6 +260,12 @@ int main(int argc, char **argv)
     assert(strcmp(lv_label_get_text(ai.title), "等待唤醒") == 0);
     assert(strcmp(lv_label_get_text(ai.status), "请说“小爱同学”") == 0 && lv_bar_get_value(ai.level) == 0);
     screenshot(argv[2], "ai-wake-idle", display);
+    input.menu=true;input.selection=PET_GROWTH_MENU_AI_TALK;
+    pet_ai_view_ui_show(&ai,&model,&input,900);lv_refr_now(display);
+    unsigned unchanged=flush_count;
+    pet_ai_view_ui_show(&ai,&model,&input,900);lv_refr_now(display);
+    assert(flush_count==unchanged); /* 没有文字/动画变化时不重绘静态菜单。 */
+    input.menu=false;
     model.session.state = PET_AI_LISTENING;
     pet_ai_view_ui_show(&ai, &model, &input, 1000);
     assert(strcmp(lv_label_get_text(ai.title), "正在听") == 0);

@@ -2,6 +2,12 @@
 
 #include <string.h>
 
+static void set_text(lv_obj_t *label, const char *text)
+{
+    /* LVGL 相同文本也会重新分配并重绘；语音轮询只提交实际变化。 */
+    if(strcmp(lv_label_get_text(label),text)) lv_label_set_text(label,text);
+}
+
 static lv_obj_t *label(lv_obj_t *root, int y, const lv_font_t *font, uint32_t color)
 {
     lv_obj_t *obj = lv_label_create(root);
@@ -95,29 +101,30 @@ void pet_ai_view_ui_show(pet_ai_view_ui_t *v, const pet_ai_screen_t *m,
         title = "等待唤醒";
         status = "请说“小爱同学”";
     }
-    lv_label_set_text(v->title, title);
-    lv_label_set_text(v->status, status);
-    lv_obj_set_style_text_color(v->status, lv_color_hex(m->faulted || (!private && !m->pending && m->session.state == PET_AI_ERROR) ?
-                                                       0xE5B461 : 0x78C3A4), 0);
+    const lv_color_t status_color=lv_color_hex(m->faulted ||
+        (!private && !m->pending && m->session.state == PET_AI_ERROR) ? 0xE5B461 : 0x78C3A4);
+    if(!lv_color_eq(lv_obj_get_style_text_color(v->status,0),status_color))
+        lv_obj_set_style_text_color(v->status,status_color,0);
+    const char *detail="";
+    char formatted[48];
     if (input->menu) {
-        lv_label_set_text(v->title, "语音与隐私");
+        title="语音与隐私";
         if (m->available && m->ready && !m->faulted && !m->pending && !private)
-            lv_label_set_text(v->status, m->capture_active ?
+            status=m->capture_active ?
                               "麦克风已开启" : input->selection == PET_GROWTH_MENU_AI_TALK ?
-                              "看到“正在听”再说话" : "语音就绪");
-        lv_label_set_text(v->detail,
-            input->selection == PET_GROWTH_MENU_AI_TALK ?
+                              "看到“正在听”再说话" : "语音就绪";
+        detail=input->selection == PET_GROWTH_MENU_AI_TALK ?
                 (private ? "先关闭静音和免打扰" : !m->ready || m->faulted ? "语音暂不可用" : "按住说话") :
             input->selection == PET_GROWTH_MENU_AI_MUTE ? (m->muted ? "解除静音" : "静音") :
             input->selection == PET_GROWTH_MENU_AI_CLEAR ? "清除本地对话" :
-            input->selection == PET_GROWTH_MENU_AI_DND ? (m->dnd ? "关闭免打扰" : "开启免打扰") : "返回主页");
-    } else if (m->feedback) lv_label_set_text(v->detail, m->feedback);
-    else if (!private && m->reply && m->reply[0] && !listening) lv_label_set_text(v->detail,m->reply);
-    else if (!private && m->transcript && m->transcript[0]) lv_label_set_text(v->detail,m->transcript);
-    else if (listening) lv_label_set_text_fmt(v->detail, "输入电平 %u%%", level);
-    else if (m->unread) lv_label_set_text_fmt(v->detail, "%u 条未读", m->unread);
-    else lv_label_set_text(v->detail, "");
-    lv_label_set_text(v->footer, input->navigation_enabled && input->menu ?
+            input->selection == PET_GROWTH_MENU_AI_DND ? (m->dnd ? "关闭免打扰" : "开启免打扰") : "返回主页";
+    } else if (m->feedback) detail=m->feedback;
+    else if (!private && m->reply && m->reply[0] && !listening) detail=m->reply;
+    else if (!private && m->transcript && m->transcript[0]) detail=m->transcript;
+    else if (listening) {lv_snprintf(formatted,sizeof(formatted),"输入电平 %u%%",level);detail=formatted;}
+    else if (m->unread) {lv_snprintf(formatted,sizeof(formatted),"%u 条未读",m->unread);detail=formatted;}
+    set_text(v->title,title);set_text(v->status,status);set_text(v->detail,detail);
+    set_text(v->footer, input->navigation_enabled && input->menu ?
         (input->selection == PET_GROWTH_MENU_AI_TALK ? "上下选择 · 按住中键说话" : "上下选择 · 右确认 · 左返回") :
         input->menu ?
         (input->selection == PET_GROWTH_MENU_AI_TALK ? "短按切换 · 按住说话" : "短按切换 · 长按执行") :

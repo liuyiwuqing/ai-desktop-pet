@@ -1,6 +1,6 @@
 # 18 · 当前需求、任务台账与交付约定
 
-更新：2026-11-15。本页是后续工作的状态入口；各模块设计仍在 01–06，产品验收标准仍在 [07](07-roadmap-acceptance.md)。历史交付记录 09–17 保留当时证据，不覆盖本页的当前判断。
+更新：2026-11-16。本页是后续工作的状态入口；各模块设计仍在 01–06，产品验收标准仍在 [07](07-roadmap-acceptance.md)。历史交付记录 09–17 保留当时证据，不覆盖本页的当前判断。
 
 ## 需求与范围
 
@@ -31,7 +31,8 @@
 | HW-04 | 首台设备备份、烧录与基础硬件验证 | 16 MB 备份及芯片核验、64 KB NVS 初始化、五份产物独立回读、8 MB PSRAM 自检通过；屏幕直连供电后恢复绘制、BOOT 菜单正常，功放改线后提示音可听见，手动录音回放可辨认本人语音；见 [27](27-hardware-and-input.md#首次实机记录2026-11-15) | 显示传输/菜单/音频基础硬件已实测；用户补充未对时时宠物未显示，单列 HW-05。联网/供应商、UI 同启并行诊断超时、OTA/掉电及长稳仍未验收 |
 | HW-05 | 未对时主页宠物与首次配置 | 已解除宠物绘制对时间同步的依赖，保留成长结算、菜单遮挡和存档异常保护；私有模板存于本机忽略目录 | `c6b761d` 已推送，远程 CI 七任务通过；用户确认宠物显示/菜单正常。后续配置改用 HW-06 热点 |
 | HW-06 | 手机热点配网与小智官方连接配置 | 已实现独立 SoftAP/HTTP/LCD 设置、Wi-Fi-only/分组 CAS、菜单重开与离线退出、官方绑定/WSS 保存；见 [28](28-device-web-setup.md) | `317ad8f` 已推送，远程 CI 七任务通过；主机/ASan/UBSan、10 项 LVGL、手机浏览器、隔离构建通过；用户手机配网保存成功，设备取得官方 WSS 配置并正常重启联网/对时。真实语音暴露 HW-07 |
-| HW-07 | 首次真实语音连接与音频验证 | 已修正 WSS 栈/TLS 内存与公网发送/首包时序；用户确认真实回答正常且结束无错误，设备对应 32 包上行/73 包下行、105,120 个真实播放采样、IDLE/DRAINED | `5aecf0b` 已推送；WSS ASan/UBSan、隔离 default 与维护构建、烧录回读通过；剩余栈最小 16,404 B，音频/NVS 错误 0；远程 CI 运行中，长稳/声学仍待验收 |
+| HW-07 | 首次真实语音连接与音频验证 | 已修正 WSS 栈/TLS 内存与公网发送/首包时序；用户确认真实回答正常且结束无错误，设备对应 32 包上行/73 包下行、105,120 个真实播放采样、IDLE/DRAINED | `5aecf0b` 已推送，远程 CI 七任务通过；WSS ASan/UBSan、隔离 default 与维护构建、烧录回读通过；剩余栈最小 16,404 B，音频/NVS 错误 0；连续失败继续见 HW-08，长稳/声学仍待验收 |
+| HW-08 | 连续语音、显示与输入实时预算 | 已实现并通过本地/实机：4 KiB 片内优先阈值、`-O2`、语音页按变化刷新及 DMA 余量诊断；隐私/超时保护保留 | 用户确认最终固件 5 轮全正常；USB 记录 7 轮 IDLE/DRAINED、显示失败 0；主机、LVGL/ASan/UBSan、隔离 default/维护构建与烧录回读通过。长回答欠载 24 次单列，长稳/OTA 待验收；提交与 CI 见末尾 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -261,4 +262,19 @@ HW-07（2026-11-15）：首次真实语音已经超出主机替身边界，先�
 
 这只证明所记录的一轮真实云端识别/回答/播放结束与用户听感，不证明连续多轮、24h/7d、AEC/声学打断、公开记忆采用、掉电或 OTA 已通过。私有日志/备份/配置/固件均留本机忽略目录，诊断输出只增加状态/原因/轮次、播放采样数与栈余量，不输出语音文本或凭据。
 
-HW-07 推送：`5aecf0b3d3e3f2574088fa98f073e1e5c17d4131` 已正常推送并核对 origin/main。对应 [43732294876](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43732294876) 当前运行中，voice-bridge-preparation 和 server-delivery-tools 已成功，其余五个固件预设仍构建；不沿用 HW-06 的 CI 成功结论。后续设备经正常软件重启进入网络设置，原始 USB 响应仍为 revision 4、Wi-Fi/voice 保存标记均为 true，无 panic；这不追加为一轮对话或长稳验收。
+HW-07 推送：`5aecf0b3d3e3f2574088fa98f073e1e5c17d4131` 已正常推送并核对 origin/main。对应 [43732294876](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43732294876) 七任务均已成功；不沿用 HW-06 的 CI 成功结论。后续设备经正常软件重启进入网络设置，原始 USB 响应仍为 revision 4、Wi-Fi/voice 保存标记均为 true，无 panic；这不追加为一轮对话或长稳验收。
+
+
+HW-07 补查：[43732294876](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43732294876) 已完成，default/full/off/tones/duplex、voice-bridge-preparation、server-delivery-tools 七任务全部成功。该结论只对应 `5aecf0b`，不覆盖后续 HW-08 的默认分配策略修改。
+
+HW-08（2026-11-16）：连续语音存在两类失败。修改前已捕捉 `esp-aes: Failed to allocate memory`→TLS `-0x0084`→发送 -132，连接开始时片内可用 12,523 B、最大块 7,680 B，无栈溢出/HAL 错误。用户描述为回答中途失败，但捕捉到的这一轮尚无新下行包，二者具体时刻不能直接等同。当前 SDK 的 S3 硬件 AES 对非对齐 PSRAM 缓冲仍需片内 DMA 临时内存；仅让 TLS 使用 PSRAM 不足以保证连续连接。
+
+最终默认采用 `SPIRAM_MALLOC_ALWAYSINTERNAL=4096` 与 `COMPILER_OPTIMIZATION_PERF=y`（`-O2`），为显式片内/DMA 分配留余量并满足录音/显示实时预算；增加纯数值诊断 `dmaFree/dmaLargest`。语音页先确定最终文案，只有文字或颜色变化时才提交 LVGL，避免每次轮询重绘和菜单标题二次覆盖。40 KiB WSS 栈、证书/主机名验证、断言、100 ms 输入/显示预算及播放/隐私保护保持原值，没有通过吞错或延长时限凑通过。`-O2` 暴露旧温湿度文本槽的 `-Werror=format-truncation`，配套扩大温度/湿度/趋势的内部字符缓冲；没有屏蔽警告或改变传感器含义。
+
+中间方案未通过：1 KiB 阈值虽增加待机余量，但显示帧耗时 103–113 ms，触发“显示不健康→隐私中断→取消录音”，用户表现为按住说话返回主页，USB 未重启。4 KiB 与缺省 `-Og` 仍出现最大 119 ms 的帧和第二轮起 INPUT_GAP。`-O2` 对照版本用户确认三轮完整回答；设备对应三轮 IDLE/DRAINED、384,480 个 24 kHz 播放采样、显示失败 0、最大 96 ms；采样所见片内最少 34,695 B、连续 DMA 最少 24,576 B，WSS 栈最少剩余 16,316 B。慢启动/输入间隔探针未触发，支持实时预算问题，但未单独测得旧版本的具体抢占者。全部 `[DEBUG-hw08]` 已清理，`ai_agent.c` 无最终改动；最终版本连续回归另记。
+
+新增真实 LVGL 回归验证相同模型/时间/菜单再次刷新不发生屏幕传输；原实现断言失败，修复后普通与 ASan/UBSan 的 `bash tools/ci/test_ui_host.sh` 均为 10/10。`bash tools/ci/test_host.sh`、`python3 tools/ci/test_build_matrix.py`（4 项）、`python3 tools/ci/check_contracts.py` 与 `python3 tools/ci/check_deps.py` 均退出 0，20 组件无环。另一种“播放间隔”临时用例只复现旧 500 ms 行为，不能解释 AES 日志，已撤销，不据此放宽播放时限。
+
+最终维护构建退出 0，应用 3,203,920 B、SHA256 `c33439498cf1850c194632c341ea27a6a5e1fd1b5a0c1a63d6ecfe9ad1a136fd`；只写 `0x20000`，独立 `verify-flash` 匹配，bootloader/分区表/OTA 初值/模型逐字节未变，未写 NVS。实际 SDKCONFIG 核对 4 KiB、`-O2`、断言与 TLS 外部内存。隔离 default 命令 `python3 tools/build_matrix.py --profile default --build-root firmware/build-matrix-hw08c --jobs 2 --execute` 退出 0，应用 2,955,440 B、SHA256 `1da24c550101fdc70f1b045bde23e155633887b00b21ae3ff4cc5e32dde2d135`；来源与产物清单逐项匹配当前文件。编译期间仍有改动的首次来源校验正确拒绝，固定后重跑通过，不采用被拒绝的证据。私有原始日志/备份/配置/固件均留忽略目录，不进入仓库。
+
+最终去探针版本实机：用户明确确认“5 轮全部正常，无跳主页或错误”；同一连续 USB 会话实际记录 7 轮 IDLE/DRAINED，258 包上行/1,384 包下行，共提交 1,992,960 个 24 kHz 采样（约 83.04 秒）。显示失败 0、最大帧 100 ms；采样所见片内最少 33,519 B、连续 DMA 最少 21,504 B，WSS 栈最少剩余 16,316 B。WSS error/cleanupError、音频 error、MCP/NVS failures 均为 0；较长回答期间播放缓冲欠载计数 24，零填充后仍正常完成，不写成音频零欠载。端到端识别/回答/播放结束与用户听感已覆盖；不据此宣称 24h/7d、所有公网抖动、AEC/声学打断、掉电或 OTA 通过。
