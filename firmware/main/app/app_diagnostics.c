@@ -140,6 +140,10 @@ esp_err_t app_diagnostics_json(char *out,size_t capacity)
         cJSON_AddNumberToObject(r,"inferenceCount",ai.inference_count);
         cJSON_AddNumberToObject(r,"inferenceMaxMs",ai.inference_max_ms);
         cJSON_AddNumberToObject(r,"audioStackFree",ai.owner_stack_free);
+        cJSON_AddNumberToObject(r,"aiState",ai.view.state);
+        cJSON_AddNumberToObject(r,"aiReason",ai.view.reason);
+        cJSON_AddNumberToObject(r,"aiTurn",ai.view.turn_id);
+        cJSON_AddNumberToObject(r,"audioSubmittedSamples",(double)ai.submitted_samples);
     }
 #endif
 #if CONFIG_PET_AI_XIAOZHI_WSS_ENABLED
@@ -158,6 +162,7 @@ esp_err_t app_diagnostics_json(char *out,size_t capacity)
         cJSON_AddNumberToObject(voice,"mcpRequests",transport.mcp_received);
         cJSON_AddNumberToObject(voice,"mcpResponses",transport.mcp_sent);
         cJSON_AddNumberToObject(voice,"mcpFailures",transport.mcp_failed);
+        cJSON_AddNumberToObject(voice,"ownerStackFree",transport.owner_stack_free);
     }
 #endif
     bool ok=cJSON_PrintPreallocated(root,out,(int)capacity,false);cJSON_Delete(root);

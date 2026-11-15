@@ -23,7 +23,11 @@
 #define HANDSHAKE_MS 5000u
 #define ASSEMBLY_MS 2000u
 #define PLAYBACK_BLOCK_MS 500u
-#define SEND_MS 200u
+/* 公网首轮会有短暂写背压；失败仍关闭本轮，绝不重放已编码音频。 */
+#define SEND_MS 1000u
+/* SDK Opus 在当前拥有者同步编解码；vendor 的预算不含在堆统计中。
+ * 按已锁定 esp_audio_codec 的 40 KiB 栈建议预留，并通过实机水位核验。 */
+#define WORKER_STACK_BYTES (40u * 1024u)
 
 typedef struct wss_owner wss_owner_t;
 typedef struct {
@@ -461,7 +465,9 @@ static esp_err_t receive_message(wss_owner_t *owner)
 
 static esp_err_t flush_playback(wss_owner_t *owner)
 {
-    if (owner->response_pending) {
+    /* tts.start 只代表云端开始合成。首包 PCM 到达前保留 A4 的回复等待期限，
+     * 否则会在真实音频尚未到达时触发它的 500 ms 播放停滞保护。 */
+    if (owner->response_pending && owner->protocol.have_audio) {
         const esp_err_t error = pet_ai_agent_post(PET_AI_RESPONSE_BEGIN, owner->active_turn);
         if (error != ESP_OK) return error;
         owner->response_pending = false;
@@ -531,8 +537,8 @@ static esp_err_t receive(wss_owner_t *owner)
             error = receive_message(owner);
             if (error != ESP_OK) return error;
         }
-        /* RESPONSE_BEGIN 必须先成功入 A4，之后才能解码后续音频。 */
-        if (owner->response_pending) continue;
+        /* 允许解码首包；之后先将 RESPONSE_BEGIN 入 A4 再消费后续包。 */
+        if (owner->response_pending && owner->protocol.have_audio) continue;
         rx_item_t item;
         if (xQueueReceive(owner->rx, &item, 0) != pdTRUE) { empty = true; break; }
         if (item.epoch != owner->binding.epoch) {
@@ -627,6 +633,12 @@ static void worker(void *context)
         }
         if (!owner->status.faulted && transmit(owner) != ESP_OK)
             fail_turn(owner, ESP_FAIL, !owner->opus.ready);
+#ifdef ESP_PLATFORM
+        const uint32_t stack_free=uxTaskGetStackHighWaterMark(NULL);
+        portENTER_CRITICAL(&status_lock);
+        owner->status.owner_stack_free=stack_free;
+        portEXIT_CRITICAL(&status_lock);
+#endif
         const TickType_t ticks = pdMS_TO_TICKS(5);
         vTaskDelay(ticks > 0 ? ticks : 1);
     }
@@ -655,7 +667,7 @@ esp_err_t pet_xz_wss_start(const pet_xz_wss_config_t *config, pet_ai_transport_t
     if (tools_handler) owner->tool_response=heap_caps_malloc(8192,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
     TaskHandle_t task = NULL;
     if ((tools_handler && !owner->tool_response) || owner->tx == NULL || owner->rx == NULL ||
-        xTaskCreate(worker, "pet_xz_wss", 8192, owner, 4, &task) != pdPASS) {
+        xTaskCreate(worker, "pet_xz_wss", WORKER_STACK_BYTES, owner, 4, &task) != pdPASS) {
         if (owner->tx != NULL) vQueueDeleteWithCaps(owner->tx);
         if (owner->rx != NULL) vQueueDeleteWithCaps(owner->rx);
         if (owner->tool_response) heap_caps_free(owner->tool_response);

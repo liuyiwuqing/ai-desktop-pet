@@ -50,7 +50,7 @@ cc "${flags[@]}" "${ai}/src/xiaozhi_wss.c" "${ai}/src/xiaozhi.c" \
     "${repo_root}/firmware/tests/host/test_xiaozhi_wss.c" "${out}/cjson_wss${suffix}.o" \
     "${out}/http_parser_wss${suffix}.o" \
     -lm -o "${out}/test_xiaozhi_wss${suffix}"
-for scenario in startup tools app-tools alloc-fail tx-queue-fail rx-queue-fail task-fail codec-fail handshake playback \
+for scenario in startup tools app-tools alloc-fail tx-queue-fail rx-queue-fail task-fail codec-fail handshake delayed-send playback first-audio-delay first-audio-timeout \
     queue-cancel barge-in destroy-fail graceful-close playback-stall decode-fail \
     socket-fail register-fail socket-start-fail send-fail handshake-timeout failure-race \
     network-gate rx-overflow malformed-offset assembly-timeout remote-close network-lost failure-backpressure \

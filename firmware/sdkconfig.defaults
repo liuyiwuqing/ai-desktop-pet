@@ -10,6 +10,9 @@ CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_MALLOC=y
 
+# Keep TLS buffers out of the internal heap used by I2S and task stacks.
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 
 # UART0 primary console, USB Serial/JTAG secondary for diagnostics.

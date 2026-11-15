@@ -557,6 +557,8 @@ PET_HOST_TSAN=1 bash tools/ci/test_ai_wss_host.sh
 
 ESP32-S3 DWARF 中 WSS 对象为 14,344 B、TX 项 648 B、RX 项 532 B。两条队列 payload 合计 99,968 B PSRAM；对象和 8,192 B worker 栈合计 22,536 B 内部内存，另有 SDK 6,144 B 栈及 A4 的 11,992 B 基础预算。这些数值不包含队列/TCB/堆管理、codec/JSON/SDK 对象、TLS/Wi-Fi、HAL DMA 与模型；静态余量不能作为运行时 heap、栈水位或稳定性证据。
 
+上述为当时预算快照。首次实机语音在 HW-07 暴露 vendor 编解码拥有者栈溢出；当前 WSS 任务改为 40 KiB，新增最小剩余栈读数，TLS 动态内存移至 N16R8 的 PSRAM。当前预算/验收以 [12](12-cloud-interop.md) 与 [18](18-requirements-and-progress.md) 为准，不沿用旧的 8 KiB 假设。
+
 输入/UI/静音与 DND 仲裁见 A7。真实 WakeNet/VAD、云端联调与实机资源/时延验收仍待推进；A6 不构成 P1/P2 完整验收。
 
 ## 19. A7 BOOT 输入、AI 状态与隐私仲裁（2026-11-12）

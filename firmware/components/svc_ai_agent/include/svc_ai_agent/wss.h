@@ -24,6 +24,7 @@ typedef struct {
     uint32_t rejected_frames, stale_items, sent_packets, received_packets;
     /* 自启动累计 MCP 信封数；含发现/通知，不证明云端使用了上下文。 */
     uint32_t mcp_received, mcp_sent, mcp_failed;
+    uint32_t owner_stack_free; /* ESP-IDF 任务栈最小剩余字节，含 vendor Opus 调用。 */
 } pet_xz_wss_snapshot_t;
 
 /*

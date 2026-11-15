@@ -48,3 +48,5 @@ HTTP 仅绑定 SoftAP 接口，固定 Host `192.168.4.1`（可带 `:80`），不
 ESP-IDF v6.1 基础维护配置启用热点和启动语音、关闭 DSP/可选扩展/开机音频诊断，应用首次构建 3,187,104 B，SHA256 `444e3e26784d45455d1cf6a84911a6e7f9fbaff3e495eb7e8c86fa9e707be7c2`；配套 bootloader/分区表/OTA 初值/模型与已烧版本相同。仅写应用分区并独立回读校验，不重新初始化 NVS。设备已启动热点，HTTP 绑定 AP 接口；用户手机打开页面并确认 Wi-Fi 已连接保存，USB 读到 revision 1、`wifiSaved=true`、NVS 失败 0。
 
 后续修订、最终应用摘要、官方绑定/真实语音、提交/推送及远程 CI 以 [18](18-requirements-and-progress.md) 的 HW-06 记录为准。尚未完成的实机项目不能由主机/浏览器替代。
+
+HW-07 修正后，用户明确确认能够听到真实回答，结束后不再显示“连接失败”；设备记录与该轮一致，完成真实下行音频与 DMA drain。当前维护固件已启用启动语音；普通 `default` 预设仍保留不开机启动 AI 的原有选择，构建其他设备时需按 [10](10-maintenance-recovery.md) 明确启用 `PET_AI_XIAOZHI_ON_BOOT`，不能只保存凭据就声称语音可用。

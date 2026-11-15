@@ -26,6 +26,7 @@ static bool failure_armed = true, wifi = true, synced = true;
 static unsigned allocations, queues, queue_calls, codec_opens, socket_inits, socket_destroys;
 static char last_text[8192];
 static unsigned tool_executions;
+static bool delayed_write;
 static pet_intent_rpc_t intents;
 static cJSON *count_tool(const cJSON *args,void *context)
 {
@@ -366,6 +367,11 @@ int esp_websocket_client_send_text(esp_websocket_client_handle_t client, const c
 {
     assert(current_task() == named_task("pet_xz_wss") && client->connected && data && bytes > 0);
     assert(timeout > 0 && timeout <= 1000);
+    if(is_case("delayed-send")&&data[0]!='{'&&!delayed_write) {
+        delayed_write=true;
+        atomic_fetch_add(&clock_ms,300);
+        if(timeout<300) return 0; /* SDK 的 poll_write 超时，连接应与实机一样失败。 */
+    }
     assert(sent_count < sizeof(sent_order));
     sent_order[sent_count++] = data[0] != '{' ? 'B' : strstr(data, "\"hello\"") ? 'H' :
         strstr(data, "\"start\"") ? 'L' : strstr(data, "\"stop\"") ? 'S' : 'A';
@@ -701,7 +707,7 @@ int main(int argc, char **argv)
         puts("Xiaozhi WSS: full PCM queue cannot block cancellation or a fresh turn passed");
         return 0;
     }
-    if (is_case("handshake")) {
+    if (is_case("handshake")||is_case("delayed-send")) {
         strcpy(uri_input, "wss://changed.example.test/");
         strcpy(token_input, "changed-token");
         assert(transport.begin_turn(transport.context, 1) == PET_AI_PORT_OK);
@@ -726,6 +732,7 @@ int main(int argc, char **argv)
     }
     if (is_case("playback") || is_case("barge-in") || is_case("destroy-fail") ||
         is_case("graceful-close") || is_case("playback-stall") || is_case("decode-fail") ||
+        is_case("first-audio-delay") || is_case("first-audio-timeout") ||
         is_case("privacy") || is_case("app-tools")) {
         const pet_ai_agent_config_t ai = {.audio = &audio, .transport = transport, .volume_pct = 25};
         assert(pet_ai_agent_start(&ai) == ESP_OK);
@@ -783,6 +790,18 @@ int main(int argc, char **argv)
             assert(pet_ai_agent_text(1,PET_AI_TEXT_ASSISTANT,"上下文测试回答")==ESP_OK);
         }
         tts(&sockets[0], "start");
+        if(is_case("first-audio-delay")||is_case("first-audio-timeout")) {
+            step("pet_xz_wss");step("pet_ai_agent");
+            atomic_fetch_add(&clock_ms,is_case("first-audio-timeout")?PET_AI_RESPONSE_TIMEOUT_MS:1200);
+            step("pet_ai_agent");step("pet_xz_wss");
+            if(is_case("first-audio-timeout")) {
+                assert(ai_status().view.state==PET_AI_ERROR&&ai_status().view.reason==PET_AI_REASON_RESPONSE_TIMEOUT);
+                assert(!playing&&!capturing&&decoded==0&&drained==0&&socket_destroys==1);
+                puts("Xiaozhi WSS: synthesis without first audio retains the original response deadline passed");
+                return 0;
+            }
+            assert(ai_status().view.state==PET_AI_THINKING&&playback_starts==0&&socket_destroys==0);
+        }
         for (unsigned i = 0; i < 3; ++i)
             fragment(&sockets[0], 2, true, "\x18\x11\x22", 3, 3, 0);
         tts(&sockets[0], "stop");
