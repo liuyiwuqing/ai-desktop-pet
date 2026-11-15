@@ -4,6 +4,8 @@ ESP-IDF 6.1 固件工程。S2 组件化、S3 契约/配置、S4 温湿度纵向�
 
 设备首版交付见 [09](../docs/09-software-delivery.md)，物理配置、诊断、备份/OTA 与迁移见 [10](../docs/10-maintenance-recovery.md)，远程管理见 [11](../docs/11-product-software-closure.md)。隔离构建预设、CI、coredump 见 [13](../docs/13-operational-software.md)，最新屏幕/BOOT 恢复与 USB 降级见 [14](../docs/14-recovery-and-device-names.md)；AI/模型启动、提示音、维护入口、扩展和 OTA 都需相应显式开关。以下 S/G/A 小节保留分阶段记录，当前差异已注明。
 
+发行硬件为 DevKitC-1 N16R8、240×320 ST7789、INMP441、MAX98357A 与喇叭，BOOT 为默认菜单输入；温湿度、摇杆、光敏、舵机均为可选扩展。当前接线和操作入口见 [27](../docs/27-hardware-and-input.md)，其中功放 LRC 已由 GPIO38 调整为 GPIO40。
+
 ## 构建
 
 ```bash
@@ -42,17 +44,17 @@ nm build-ext/nexus_pet.elf | grep pet_ext_
 
 ## 气候模块开关
 
-温湿度模块默认启用，使用 DHT11（GPIO15，5 s 采样）。无硬件时用 fake 传感器验证链路：
+温湿度扩展默认关闭；显式 `CONFIG_PET_MODULE_CLIMATE_ENABLED=y` 后使用 DHT11（GPIO15，5 s 采样）。无硬件时可同时启用 fake 传感器验证链路：
 
 ```bash
 # 桌面验证：固定温湿度序列，不需要 DHT11
 cp sdkconfig /tmp/pet-sdkconfig.fake
-printf '\nCONFIG_PET_CLIMATE_FAKE_SENSOR=y\n' >> /tmp/pet-sdkconfig.fake
+printf '\nCONFIG_PET_MODULE_CLIMATE_ENABLED=y\nCONFIG_PET_CLIMATE_FAKE_SENSOR=y\n' >> /tmp/pet-sdkconfig.fake
 idf.py -B build-fake -D SDKCONFIG=/tmp/pet-sdkconfig.fake build
 xtensa-esp32s3-elf-nm build-fake/nexus_pet.elf | grep fake_climate
 ```
 
-关闭 `CONFIG_PET_MODULE_CLIMATE_ENABLED` 可验证组合根不依赖该模块：构建通过且 ELF 中无 climate 符号。首版 UI 出口为串口卡片日志，`presentation` 只产出纯文本快照。
+关闭 `CONFIG_PET_MODULE_CLIMATE_ENABLED` 可验证组合根不依赖该模块：构建通过且 ELF 中无 climate 符号。启用时 UI 提供数值、60 分钟图表与重试，串口保留诊断摘要；关闭时菜单跳过温湿度，不将未安装模块报成故障。
 
 ## 网络模块与凭据
 

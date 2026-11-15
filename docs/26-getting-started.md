@@ -68,6 +68,8 @@ python3 tools/export_pet_preview.py
 
 品牌 Logo 的预览与导出另见[品牌资产](assets/brand/README.md)，其资源不参与固件链接。
 
+硬件接线与扩展配置见[硬件与输入](27-hardware-and-input.md)；正常发行基线无需温湿度、摇杆、光敏或舵机。
+
 ## 4. 进入开发验证
 
 需要 Python 3；主机脚本另需 C 编译器。按本次修改选择对应检查，常用入口为：

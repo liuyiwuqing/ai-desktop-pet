@@ -27,6 +27,10 @@ def generate(check=False):
     pins += [audio["speaker"][k] for k in ("bclk", "ws", "dout")]
     if any(type(p) is not int or not 0 <= p <= 48 for p in pins) or len(set(pins)) != len(pins):
         raise ValueError("invalid or overlapping GPIOs")
+    # N16R8 memory, native USB, UART console, straps and either DevKitC-1 RGB revision.
+    reserved = {3, 19, 20, 38, 43, 44, 45, 46, 48, *range(22, 38)}
+    if any(p in reserved for p in pins) or board["input"]["boot"] != 0:
+        raise ValueError("GPIO reserved by ESP32-S3-DevKitC-1 N16R8")
     values = {"LCD_" + k.upper(): v for k, v in lcd.items() if k != "invertColor"}
     values["LCD_INVERT_COLOR"] = int(lcd["invertColor"])
     values["BOOT_GPIO"] = board["input"]["boot"]

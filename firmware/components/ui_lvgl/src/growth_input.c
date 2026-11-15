@@ -43,6 +43,8 @@ int pet_growth_input_update(pet_growth_input_t *p, bool pressed, bool blocked, u
             else if (p->selection == PET_GROWTH_MENU_RETURN)
                 p->selection = PET_GROWTH_MENU_AI_TALK;
             else ++p->selection;
+            if (!p->climate_enabled && p->selection == PET_GROWTH_MENU_CLIMATE)
+                ++p->selection;
         } else if (p->press_voice) return PET_GROWTH_INPUT_AI_CANCEL;
         return -1;
     }

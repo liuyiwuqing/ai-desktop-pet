@@ -42,6 +42,8 @@
 | [25-brand-identity](25-brand-identity.md) | 栖团 Qitomo 命名、Logo、配色与技术名映射 | 品牌资产已交付；固件技术名沿用 | 24 |
 | [26-getting-started](26-getting-started.md) | 成长、语音、LVGL 本地体验与开发检查 | 本机演练入口，硬件另行验收 | 01、04 |
 
+当前发行硬件与可选模块、接线及菜单操作见 [27-hardware-and-input](27-hardware-and-input.md)。
+
 ## 评审方式
 
 每个模块按以下顺序确认，避免边写边改：

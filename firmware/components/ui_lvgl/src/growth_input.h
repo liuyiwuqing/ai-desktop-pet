@@ -24,6 +24,7 @@ typedef struct {
     uint8_t selection;
     bool initialized, raw, stable, armed, menu;
     bool voice_enabled, voice_only, voice_active, voice_ready;
+    bool climate_enabled;
     bool holding, press_voice;
 } pet_growth_input_t;
 /* AI 项复用同一个按键代次；被消息/显示故障遮挡后，必须重新松开再按。 */

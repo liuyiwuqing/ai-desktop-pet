@@ -4,13 +4,13 @@
 
 ## 需求与范围
 
-目标是在 ESP32-S3 N16R8 上集成语音、信息接收、温湿度、成长和扩展控制。设备插电联网后独立运行，Mac 仅用于开发，Mac 控制为可选功能。CORE 部署到常在线 Linux；基础语音仍由设备直接连接小智，CORE 不代理音频。
+目标是在 ESP32-S3-DevKitC-1 N16R8 上集成语音、信息接收、成长和可选扩展。正常发行硬件只要求开发板、240×320 ST7789、INMP441、MAX98357A 与喇叭；默认 BOOT 按键，温湿度、二维摇杆、光敏和舵机按需启用。设备插电联网后独立运行，Mac 仅用于开发，Mac 控制为可选功能。CORE 部署到常在线 Linux；基础语音仍由设备直接连接小智，CORE 不代理音频。
 
 | 需求 | 当前软件交付 | 尚缺的产品验收 |
 | --- | --- | --- |
 | R1 语音与表现 | 唤醒/VAD、半双工、WSS/Opus、缓冲、上下文与 MCP、文字/表情、隐私门控；见 [01](01-ai-agent.md)、[12](12-cloud-interop.md) | 真实供应商协议/工具采用、真实音频、声学打断、延迟/连续对话 |
 | R2 信息接收 | CORE 消息/管理台、MQTT/TLS、持久队列/去重、回执、DND、远程配置/回读/审计；见 [02](02-message-hub.md)、[11](11-product-software-closure.md) | 真实 Broker ACL/设备显示/断网掉电、生产迁移和消息时间线 |
-| R3 温湿度 | DHT11 接口、采集/异常恢复、60 分钟图表、告警与成长联动；见 [03](03-climate-sensor.md) | 真实传感器接线、误差、刷新/故障恢复与长期采集 |
+| R3 可选温湿度扩展 | DHT11 接口、采集/异常恢复、60 分钟图表、告警与成长联动；见 [03](03-climate-sensor.md) | 真实传感器接线、误差、刷新/故障恢复与长期采集 |
 | R4 成长 | 本地互动/每日任务/成就/动画、对话与专注奖励、双槽存档/受控恢复；CORE 专注与设备只读镜像；见 [04](04-growth-game.md)、[21](21-growth-sync.md) | 实机掉电/7 天；两端独立结算，服务端奖励下发为二期 |
 | R5 扩展控制 | 固定能力、确认/审计、Mac Bridge 与舵机软件/限位/急停；见 [05](05-extension-device-control.md)、[06](06-extension-servo.md) | 实际白名单控制、舵机型号/供电/机械校准；其他平台为后续范围 |
 | R6 维护与交付 | 物理配置/诊断/备份、签名及远程 OTA/回滚逻辑、CORE/记忆工具双令牌、恢复 UI、隔离构建/CI、服务端发布包/预检、管理台 Docker Compose | 生产钥/HTTPS、真实服务凭据维护、目标机与实机恢复 |
@@ -25,6 +25,9 @@
 
 | 编号 | 工作项 | 状态与证据 | 后续动作 |
 | --- | --- | --- | --- |
+| HW-01 | 发行硬件与扩展基线 | 软件已验证；DHT11 默认关闭、菜单跳过、功放 LRC 改为 GPIO40，保留内部板型身份；见 [27](27-hardware-and-input.md) | 主机、10 项 LVGL、隔离 default 构建通过；提交/推送另核对，实物待验收 |
+| HW-02 | 可选摇杆菜单输入 | 本轮待实现；BOOT 保留、显式启用、方向与确认/返回、空闲与故障保护 | 按公开输入接口、真实 UI 和目标构建验证 |
+| HW-03 | 可选光敏与硬件使用说明 | 本轮待实现；光敏按需启用、舵机沿用既有限位/arm | 补齐接线/配置与边界；不烧录或驱动设备 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -186,3 +189,8 @@ CONSOLE-09-A 的 CORE `cb18ba2` / 04 `e728aeb` 已正常推送并核对远端。
 2026-11-15 本轮收口：CORE 最新实现 `230c809`，04 软件回归 `1fe497c`、镜像/包交付文档 `a9e7604` 均已正常推送并核对远端；每个独立切片均有单独实现与配套提交。CORE [镜像发布 43620052738](https://github.com/liuyiwuqing/nexus-core/actions/runs/43620052738) 四个 job success，双架构 manifest 与 digest 回拉后的 7 项编排通过；04 [43620611463](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43620611463) 绑定 `1fe497c`，七个 job 全部 success，含 default/full/off/tones/duplex 及 full 主机/协议/DSP/LVGL。后续只改 docs，受 CI 路径保护的代码/配置/工具与已验证提交一致；此前 `e15692a` 对应运行被新 push 取消，不计作成功。
 
 当前可独立验收的本轮管理台软件切片、最终回归、镜像发布和干净离线包已交付；目标服务器生产部署/迁移/HTTPS、真实供应商、实机和长期稳定性仍未验收。设备 IP/RSSI/凭据维护 UI 等产品扩展、SW-06 奖励二期、SW-07 真实声学打断及 SW-08 后续范围继续保留，不把软件与隔离验证等同完整产品验收。用户已确认本次完成管理台与交付、二期单列；当前按该分期收口。
+
+
+HW-01（2026-11-15）：按用户新要求调整基础发行硬件与可选扩展。先以公开菜单接口复现基础版仍可选中未安装的温湿度，新增断言失败后增加功能门控；已启用温湿度、语音按住/释放/取消、启动按住与消息抢占回归均通过。功放 LRC 从 GPIO38 改为 GPIO40，并由生成器拒绝 N16R8 存储、USB、UART、绑带及两版 RGB 保留引脚。JSON profile 与默认预设均关闭温湿度，full 显式保留其覆盖。
+
+本项 `bash tools/ci/test_host.sh`、`bash tools/ci/test_ui_host.sh`（10/10）、`python3 tools/ci/test_build_matrix.py`（4/4）、`check_contracts.py`、`check_deps.py`、`board_codegen.py --check` 与差异检查均退出 0。显式设置 `IDF_PYTHON_ENV_PATH` 后，以 ESP-IDF v6.1 执行 `python tools/build_matrix.py --profile default --build-root firmware/build-matrix-hw01 --execute --jobs 4` 退出 0，实际 sdkconfig 中 UI/音频开启、温湿度/舵机关闭，产物/来源证据保存在忽略目录。本机 export.sh 最初错误查找未安装的 py3.14 环境，改用仓库已说明的现有 v6.1 venv 后成功，无安装或依赖变更。未烧录、未擦除、未接入真实模块；背光驱动与物理接线仍须验收。

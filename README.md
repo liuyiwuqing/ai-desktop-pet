@@ -84,7 +84,7 @@ bash tools/simulate_growth.sh
 
 ## 硬件基线
 
-当前板型为 `dodo-s3-lcd`：ESP32-S3 N16R8（16 MB Flash、8 MB PSRAM）、240×320 ST7789 屏、INMP441 麦克风、MAX98357A 功放与扬声器、DHT11 温湿度传感器。舵机为可选扩展，需要独立供电和校准。
+正常发行版硬件为 **ESP32-S3-DevKitC-1 N16R8**（16 MB Flash、8 MB PSRAM）、**240×320 ST7789 屏、INMP441 麦克风、MAX98357A 功放与无源扬声器**。默认使用板载 BOOT 按键操作菜单。温湿度、二维摇杆、光敏和舵机属于可选扩展，不要求基础设备安装；接线与启用方式见[硬件与输入](docs/27-hardware-and-input.md)。
 
 实际引脚以 [board.json](firmware/boards/dodo-s3-lcd/board.json) 为准。`02`、`03` 与本工程使用独立版本和存档/分区方案；首次上板前需按[维护与迁移文档](docs/10-maintenance-recovery.md)核对，当前流程只构建、不烧录或擦除。
 

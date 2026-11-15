@@ -16,7 +16,7 @@ spec.loader.exec_module(codegen)
 board = json.loads(codegen.SOURCE.read_text())
 board["audio"] = {
     "mic": {"i2s": 0, "bclk": 16, "ws": 17, "din": 18},
-    "speaker": {"i2s": 1, "bclk": 21, "ws": 38, "dout": 39},
+    "speaker": {"i2s": 1, "bclk": 21, "ws": 40, "dout": 39},
 }
 
 
@@ -43,7 +43,9 @@ for device, field, pin in [("mic", "din", 8), ("speaker", "bclk", 15), ("speaker
 header = generate(board)
 assert "#define PET_BOARD_MIC_DIN 18\n" in header
 assert "#define PET_BOARD_SPEAKER_BCLK 21\n" in header
-for field, value in [("i2s", 0), ("dout", 49), ("dout", True)]:
+assert "#define PET_BOARD_SPEAKER_WS 40\n" in header
+for field, value in [("i2s", 0), ("dout", 49), ("dout", True),
+                     *[("ws", pin) for pin in (3, 19, 20, 22, 26, 35, 36, 37, 38, 43, 44, 45, 46, 48)]]:
     invalid = copy.deepcopy(board)
     invalid["audio"]["speaker"][field] = value
     try:

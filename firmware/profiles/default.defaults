@@ -1,2 +1,4 @@
-# Product baseline: UI, growth, climate and networking; voice stays opt-in.
+# DevKitC-1 N16R8 + ST7789 + I2S audio + BOOT; extensions and voice startup opt-in.
 CONFIG_APP_REPRODUCIBLE_BUILD=y
+# CONFIG_PET_MODULE_CLIMATE_ENABLED is not set
+# CONFIG_PET_EXT_SERVO is not set

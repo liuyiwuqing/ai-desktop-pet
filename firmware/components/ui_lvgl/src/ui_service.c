@@ -495,6 +495,9 @@ static void ui_task(void *arg)
         goto fail;
 #endif
 #if CONFIG_PET_MODULE_CLIMATE_ENABLED
+#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
+    ui->growth_input.climate_enabled = true;
+#endif
     lv_obj_t *climate_root=lv_obj_create(lv_display_get_screen_active(ui->display));
     pet_climate_view_ui_init(&ui->climate_view,climate_root,ui->font16,ui->font24);
     lv_obj_add_flag(climate_root,LV_OBJ_FLAG_HIDDEN);

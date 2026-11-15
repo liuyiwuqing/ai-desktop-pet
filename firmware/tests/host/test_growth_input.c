@@ -10,7 +10,17 @@ static int click(pet_growth_input_t *p, uint32_t start, uint32_t duration)
 }
 int main(void)
 {
-    pet_growth_input_t p = {0};
+    /* The release device has no climate extension; navigation must skip it. */
+    pet_growth_input_t base = {0};
+    pet_growth_input_update(&base, false, false, 0);
+    click(&base, 100, 1000);
+    for (unsigned i = 0; i < PET_GROWTH_MENU_CLIMATE; ++i) {
+        click(&base, 1300 + i * 200, 100);
+        assert(base.selection != PET_GROWTH_MENU_CLIMATE);
+    }
+    assert(base.selection == PET_GROWTH_MENU_FOCUS);
+
+    pet_growth_input_t p = {.climate_enabled = true};
     pet_growth_input_update(&p, false, false, 0);
     assert(click(&p, 100, 100) == -1 && !p.menu);
     assert(click(&p, 300, 1000) == -1 && p.menu && p.selection == 0);
@@ -21,7 +31,7 @@ int main(void)
     pet_growth_input_update(&p, true, true, 4500); /* 消息抢占取消手势 */
     pet_growth_input_update(&p, false, false, 5300);
     assert(pet_growth_input_update(&p, false, false, 5330) == -1 && !p.menu);
-    p = (pet_growth_input_t){0};
+    p = (pet_growth_input_t){.climate_enabled = true};
     pet_growth_input_update(&p, true, false, 0); /* 开机按住不得执行 */
     pet_growth_input_update(&p, false, false, 2000);
     assert(pet_growth_input_update(&p, false, false, 2030) == -1 && !p.menu);
@@ -67,7 +77,7 @@ int main(void)
     assert(!p.press_voice);
     pet_growth_input_update(&p, false, false, 7800);
     assert(pet_growth_input_update(&p, false, false, 7830) == -1);
-    p = (pet_growth_input_t){.voice_enabled = true, .voice_ready = true};
+    p = (pet_growth_input_t){.voice_enabled = true, .voice_ready = true, .climate_enabled = true};
     pet_growth_input_update(&p, false, false, 0);
     click(&p, 100, 1000);
     assert(p.selection == PET_GROWTH_MENU_AI_TALK);

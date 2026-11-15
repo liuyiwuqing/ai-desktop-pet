@@ -5,7 +5,7 @@
 bool pet_bsp_gpio_available(int gpio)
 {
     if(!GPIO_IS_VALID_OUTPUT_GPIO(gpio)||gpio==0||gpio==3||gpio==19||gpio==20||
-        (gpio>=26&&gpio<=37)||gpio==45||gpio==46)return false;
+        (gpio>=22&&gpio<=38)||gpio==43||gpio==44||gpio==45||gpio==46||gpio==48)return false;
     const int used[]={PET_BOARD_LCD_MOSI,PET_BOARD_LCD_SCLK,PET_BOARD_LCD_CS,PET_BOARD_LCD_DC,
         PET_BOARD_LCD_RESET,PET_BOARD_LCD_BACKLIGHT,PET_BOARD_BOOT_GPIO,PET_BOARD_DHT11_GPIO,
         PET_BOARD_MIC_BCLK,PET_BOARD_MIC_WS,PET_BOARD_MIC_DIN,PET_BOARD_SPEAKER_BCLK,

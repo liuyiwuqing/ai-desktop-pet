@@ -154,7 +154,7 @@ int main(void)
     assert(channels[0].channel.dma_desc_num == 4 && channels[0].channel.dma_frame_num == 320);
     assert(channels[1].channel.dma_desc_num == 3 && channels[1].channel.dma_frame_num == 480);
     assert(channels[1].channel.auto_clear_after_cb);
-    assert(channels[1].config.gpio_cfg.bclk == 21 && channels[1].config.gpio_cfg.ws == 38 &&
+    assert(channels[1].config.gpio_cfg.bclk == 21 && channels[1].config.gpio_cfg.ws == 40 &&
            channels[1].config.gpio_cfg.dout == 39);
 
     fault = ENABLE_RX;

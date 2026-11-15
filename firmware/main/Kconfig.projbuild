@@ -194,12 +194,13 @@ config PET_GROWTH_UTC_OFFSET_MINUTES
       Fixed local offset for the daily 04:00 reset and night state. DST is not applied.
 
 config PET_MODULE_CLIMATE_ENABLED
-    bool "Enable climate module"
-    default y
+    bool "Enable optional DHT11 climate extension"
+    default n
     help
       Temperature/humidity sampling, filtering, alerts and daily extremes
-      (components/svc_climate). Disable to verify the composition root builds
-      without it.
+      (components/svc_climate). The release hardware does not include this
+      sensor. Enable only after wiring the optional extension; disabled builds
+      do not sample a floating pin or show its menu entry.
 
 config PET_CLIMATE_FAKE_SENSOR
     bool "Use fake climate sensor"

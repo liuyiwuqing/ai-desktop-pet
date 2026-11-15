@@ -52,7 +52,7 @@
 | 麦克风采样 | 16 kHz，单声道，24-bit 数据装在 32-bit 槽，软件右移对齐 |
 | 麦克风 DMA | 4 × 320 样本（20 ms/帧），internal RAM |
 | 麦克风环形缓冲 | 1 s（32 KB），internal RAM |
-| 功放 | MAX98357A，I2S1，BCLK21 / LRC38 / DIN39，VIN 5V，共地 |
+| 功放 | MAX98357A，I2S1，BCLK21 / LRC40 / DIN39，VIN 5V，共地 |
 | 播放采样 | 24 kHz，单声道，16-bit PCM |
 | 播放 DMA | 3 × 480 样本（20 ms/帧），双缓冲/三缓冲 |
 | 扬声器 | 8 Ω 1–3 W；具体阻抗/功率待实物确认 |
@@ -323,7 +323,7 @@ AI 不直接执行设备动作，只产出意图：
 
 ### 板级实现
 
-引脚来自 `firmware/boards/dodo-s3-lcd/board.json`：麦克风 I2S0 BCLK16/WS17/DIN18，功放 I2S1 BCLK21/WS38/DOUT39。生成器一并检查 LCD、BOOT、DHT11 与音频引脚冲突；DHT11 的运行编译配置覆盖值另在音频初始化时拒绝冲突。
+引脚来自 `firmware/boards/dodo-s3-lcd/board.json`：麦克风 I2S0 BCLK16/WS17/DIN18，功放 I2S1 BCLK21/WS40/DOUT39。生成器一并检查 LCD、BOOT、DHT11 与音频引脚冲突；DHT11 的运行编译配置覆盖值另在音频初始化时拒绝冲突。
 
 - INMP441 使用 Philips 32-bit 左槽，取高 16 位；不复制 donor 曾用于排查的额外放大。RX DMA 为 4×320 个 32-bit 样本。
 - TX 将单声道复制到左右 16-bit 槽，兼容 MAX98357A 的声道选择；DMA 为 3×480 帧（24 kHz 下每个 20 ms，16 kHz 诊断下 30 ms）。每次启动先预填整个 DMA 环为零，完成的描述符自动清零，避免欠载或停止/重启后重播旧语音。
