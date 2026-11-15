@@ -1,6 +1,9 @@
 set(ui_sources "src/ui_service.c")
 if(CONFIG_PET_MODULE_UI_ENABLED)
     list(APPEND ui_sources "src/message_view.c" "src/ui_owner.c")
+    if(CONFIG_PET_SETUP_PORTAL_ENABLED)
+        list(APPEND ui_sources "src/setup_ui.c" "src/setup_view.c")
+    endif()
     if(CONFIG_PET_RECOVERY_ENABLED)
         list(APPEND ui_sources "src/recovery_view.c" "src/recovery_ui.c")
     endif()
@@ -26,7 +29,7 @@ idf_component_register(
     INCLUDE_DIRS "include"
     PRIV_INCLUDE_DIRS "src"
     REQUIRES "contracts" "pet_hal"
-    PRIV_REQUIRES "presentation" "svc_growth" "svc_ai_agent" "svc_config" "svc_climate" "svc_focus" "svc_message_hub" "lvgl__lvgl" "esp_timer" "heap" "device_control"
+    PRIV_REQUIRES "presentation" "svc_growth" "svc_ai_agent" "svc_config" "svc_climate" "svc_focus" "svc_message_hub" "svc_setup" "lvgl__lvgl" "esp_timer" "heap" "device_control"
 )
 # 字体超过 LVGL 默认 64 KB 内存池；使用 IDF malloc（大块分配到 PSRAM）。
 # 固定配置也覆盖旧 sdkconfig，关闭 UI 后不残留无效的内存文件系统盘符。

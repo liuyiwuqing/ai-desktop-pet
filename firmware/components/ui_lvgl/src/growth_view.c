@@ -55,7 +55,7 @@ void pet_growth_view_ui_show(pet_growth_view_ui_t *v, const pet_growth_view_t *s
                             bool pending, const char *feedback)
 {
     static const char *states[] = {"自在发呆", "心情不错", "有新收获！", "有点低落", "有点困了", "肚子饿了", "需要照料", "正在睡觉"};
-    static const char *actions[] = {"喂食 · 5 金币", "摸头", "玩耍 · 10 精力", "睡觉", "唤醒", "喂食任务", "摸头任务", "玩耍任务", "成长成就", "温湿度", "开始 25 分钟专注", "暂停专注", "继续专注", "取消专注", "返回主页"};
+    static const char *actions[] = {"喂食 · 5 金币", "摸头", "玩耍 · 10 精力", "睡觉", "唤醒", "喂食任务", "摸头任务", "玩耍任务", "成长成就", "温湿度", "开始 25 分钟专注", "暂停专注", "继续专注", "取消专注", "网络设置", "返回主页"};
     /* 菜单保留完整的操作空间；主页把数值排紧，为角色留出固定画布。 */
     const bool home = !input->menu;
     const bool achievements = input->menu && input->selection == PET_GROWTH_MENU_ACHIEVEMENTS;

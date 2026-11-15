@@ -11,6 +11,9 @@
 #include <time.h>
 
 #include "sdkconfig.h"
+#if CONFIG_PET_SETUP_PORTAL_ENABLED
+#include "svc_setup/api.h"
+#endif
 
 #include "esp_heap_caps.h"
 #include "esp_idf_version.h"
@@ -144,9 +147,8 @@ static bool load_net_config(pet_net_config_t *config)
     config->keepalive_s = CONFIG_PET_NET_KEEPALIVE_S;
     config->reconnect_timeout_ms = CONFIG_PET_NET_RECONNECT_MS;
 
-    if (s_wifi_ssid[0] == '\0' || s_broker_uri[0] == '\0') {
-        ESP_LOGW(TAG, "network not provisioned: set NVS net/wifi_ssid and "
-                      "nexus/mqtt_uri (device=%s)", s_device_id);
+    if (s_wifi_ssid[0] == '\0') {
+        ESP_LOGW(TAG, "Wi-Fi not provisioned (device=%s)", s_device_id);
         return false;
     }
     return true;
@@ -456,6 +458,21 @@ esp_err_t app_start(void)
 #endif
         return ESP_OK;
     }
+
+#if CONFIG_PET_SETUP_PORTAL_ENABLED
+    bool setup=false;
+    esp_err_t setup_error=pet_setup_should_start(&setup);
+    if(setup_error==ESP_OK&&setup) {
+        setup_error=pet_setup_start();
+        if(setup_error==ESP_OK) setup_error=pet_ui_setup_start(pet_bsp_display(),pet_bsp_confirm_button());
+        if(setup_error==ESP_OK) return ESP_OK;
+        /* 配网模式不能带着部分初始化的 Wi-Fi 再启动业务网络。保留 USB 维护。 */
+        ESP_LOGE(TAG,"local setup unavailable: %s; use USB maintenance",esp_err_to_name(setup_error));
+        return setup_error;
+    }
+    if(setup_error!=ESP_OK)
+        ESP_LOGW(TAG,"setup state unavailable: %s; keeping saved data",esp_err_to_name(setup_error));
+#endif
 
 #if CONFIG_PET_MODULE_CLIMATE_ENABLED
     ESP_ERROR_CHECK(pet_event_bus_subscribe(PET_EVT_CLIMATE_READING, on_climate_reading));

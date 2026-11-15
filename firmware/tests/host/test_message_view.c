@@ -8,6 +8,7 @@
 #include "climate_view.h"
 #include "control_view.h"
 #include "recovery_view.h"
+#include "setup_view.h"
 #include "message_fixture.h"
 
 static uint16_t pixels[240 * 320];
@@ -351,6 +352,27 @@ int main(int argc, char **argv)
     pet_recovery_view_ui_show(&recovery,PET_RECOVERY_PROMPT_IDLE,false);
     assert(strstr(lv_label_get_text(recovery.action),"BOOT 不可用"));
     screenshot(argv[2],"recovery-no-button",display);
+    lv_obj_add_flag(recovery_root,LV_OBJ_FLAG_HIDDEN);
+    pet_setup_view_t setup;
+    lv_obj_t *setup_root=lv_obj_create(lv_display_get_screen_active(display));
+    pet_setup_view_init(&setup,setup_root,small,large);
+    pet_setup_snapshot_t setup_state={.state=PET_SETUP_READY,.remaining_s=900};
+    strcpy(setup_state.ap_ssid,"Qitomo-1234");strcpy(setup_state.ap_password,"2345ABCDEFGH");
+    pet_setup_view_show(&setup,&setup_state);
+    assert(strstr(lv_label_get_text(setup.ssid),"Qitomo-1234"));
+    assert(strstr(lv_label_get_text(setup.password),"2345ABCDEFGH"));
+    assert(strstr(lv_label_get_text(setup.address),"http://192.168.4.1"));
+    screenshot(argv[2],"setup-ready",display);
+    setup_state.state=PET_SETUP_WAITING_BIND;strcpy(setup_state.activation_code,"123456");
+    pet_setup_view_show(&setup,&setup_state);
+    assert(strstr(lv_label_get_text(setup.action),"123456"));
+    screenshot(argv[2],"setup-bind",display);
+    for(int state=PET_SETUP_STARTING;state<=PET_SETUP_LEAVING;state++) {
+        setup_state.state=(pet_setup_state_t)state;pet_setup_view_show(&setup,&setup_state);lv_obj_update_layout(setup_root);
+        assert(lv_obj_get_y(setup.state)+lv_obj_get_height(setup.state)<=100);
+        assert(lv_obj_get_y(setup.password)+lv_obj_get_height(setup.password)<193);
+        assert(lv_obj_get_y(setup.action)+lv_obj_get_height(setup.action)<=320);
+    }
     lv_display_delete(display);
     lv_binfont_destroy(small);
     lv_binfont_destroy(large);

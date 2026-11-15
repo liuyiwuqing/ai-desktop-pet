@@ -29,7 +29,9 @@
 | HW-02 | 可选摇杆菜单输入 | 软件已验证；BOOT 保留、显式启用、方向与确认/返回、回中/消抖/连发及采样故障保护 | 主机、10 项 LVGL、ASan/UBSan 与隔离 full 构建通过；`7d14833` 已推送并核对 origin/main，ADC 与实物交互待验收 |
 | HW-03 | 可选光敏与硬件使用说明 | 软件已验证；光敏 ADC1、平滑调光/手动上限/熄屏与异常回退；接线/配置及舵机保护同步 | `acec2a5` 已推送并核对；本地五预设、主机/LVGL/ASan/UBSan、远程 CI 七任务全绿，实物待验收 |
 | HW-04 | 首台设备备份、烧录与基础硬件验证 | 16 MB 备份及芯片核验、64 KB NVS 初始化、五份产物独立回读、8 MB PSRAM 自检通过；屏幕直连供电后恢复绘制、BOOT 菜单正常，功放改线后提示音可听见，手动录音回放可辨认本人语音；见 [27](27-hardware-and-input.md#首次实机记录2026-11-15) | 显示传输/菜单/音频基础硬件已实测；用户补充未对时时宠物未显示，单列 HW-05。联网/供应商、UI 同启并行诊断超时、OTA/掉电及长稳仍未验收 |
-| HW-05 | 未对时主页宠物与首次配置 | 已解除宠物绘制对时间同步的依赖，保留成长结算、菜单遮挡和存档异常保护；私有模板存于本机忽略目录 | 真实 LVGL 失败复现后修正，10 项 UI、主机回归及隔离构建通过；应用已烧入/回读匹配、12 秒无 panic；用户确认宠物显示/菜单正常。凭据待填写，未联网语音；本项推送/CI另行核对 |
+| HW-05 | 未对时主页宠物与首次配置 | 已解除宠物绘制对时间同步的依赖，保留成长结算、菜单遮挡和存档异常保护；私有模板存于本机忽略目录 | `c6b761d` 已推送，远程 CI 七任务通过；用户确认宠物显示/菜单正常。后续配置改用 HW-06 热点 |
+| HW-06 | 手机热点配网与小智官方连接配置 | 已实现独立 SoftAP/HTTP/LCD 设置、Wi-Fi-only/分组 CAS、菜单重开与离线退出、官方绑定/WSS 保存；见 [28](28-device-web-setup.md) | 主机/ASan/UBSan、10 项 LVGL、手机浏览器、隔离构建通过；应用已烧入回读验证，用户手机配网保存成功，设备取得官方 WSS 配置并正常重启联网/对时。提交/远程 CI 另记；真实语音暴露 HW-07 |
+| HW-07 | 首次真实语音连接与音频验证 | 进行中；已定位首次发起对话时 `pet_xz_wss` 栈溢出，不能将 ready/保存标记当作对话通过 | 按实际 SDK 编解码栈预算修正并测栈余量，保留已保存凭据后回归真实对话 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -234,3 +236,14 @@ HW-05（2026-11-15）：用户随后补充最终主页一直“等待时间同�
 本项 `ctest --test-dir firmware/build-ui-preview -R '^message_view$' --output-on-failure` 在修正后退出 0；`bash tools/ci/test_ui_host.sh` 10/10、`bash tools/ci/test_host.sh` 均退出 0，已查看 `growth-waiting-time` 实际 LVGL 预览。用户要求创建本机配置模板，空凭据 JSON 权限 600、目录 700，同步字段说明；补齐 `/data/` 忽略并核对模板不进入 Git。模板仍待用户填写，不写入设备、不伪造联网/时间或小智可用。
 
 ESP-IDF v6.1 使用原基础维护开关在独立 `firmware/build-hardware-offline-20261115/` 完整构建，应用 2,860,624 B，SHA256 `92b772da50cb45eb1fdbc81bc3f2a6a9907d01e0d2269cdf07d97e99fc8b50c0`；bootloader/分区表/OTA 初值/模型与上一版逐字节一致。只在 `0x20000` 写应用并独立 `verify-flash` 摘要匹配，不再次初始化 NVS；启动观察 12 秒无 panic，UI 已初始化，诊断与开机语音仍关闭。构建/串口/原备份保留本机忽略目录。用户随后明确确认等待时间同步时宠物已显示、菜单正常；本项远程 CI 另记，不沿用 HW-04 的模糊画面结论。
+
+
+HW-05 远程验证：`c6b761d` 的 [43726970383](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43726970383) 已完成，default/full/off/tones/duplex、voice-bridge-preparation、server-delivery-tools 七任务均成功。
+
+HW-06（2026-11-15）：用户要求通过设备热点/手机浏览器设置，明确供应商为小智官方平台。新增独立 `svc_setup` 启动模式，密码热点 15 分钟限时、固定 AP 接口 HTTP、Origin/nonce/CAS、防重复提交、Wi-Fi 成功取得 IP 后才保存；长按 BOOT 退出，菜单可重新进入，明确离线选择不反复弹出。分组更新保留其余服务/设备身份，兼容完整旧 namespace，并保持 USB 全量 provision 契约。正常模式允许仅 Wi-Fi，MQTT 可选，SNTP 与官方 WSS 不依赖 NEXUS。官方 TLS 配置仅保存绑定/WSS 信息，忽略供应商固件字段，不替换本项目固件。
+
+`bash tools/ci/test_host.sh`、`PET_HOST_SANITIZE=1 bash tools/ci/test_host.sh`、`PET_HOST_SANITIZE=1 bash tools/ci/test_config_host.sh` 退出 0；真实 LVGL 的 `bash tools/ci/test_ui_host.sh` 10/10；契约/板型生成、四项 build-matrix 工具测试、20 组件依赖无环及 JavaScript 语法检查通过。新增 boot 公开接口覆盖无配置/编译期 Wi-Fi/显式离线/损坏记录/异步请求失败重试；策略覆盖 Host/Origin/session 与 Wi-Fi 边界，实际响应解析覆盖绑定码、WSS 与供应商固件忽略。macOS ASan 编译首次将第三方 cJSON 的弃用 `sprintf` 警告提升为错误，改为只对该第三方对象使用既有屏蔽方式后重跑通过；没有修改第三方源码或整体关闭警告。新增模块首次 SDK 构建的 const 参数和 FreeRTOS 头文件顺序问题已修正，实际 ESP-IDF v6.1 构建退出 0。
+
+浏览器使用实际 HTML 与本机模拟 API，验证 390px 手机布局、密码失败重试、特殊 SSID 无注入、绑定码/处理中/退出，以及服务端已保存但 HTTP 确认丢失时由新 revision 清除旧错误。成功后按钮改为“语音配置已保存”，避免反复请求绑定。临时浏览器任务空间与本机服务已关闭；模拟检查不替代设备或官方平台。
+
+首次应用 3,187,104 B、SHA256 `444e3e26784d45455d1cf6a84911a6e7f9fbaff3e495eb7e8c86fa9e707be7c2` 在 `0x20000` 写入并独立回读匹配；配套四份产物与已烧版本逐字节相同，不再次初始化 NVS。设备真实 AP/HTTP 启动后，用户用手机打开页面并确认家庭 Wi-Fi 已连接保存；USB 对应 revision 1、NVS 失败 0。官方请求随后直接取得合法 WSS 信息并保存，revision 4、`voiceSaved=true`、错误 0；没有显示新绑定码，不伪称用户重新完成了平台添加。退出后设备从保存凭据连接家庭 Wi-Fi，41 秒时 SNTP 成功，AI/WSS ready 且 networkReady=true，无音频故障。随后用户首次发起真实对话，设备明确报告 `pet_xz_wss` 栈溢出并重启，用户界面提示暂时无法对话；单列 HW-07 修复，不把配置保存和网络就绪当作真实语音通过。原密码、WSS token、备份、串口日志与固件仅留忽略目录。

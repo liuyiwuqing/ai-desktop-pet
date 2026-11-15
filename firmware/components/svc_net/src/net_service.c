@@ -33,8 +33,8 @@ esp_err_t pet_net_init(const pet_net_config_t *config)
     }
 
     s_config = config;
-    ESP_LOGI(TAG, "transport=%s device=%s broker=%s", s_driver->id,
-             config->device_id, config->broker_uri);
+    ESP_LOGI(TAG, "transport=%s device=%s mqtt=%s", s_driver->id,
+             config->device_id, config->broker_uri && config->broker_uri[0] ? "configured" : "disabled");
     return ESP_OK;
 }
 

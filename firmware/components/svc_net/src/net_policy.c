@@ -95,15 +95,13 @@ pet_net_error_t pet_net_config_validate(const pet_net_config_t *config)
         }
     }
 
-    if (config->broker_uri == NULL) {
-        return PET_NET_ERROR_CONFIG;
-    }
-    size_t uri_length = bounded_length(config->broker_uri, PET_NET_URI_MAX + 1);
-    if (uri_length <= 8 || uri_length > PET_NET_URI_MAX ||
+    const bool broker = config->broker_uri != NULL && config->broker_uri[0] != '\0';
+    size_t uri_length = broker ? bounded_length(config->broker_uri, PET_NET_URI_MAX + 1) : 0;
+    if (broker && (uri_length <= 8 || uri_length > PET_NET_URI_MAX ||
         strncmp(config->broker_uri, "mqtts://", 8) != 0 ||
         has_control_char(config->broker_uri, uri_length) ||
         config->broker_uri[8] == '\0' || config->broker_uri[8] == '/' ||
-        config->broker_uri[8] == ':') {
+        config->broker_uri[8] == ':')) {
         return PET_NET_ERROR_CONFIG;
     }
 
@@ -111,6 +109,10 @@ pet_net_error_t pet_net_config_validate(const pet_net_config_t *config)
         !optional_text_valid(config->mqtt_password, PET_NET_TOKEN_MAX)) {
         return PET_NET_ERROR_CONFIG;
     }
+
+    if (!broker && ((config->mqtt_username && config->mqtt_username[0]) ||
+                    (config->mqtt_password && config->mqtt_password[0]) || config->ca_cert_pem))
+        return PET_NET_ERROR_CONFIG;
 
     if (config->ca_cert_pem != NULL) {
         size_t pem_length = bounded_length(config->ca_cert_pem, PET_NET_CA_PEM_MAX + 1);

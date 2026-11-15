@@ -7,6 +7,8 @@
 typedef uint32_t (*pet_ui_clock_t)(void);
 esp_err_t pet_ui_start(const pet_display_t *display, const pet_button_input_t *button,
                        pet_ui_clock_t clock);
+/* 配网启动独占显示；配网服务须已启动，正常业务 UI 不同时运行。 */
+esp_err_t pet_ui_setup_start(const pet_display_t *display,const pet_button_input_t *button);
 
 typedef void (*pet_ui_recovery_restart_t)(void *context);
 /* Recovery startup only (UI + RECOVERY enabled); no business services are initialized.

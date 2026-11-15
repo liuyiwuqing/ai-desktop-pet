@@ -88,6 +88,15 @@ static void test_config_validation(void)
     CHECK(pet_net_config_validate(NULL) == PET_NET_ERROR_CONFIG);
 
     config = base_config();
+    config.broker_uri = "";
+    config.mqtt_username = config.mqtt_password = "";
+    CHECK(pet_net_config_validate(&config) == PET_NET_ERROR_NONE);
+    config.broker_uri = NULL;
+    CHECK(pet_net_config_validate(&config) == PET_NET_ERROR_NONE);
+    config.mqtt_password = "stray-token";
+    CHECK(pet_net_config_validate(&config) == PET_NET_ERROR_CONFIG);
+
+    config = base_config();
     config.wifi_password = NULL;
     CHECK(pet_net_config_validate(&config) == PET_NET_ERROR_NONE);
 

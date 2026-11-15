@@ -17,9 +17,9 @@ python3 tools/configure_device.py settings --file config/examples/device-config.
 
 先 `get` 获取 revision，再提交完整配置；旧 revision 拒绝，无变化不加版本。单 NVS blob 原子替换及回读校验；损坏或提交不明锁写，不自动清空。默认音量 25%，支持手动/跨午夜定时 DND 和固定 UTC 偏移；当前 UI 仅中文，`en-US` 返回 `ESP_ERR_NOT_SUPPORTED`。
 
-首次配网准备权限 `600` 的私有 JSON 文件，再用 `provision --file <private.json> --revision <status返回值>`；字段见 [config](../config/README.md)。完整凭据包原子替换、不导出，已存在设备身份不能通过此入口更换。成功返回 `restartRequired=true`，由维护者另行重启。超时不能直接视为失败，应先读取 revision/状态。
+首次配网优先使用[设备热点设置](28-device-web-setup.md)：手机连接屏幕所示热点并访问 `http://192.168.4.1`，保存 Wi-Fi 后可在页面获取小智官方绑定码。USB 维护仍可准备权限 `600` 的私有 JSON 文件，再用 `provision --file <private.json> --revision <status返回值>`；字段见 [config](../config/README.md)。该命令完整替换凭据包、不导出，已存在设备身份不能通过此入口更换。成功返回 `restartRequired=true`，由维护者另行重启。超时不能直接视为失败，应先读取 revision/状态。
 
-未配网的基础维护版可能显示“等待时间同步”，语音页显示“请先完成语音配置”。当前网络启动要求同时具备 Wi-Fi 与 MQTT 配置，取得 IP 后才启动 SNTP；真实对时前不结算成长，但主页仍应显示宠物。联网语音还要求私有包中的完整 `xiaozhi` 分组以及固件 `CONFIG_PET_AI_XIAOZHI_ON_BOOT=y`；只填写包或只开启编译开关都不能替代另一项。使用 WSS 传输不代表已完成供应商激活/协议验收。
+未配网的基础维护版可能显示“等待时间同步”，语音页显示“请先完成语音配置”。HW-06 起允许只保存 Wi-Fi：取得 IP 后启动 SNTP，未配置 NEXUS 时不启动 MQTT；真实对时前不结算成长，但主页仍应显示宠物。联网语音还要求私有包中的完整 `xiaozhi` 分组以及固件 `CONFIG_PET_AI_XIAOZHI_ON_BOOT=y`；热点绑定可自动保存该分组，只保存 Wi-Fi 或只开启编译开关均不能替代它。使用 WSS 传输不代表已完成供应商激活/协议验收。
 
 本机配置模板可放于 Git 忽略的 `data/device-setup/`，目录权限 `700`、JSON 权限 `600`；只在本机编辑，日志与提交不得包含密码/令牌。空字段模板不能作为完成配置的证据；提交凭据前应确认所有必填字段和 revision。填写后由维护者发送并显式重启，再分别检查 IP、SNTP、小智连接和真实对话。
 

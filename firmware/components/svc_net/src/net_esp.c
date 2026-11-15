@@ -201,7 +201,7 @@ static void sntp_timeout_cb(void *arg)
     if (!s_running || s_time_synced) {
         return;
     }
-    ESP_LOGW(TAG, "sntp not synced within %d ms, mqtt starts in degraded mode",
+    ESP_LOGW(TAG, "sntp not synced within %d ms; retry continues",
              NET_SNTP_SYNC_TIMEOUT_MS);
     start_mqtt();
 }
@@ -490,11 +490,10 @@ static esp_err_t wifi_init_and_configure(const pet_net_config_t *config)
     }
 
     wifi_config_t wifi_config = {0};
-    strlcpy((char *)wifi_config.sta.ssid, config->wifi_ssid,
-            sizeof(wifi_config.sta.ssid));
-    strlcpy((char *)wifi_config.sta.password,
-            config->wifi_password != NULL ? config->wifi_password : "",
-            sizeof(wifi_config.sta.password));
+    /* SDK 数组允许满 32/64 字节，不强行预留 NUL 而截断已校验的凭据。 */
+    memcpy(wifi_config.sta.ssid, config->wifi_ssid, strlen(config->wifi_ssid));
+    if (config->wifi_password)
+        memcpy(wifi_config.sta.password, config->wifi_password, strlen(config->wifi_password));
     wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
 
     return esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
@@ -604,11 +603,13 @@ static esp_err_t esp_net_start(const pet_net_config_t *config)
         return err;
     }
 
-    err = mqtt_init(config);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "mqtt init failed: %s", esp_err_to_name(err));
-        publish_state(PET_NET_STATE_OFFLINE, PET_NET_ERROR_MQTT);
-        return err;
+    if (config->broker_uri && config->broker_uri[0]) {
+        err = mqtt_init(config);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "mqtt init failed: %s", esp_err_to_name(err));
+            publish_state(PET_NET_STATE_OFFLINE, PET_NET_ERROR_MQTT);
+            return err;
+        }
     }
 
     s_config = config;

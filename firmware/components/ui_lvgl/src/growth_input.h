@@ -10,6 +10,7 @@ enum {
     PET_GROWTH_MENU_FOCUS_PAUSE,
     PET_GROWTH_MENU_FOCUS_RESUME,
     PET_GROWTH_MENU_FOCUS_CANCEL,
+    PET_GROWTH_MENU_NETWORK,
     PET_GROWTH_MENU_RETURN,
     PET_GROWTH_MENU_COUNT,
     PET_GROWTH_MENU_AI_TALK = PET_GROWTH_MENU_COUNT,
@@ -26,6 +27,7 @@ typedef struct {
     bool initialized, raw, stable, armed, menu;
     bool voice_enabled, voice_only, voice_active, voice_ready;
     bool climate_enabled;
+    bool network_enabled;
     bool navigation_enabled;
     bool holding, press_voice;
 } pet_growth_input_t;

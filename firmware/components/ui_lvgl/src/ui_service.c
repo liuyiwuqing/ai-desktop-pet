@@ -1,5 +1,8 @@
 #include "ui_lvgl/api.h"
 #include "sdkconfig.h"
+#if CONFIG_PET_SETUP_PORTAL_ENABLED
+#include "svc_setup/api.h"
+#endif
 
 #if CONFIG_PET_MODULE_UI_ENABLED
 #include <inttypes.h>
@@ -542,6 +545,9 @@ static void ui_task(void *arg)
     pet_climate_view_ui_init(&ui->climate_view,climate_root,ui->font16,ui->font24);
     lv_obj_add_flag(climate_root,LV_OBJ_FLAG_HIDDEN);
 #endif
+#if CONFIG_PET_SETUP_PORTAL_ENABLED && (CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI)
+    ui->growth_input.network_enabled = true;
+#endif
     ui->privacy = lv_label_create(lv_display_get_screen_active(ui->display));
 #if CONFIG_PET_EXT_DEVICE_CONTROL
     pet_control_view_ui_init(&ui->control_view,lv_obj_create(lv_display_get_screen_active(ui->display)),ui->font16,ui->font24);
@@ -673,6 +679,13 @@ static void ui_task(void *arg)
 #endif
         if (selected < 0 && direction != PET_NAV_NONE)
             selected = pet_growth_input_navigate(&ui->growth_input, direction, navigation_blocked, now_ms());
+#if CONFIG_PET_SETUP_PORTAL_ENABLED
+        if (selected==PET_GROWTH_MENU_NETWORK) {
+            esp_err_t setup=pet_setup_request();
+            feedback(ui,setup==ESP_OK?"正在打开网络设置…":"网络设置未完成，请重试",false);
+        }
+        if(pet_setup_request_failed()) feedback(ui,"保存失败，请重试",false);
+#endif
 #if PET_UI_AI
         if (was_menu && !ui->growth_input.menu && ui->growth_input.selection == PET_GROWTH_MENU_RETURN)
             ui->voice_panel = false;

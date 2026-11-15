@@ -26,7 +26,7 @@ python3 tools/ci/check_contracts.py
 
 ## 私有凭据包
 
-凭据文件不放本目录/仓库。使用权限 `600` 的私有 JSON，完整替换 `pet_provision/bundle_v1`：
+凭据文件不放本目录/仓库。USB 维护使用权限 `600` 的私有 JSON，完整替换 `pet_provision/bundle_v1`：
 
 | 分组 | 必填 | 可选 |
 | --- | --- | --- |
@@ -38,5 +38,7 @@ python3 tools/ci/check_contracts.py
 MQTT/WSS/控制分别要求 `mqtts://`、`wss://`、`https://`；CA 省略时使用 SDK 信任包。allowed_apps/projects 为逗号分隔白名单 ID，最多 16 项，每项 `[a-zA-Z0-9_-]{1,40}`，并须与控制网关一致。配置入口拒绝未知/重复字段、深层 JSON 和超长输入，不导出凭据，日志不输出秘密。
 
 新包不存在才兼容旧 namespace/key；包存在但损坏/缺必填键，不拼接旧凭据。设备身份已存在时禁止更换，避免历史回执错发。凭据成功后需显式重启；首次配置串口默认关闭。发布签名私钥与供应商密钥始终留在维护者/服务端，不下发设备。
+
+[设备热点设置](../docs/28-device-web-setup.md) 使用同一存储格式的分组 CAS patch：只提交 `net`、`nexus` 或 `xiaozhi` 中的目标组，完整保留其余组，校验后原子写入/回读；已有 NEXUS 身份继续固定。存储读取允许 Wi-Fi-only，缺少 NEXUS 时正常模式启动 Wi-Fi/SNTP并禁用 MQTT，官方绑定随后补齐 `xiaozhi`。USB 全量入口仍要求表中的 `net` 与 `nexus`，未放宽原有命令契约。首次分组写入会保留完整合法的旧 namespace 分组；检测到部分遗留凭据或存储损坏时拒绝覆盖。
 
 远程升级命令/回执/完整状态见 [remote-ota-v1](../integration/contracts/remote-ota-v1/README.md)，与消息和配置通道并列；不包含 URL、公钥或秘密。

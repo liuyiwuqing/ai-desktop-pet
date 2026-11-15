@@ -62,14 +62,17 @@ static bool valid(const cJSON *root)
         if (!bit || (mask&bit)) return false;
         mask |= bit;
     }
-    if ((mask&3) != 3 || !group(root,"net",net,nl,2,1) || !group(root,"nexus",nexus,ml,5,15) ||
+    if (!(mask&1) || !group(root,"net",net,nl,2,1) || !group(root,"nexus",nexus,ml,5,(mask&2) ? 15 : 0) ||
         !group(root,"xiaozhi",ai,al,5,(mask&4) ? 15 : 0)||!group(root,"control",control,cl,5,(mask&8)?3:0)) return false;
     const cJSON *n = cJSON_GetObjectItemCaseSensitive(root,"nexus");
-    const char *id = cJSON_GetObjectItemCaseSensitive(n,"device_id")->valuestring;
-    for (const char *p=id; *p; ++p)
-        if (!((*p>='a'&&*p<='z')||(*p>='A'&&*p<='Z')||(*p>='0'&&*p<='9')||*p=='-'||*p=='_')) return false;
-    const char *uri = cJSON_GetObjectItemCaseSensitive(n,"mqtt_uri")->valuestring;
-    if (strncmp(uri,"mqtts://",8) || !uri[8] || strstr(uri,"@") || strstr(uri,"#")) return false;
+    const char *uri;
+    if (n) {
+        const char *id = cJSON_GetObjectItemCaseSensitive(n,"device_id")->valuestring;
+        for (const char *p=id; *p; ++p)
+            if (!((*p>='a'&&*p<='z')||(*p>='A'&&*p<='Z')||(*p>='0'&&*p<='9')||*p=='-'||*p=='_')) return false;
+        uri = cJSON_GetObjectItemCaseSensitive(n,"mqtt_uri")->valuestring;
+        if (strncmp(uri,"mqtts://",8) || !uri[8] || strstr(uri,"@") || strstr(uri,"#")) return false;
+    }
     if (mask&4) {
         const cJSON *a = cJSON_GetObjectItemCaseSensitive(root,"xiaozhi");
         uri = cJSON_GetObjectItemCaseSensitive(a,"ws_uri")->valuestring;
@@ -125,21 +128,36 @@ esp_err_t pet_provision_load_str(const char *ns, const char *key, char *out, siz
     esp_err_t e=load(&root,&revision);
     if (e==ESP_ERR_NVS_NOT_FOUND) return pet_storage_load_str(ns,key,out,cap);
     if (e==ESP_OK) {
-        const cJSON *value=cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItemCaseSensitive(root,ns),key);
+        const cJSON *object=cJSON_GetObjectItemCaseSensitive(root,ns);
+        const cJSON *value=cJSON_GetObjectItemCaseSensitive(object,key);
         bool optional=!strcmp(key,"ws_ca")||!strcmp(key,"mqtt_ca")||!strcmp(key,"wifi_pass")||
             (!strcmp(ns,"control")&&(!strcmp(key,"ca")||!strcmp(key,"allowed_apps")||!strcmp(key,"allowed_projects")));
-        e=!cJSON_IsString(value) ? optional ? ESP_ERR_NVS_NOT_FOUND : ESP_ERR_INVALID_STATE :
+        e=!cJSON_IsString(value) ? optional || (!object && !strcmp(ns,"nexus")) ? ESP_ERR_NVS_NOT_FOUND : ESP_ERR_INVALID_STATE :
             strlen(value->valuestring)>=cap ? ESP_ERR_INVALID_SIZE : ESP_OK;
         if (e==ESP_OK) strcpy(out,value->valuestring);
     }
     secure_delete(root); return e;
+}
+static esp_err_t store_bundle(const char *json, size_t bytes, uint32_t current)
+{
+    unsigned char *data=malloc(bytes+4), *readback=malloc(bytes+4); size_t check_size=0;
+    if (!data||!readback) { free(data); free(readback); return ESP_ERR_NO_MEM; }
+    uint32_t next=current+1;
+    for (unsigned i=0;i<4;++i) data[i]=(unsigned char)(next>>(i*8));
+    memcpy(data+4,json,bytes);
+    esp_err_t e=pet_storage_save("pet_provision","bundle_v1",data,bytes+4);
+    esp_err_t checked=pet_storage_load("pet_provision","bundle_v1",readback,bytes+4,&check_size);
+    if (checked==ESP_OK&&check_size==bytes+4&&!memcmp(data,readback,check_size)) e=ESP_OK;
+    else if (e==ESP_OK) e=ESP_FAIL;
+    wipe(data,bytes+4); wipe(readback,bytes+4); free(data); free(readback);
+    return e;
 }
 esp_err_t pet_provision_save(const char *json, size_t bytes, uint32_t expected)
 {
     if (atomic_flag_test_and_set(&saving)) return ESP_ERR_TIMEOUT;
     cJSON *root=parse(json,bytes), *old=NULL; uint32_t current=0;
     esp_err_t e=ESP_ERR_INVALID_ARG;
-    if (!valid(root)) goto done;
+    if (!valid(root) || !cJSON_HasObjectItem(root,"nexus")) goto done;
     e=load(&old,&current);
     if (e!=ESP_OK && e!=ESP_ERR_NVS_NOT_FOUND) goto done;
     if (expected!=current || current==UINT32_MAX) { e=ESP_ERR_INVALID_STATE; goto done; }
@@ -147,18 +165,79 @@ esp_err_t pet_provision_save(const char *json, size_t bytes, uint32_t expected)
     char old_id[41];
     e=pet_provision_load_str("nexus","device_id",old_id,sizeof(old_id));
     if ((e==ESP_OK && strcmp(id,old_id)) || (e!=ESP_OK && e!=ESP_ERR_NVS_NOT_FOUND)) { e=ESP_ERR_INVALID_STATE; goto done; }
-    unsigned char *data=malloc(bytes+4), *readback=malloc(bytes+4); size_t check_size=0;
-    if (!data||!readback) { free(data); free(readback); e=ESP_ERR_NO_MEM; goto done; }
-    uint32_t next=current+1;
-    for (unsigned i=0;i<4;++i) data[i]=(unsigned char)(next>>(i*8));
-    memcpy(data+4,json,bytes);
-    e=pet_storage_save("pet_provision","bundle_v1",data,bytes+4);
-    esp_err_t checked=pet_storage_load("pet_provision","bundle_v1",readback,bytes+4,&check_size);
-    if (checked==ESP_OK&&check_size==bytes+4&&!memcmp(data,readback,check_size)) e=ESP_OK;
-    else if (e==ESP_OK) e=ESP_FAIL;
-    wipe(data,bytes+4); wipe(readback,bytes+4); free(data); free(readback);
+    e=store_bundle(json,bytes,current);
 done:
     secure_delete(root); secure_delete(old); atomic_flag_clear(&saving); return e;
+}
+
+static esp_err_t preserve_legacy(cJSON *root)
+{
+    /* 首次网页配置也不能丢掉旧 namespace 中已安装的服务。部分损坏则拒绝覆盖。 */
+    const struct { const char *name; const char *keys[7]; } groups[] = {
+        {"net", {"wifi_ssid","wifi_pass",NULL}},
+        {"nexus", {"device_id","mqtt_uri","mqtt_user","mqtt_pass","mqtt_ca",NULL}},
+        {"xiaozhi", {"ws_uri","ws_token","device_id","client_id","ws_ca",NULL}},
+        {"control", {"api_uri","token","ca","allowed_apps","allowed_projects",NULL}},
+    };
+    char *value=malloc(4097);
+    if(!value) return ESP_ERR_NO_MEM;
+    esp_err_t err=ESP_OK;
+    for(size_t g=0;g<sizeof(groups)/sizeof(groups[0])&&err==ESP_OK;g++) {
+        cJSON *object=NULL;
+        for(unsigned k=0;groups[g].keys[k];k++) {
+            esp_err_t loaded=pet_storage_load_str(groups[g].name,groups[g].keys[k],value,4097);
+            if(loaded==ESP_ERR_NVS_NOT_FOUND) continue;
+            if(loaded!=ESP_OK) {err=loaded;break;}
+            if(!object) object=cJSON_AddObjectToObject(root,groups[g].name);
+            if(!object||!cJSON_AddStringToObject(object,groups[g].keys[k],value)) {err=ESP_ERR_NO_MEM;break;}
+            wipe(value,4097);
+        }
+    }
+    wipe(value,4097);free(value);return err;
+}
+
+esp_err_t pet_provision_patch(const char *json, size_t bytes, uint32_t expected)
+{
+    if(atomic_flag_test_and_set(&saving)) return ESP_ERR_TIMEOUT;
+    cJSON *patch=parse(json,bytes),*root=NULL; char *encoded=NULL; uint32_t current=0;
+    esp_err_t e=ESP_ERR_INVALID_ARG;
+    if(!cJSON_IsObject(patch)||!patch->child) goto done;
+    e=load(&root,&current);
+    if(e==ESP_ERR_NVS_NOT_FOUND) {
+        root=cJSON_CreateObject();
+        e=root?preserve_legacy(root):ESP_ERR_NO_MEM;
+    }
+    if(e!=ESP_OK) goto done;
+    if(current!=expected||current==UINT32_MAX) {e=ESP_ERR_INVALID_STATE;goto done;}
+    for(cJSON *p=patch->child;p;p=p->next) {
+        if(!p->string||(strcmp(p->string,"net")&&strcmp(p->string,"nexus")&&strcmp(p->string,"xiaozhi")&&strcmp(p->string,"control"))) {
+            e=ESP_ERR_INVALID_ARG;goto done;
+        }
+        for(cJSON *q=patch->child;q!=p;q=q->next) if(!strcmp(q->string,p->string)) {e=ESP_ERR_INVALID_ARG;goto done;}
+        if(!strcmp(p->string,"nexus")) {
+            cJSON *old_id=cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItemCaseSensitive(root,"nexus"),"device_id");
+            cJSON *id=cJSON_GetObjectItemCaseSensitive(p,"device_id");
+            if(cJSON_IsString(old_id)&&(!cJSON_IsString(id)||strcmp(old_id->valuestring,id->valuestring))) {e=ESP_ERR_INVALID_STATE;goto done;}
+        }
+        cJSON *copy=cJSON_Duplicate(p,true);
+        if(!copy) {e=ESP_ERR_NO_MEM;goto done;}
+        cJSON *old=cJSON_DetachItemFromObjectCaseSensitive(root,p->string);secure_delete(old);
+        if(!cJSON_AddItemToObject(root,p->string,copy)) {secure_delete(copy);e=ESP_ERR_NO_MEM;goto done;}
+    }
+    if(!valid(root)) {e=ESP_ERR_INVALID_ARG;goto done;}
+    cJSON *net=cJSON_GetObjectItemCaseSensitive(patch,"net");
+    if(net) {
+        cJSON *password=cJSON_GetObjectItemCaseSensitive(net,"wifi_pass");
+        size_t length=cJSON_IsString(password)?strlen(password->valuestring):0;
+        if(length>0&&length<8) {e=ESP_ERR_INVALID_ARG;goto done;}
+    }
+    encoded=cJSON_PrintUnformatted(root);
+    if(!encoded) {e=ESP_ERR_NO_MEM;goto done;}
+    if(strlen(encoded)>PET_PROVISION_JSON_MAX) {e=ESP_ERR_INVALID_SIZE;goto done;}
+    e=store_bundle(encoded,strlen(encoded),current);
+done:
+    if(encoded) {wipe(encoded,strlen(encoded));cJSON_free(encoded);}
+    secure_delete(patch);secure_delete(root);atomic_flag_clear(&saving);return e;
 }
 esp_err_t pet_config_command(const char *line, size_t bytes, char *out, size_t cap)
 {

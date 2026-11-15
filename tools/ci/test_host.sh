@@ -30,6 +30,38 @@ python3 "${repo_root}/tools/ci/test_voice_simulator.py"
 python3 "${repo_root}/tools/ci/test_sr_models.py"
 python3 "${repo_root}/tools/ci/test_control_gateway.py"
 
+build_and_run test_setup_policy \
+    -I "${repo_root}/firmware/tests/host/support" \
+    -I "${repo_root}/firmware/components/svc_setup/include" \
+    -I "${repo_root}/firmware/components/svc_setup/private_include" \
+    "${repo_root}/firmware/components/svc_setup/src/setup_policy.c" \
+    "${repo_root}/firmware/tests/host/test_setup_policy.c"
+
+for fallback in '' compiled-network; do
+    build_and_run test_setup_boot \
+        -D"CONFIG_PET_NET_WIFI_SSID=\"${fallback}\"" \
+        -I "${repo_root}/firmware/tests/host/support/setup_boot" \
+        -I "${repo_root}/firmware/tests/host/support/ai_agent" \
+        -I "${repo_root}/firmware/tests/host/support" -I "${contracts_inc}" \
+        -I "${repo_root}/firmware/components/svc_config/include" \
+        -I "${repo_root}/firmware/components/storage/include" \
+        -I "${repo_root}/firmware/components/svc_setup/include" \
+        "${repo_root}/firmware/components/svc_setup/src/setup_boot.c" \
+        "${repo_root}/firmware/tests/host/test_setup_boot.c"
+done
+
+cc "${host_flags[@]}" -Wno-deprecated-declarations \
+    -I "${repo_root}/firmware/managed_components/espressif__cjson/cJSON" \
+    -c "${repo_root}/firmware/managed_components/espressif__cjson/cJSON/cJSON.c" \
+    -o "${out_dir}/setup_cjson.o"
+build_and_run test_setup_activation \
+    -I "${repo_root}/firmware/tests/host/support" -I "${contracts_inc}" \
+    -I "${repo_root}/firmware/components/svc_setup/private_include" \
+    -I "${repo_root}/firmware/managed_components/espressif__cjson/cJSON" \
+    "${repo_root}/firmware/components/svc_setup/src/setup_activation_policy.c" \
+    "${out_dir}/setup_cjson.o" \
+    "${repo_root}/firmware/tests/host/test_setup_activation.c" -lm
+
 bash "${repo_root}/tools/ci/test_config_host.sh"
 bash "${repo_root}/tools/ci/test_ota_host.sh"
 bash "${repo_root}/tools/ci/test_ota_remote_host.sh"

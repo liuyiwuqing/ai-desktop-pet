@@ -17,6 +17,7 @@ static bool fail_write, fail_read;
 static unsigned writes;
 static unsigned char credentials[11000];
 static size_t credentials_size;
+static unsigned legacy_mode;
 esp_err_t pet_storage_init(void) { return ESP_OK; }
 esp_err_t pet_storage_load(const char *ns, const char *key, void *out, size_t cap, size_t *size)
 {
@@ -45,7 +46,20 @@ esp_err_t pet_storage_save(const char *ns, const char *key, const void *data, si
     assert(size <= sizeof(saved)); memcpy(saved, data, size); saved_size = size; return ESP_OK;
 }
 esp_err_t pet_storage_load_str(const char *ns, const char *key, char *out, size_t cap)
-{ (void)ns; (void)key; (void)out; (void)cap; return ESP_ERR_NVS_NOT_FOUND; }
+{
+    const char *value=NULL;
+    if(legacy_mode&&!strcmp(ns,"nexus")) {
+        if(!strcmp(key,"device_id")) value="legacy-device";
+        else if(legacy_mode==1) {
+            if(!strcmp(key,"mqtt_uri")) value="mqtts://legacy.test";
+            if(!strcmp(key,"mqtt_user")) value="legacy-user";
+            if(!strcmp(key,"mqtt_pass")) value="legacy-token";
+        }
+    }
+    if(!value) return ESP_ERR_NVS_NOT_FOUND;
+    if(strlen(value)>=cap) return ESP_ERR_INVALID_SIZE;
+    strcpy(out,value);return ESP_OK;
+}
 SemaphoreHandle_t xSemaphoreCreateMutex(void)
 {
     pthread_mutex_t *m = malloc(sizeof(*m)); assert(m && !pthread_mutex_init(m, NULL)); return m;
@@ -94,6 +108,42 @@ static const char json[] = "{\"schemaVersion\":1,\"timezone\":\"Asia/Shanghai\",
     "\"allowCritical\":true},\"message\":{\"queueDepth\":8,\"durationMs\":8000}}";
 int main(void)
 {
+    const char wifi_only[]="{\"net\":{\"wifi_ssid\":\"portal-only\",\"wifi_pass\":\"dummy-pass\"}}";
+    assert(pet_provision_patch(wifi_only,strlen(wifi_only),0)==ESP_OK);
+    uint32_t wifi_revision;
+    assert(pet_provision_revision(&wifi_revision)==ESP_OK&&wifi_revision==1);
+    char wifi_value[128];
+    assert(pet_provision_load_str("net","wifi_ssid",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"portal-only"));
+    assert(pet_provision_load_str("nexus","device_id",wifi_value,sizeof(wifi_value))==ESP_ERR_NVS_NOT_FOUND);
+    assert(pet_provision_patch(wifi_only,strlen(wifi_only),0)==ESP_ERR_INVALID_STATE);
+    const char service[]="{\"nexus\":{\"device_id\":\"portal-device\",\"mqtt_uri\":\"mqtts://example.test\",\"mqtt_user\":\"device\",\"mqtt_pass\":\"dummy-token\"}}";
+    assert(pet_provision_patch(service,strlen(service),1)==ESP_OK);
+    assert(pet_provision_load_str("net","wifi_ssid",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"portal-only"));
+    assert(pet_provision_load_str("nexus","mqtt_pass",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"dummy-token"));
+    const char different_id[]="{\"nexus\":{\"device_id\":\"other-device\",\"mqtt_uri\":\"mqtts://example.test\",\"mqtt_user\":\"device\",\"mqtt_pass\":\"dummy-token\"}}";
+    assert(pet_provision_patch(different_id,strlen(different_id),2)==ESP_ERR_INVALID_STATE);
+    const char changed_wifi[]="{\"net\":{\"wifi_ssid\":\"changed-home\",\"wifi_pass\":\"dummy-pass\"}}";
+    assert(pet_provision_patch(changed_wifi,strlen(changed_wifi),2)==ESP_OK);
+    assert(pet_provision_load_str("nexus","mqtt_pass",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"dummy-token"));
+    const char invalid_wifi[]="{\"net\":{\"wifi_ssid\":\"home\",\"wifi_pass\":\"short\"}}";
+    assert(pet_provision_patch(invalid_wifi,strlen(invalid_wifi),3)==ESP_ERR_INVALID_ARG);
+    fail_write=true;
+    assert(pet_provision_patch(wifi_only,strlen(wifi_only),3)==ESP_FAIL);
+    fail_write=false;
+    assert(pet_provision_load_str("net","wifi_ssid",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"changed-home"));
+    assert(pet_provision_revision(&wifi_revision)==ESP_OK&&wifi_revision==3);
+    const char unknown_group[]="{\"other\":{\"key\":\"value\"}}";
+    assert(pet_provision_patch(unknown_group,strlen(unknown_group),3)==ESP_ERR_INVALID_ARG);
+    const char duplicate[]="{\"net\":{\"wifi_ssid\":\"one\"},\"net\":{\"wifi_ssid\":\"two\"}}";
+    assert(pet_provision_patch(duplicate,strlen(duplicate),3)==ESP_ERR_INVALID_ARG);
+    credentials_size=0;legacy_mode=1;
+    assert(pet_provision_patch(wifi_only,strlen(wifi_only),0)==ESP_OK);
+    assert(pet_provision_load_str("nexus","device_id",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"legacy-device"));
+    assert(pet_provision_load_str("nexus","mqtt_pass",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"legacy-token"));
+    credentials_size=0;legacy_mode=2;
+    assert(pet_provision_patch(wifi_only,strlen(wifi_only),0)==ESP_ERR_INVALID_ARG);
+    assert(credentials_size==0);legacy_mode=0;
+    credentials_size=0; /* 下一组原有完整包/CLI 用例使用独立的空存储。 */
     assert(pet_config_init() == ESP_OK);
     pet_config_snapshot_t s;
     assert(pet_config_snapshot(&s) == ESP_OK && s.revision == 0 && s.writable);

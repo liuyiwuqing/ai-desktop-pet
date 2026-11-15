@@ -2,6 +2,9 @@
 #include "app_backup.h"
 #include "app_recovery.h"
 #include "sdkconfig.h"
+#if CONFIG_PET_SETUP_PORTAL_ENABLED
+#include "svc_setup/api.h"
+#endif
 #include <string.h>
 #include <stdio.h>
 #include "svc_config/provision.h"
@@ -77,6 +80,21 @@ esp_err_t app_diagnostics_json(char *out,size_t capacity)
     cJSON_AddNumberToObject(r,"internalFree",heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
     cJSON_AddNumberToObject(r,"internalLargest",heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
     cJSON_AddNumberToObject(r,"psramFree",heap_caps_get_free_size(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
+#if CONFIG_PET_SETUP_PORTAL_ENABLED
+    pet_setup_snapshot_t setup;
+    if(pet_setup_snapshot(&setup)==ESP_OK) {
+        cJSON *local=cJSON_AddObjectToObject(r,"setup");
+        cJSON_AddNumberToObject(local,"state",setup.state);
+        cJSON_AddNumberToObject(local,"code",setup.error);
+        cJSON_AddNumberToObject(local,"remainingSeconds",setup.remaining_s);
+        cJSON_AddNumberToObject(local,"revision",setup.revision);
+        cJSON_AddBoolToObject(local,"wifiSaved",setup.wifi_saved);
+        cJSON_AddBoolToObject(local,"voiceSaved",setup.voice_saved);
+        /* 热点口令、会话 nonce、Wi-Fi 和供应商凭据不进入诊断/日志。 */
+        volatile unsigned char *secret=(volatile unsigned char *)&setup;
+        for(size_t i=0;i<sizeof(setup);i++) secret[i]=0;
+    }
+#endif
     cJSON_AddNumberToObject(r,"eventsDropped",pet_event_bus_dropped());
     pet_storage_metrics_t nvs;pet_storage_metrics(&nvs);
     cJSON_AddNumberToObject(r,"nvsWrites",nvs.write_attempts);cJSON_AddNumberToObject(r,"nvsFailures",nvs.write_failures);

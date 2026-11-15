@@ -29,6 +29,7 @@ idf_component_register(
         "svc_climate"
         "svc_message_hub"
         "svc_net"
+        "svc_setup"
         "svc_audio"
         "svc_ai_agent"
         "bsp_dodo_s3_lcd"

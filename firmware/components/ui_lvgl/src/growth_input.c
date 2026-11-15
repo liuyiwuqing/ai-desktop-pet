@@ -6,6 +6,7 @@ static bool available(const pet_growth_input_t *p, unsigned choice)
     if (choice >= PET_GROWTH_MENU_AI_TALK)
         return p->voice_enabled && choice <= PET_GROWTH_MENU_AI_CLEAR;
     if (choice == PET_GROWTH_MENU_RETURN) return true;
+    if (choice == PET_GROWTH_MENU_NETWORK) return p->network_enabled;
     return !p->voice_only && (choice != PET_GROWTH_MENU_CLIMATE || p->climate_enabled);
 }
 

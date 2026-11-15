@@ -2,6 +2,15 @@ rsource "Kconfig.board"
 
 menu "PET modules"
 
+config PET_SETUP_PORTAL_ENABLED
+    bool "Enable local SoftAP web setup"
+    depends on PET_MODULE_NET_ENABLED && !PET_NET_FAKE && PET_MODULE_UI_ENABLED
+    default y
+    help
+      First boot with no Wi-Fi opens a password-protected SoftAP for 15 minutes.
+      The LCD shows the temporary connection details; setup can also be reopened
+      from the BOOT menu. Supports Wi-Fi-only use and optional Xiaozhi binding.
+
 config PET_PROVISION_CONSOLE_ENABLED
     bool "Enable physical serial configuration commands"
     default n
