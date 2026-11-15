@@ -33,7 +33,7 @@
 | HW-06 | 手机热点配网与小智官方连接配置 | 已实现独立 SoftAP/HTTP/LCD 设置、Wi-Fi-only/分组 CAS、菜单重开与离线退出、官方绑定/WSS 保存；见 [28](28-device-web-setup.md) | `317ad8f` 已推送，远程 CI 七任务通过；主机/ASan/UBSan、10 项 LVGL、手机浏览器、隔离构建通过；用户手机配网保存成功，设备取得官方 WSS 配置并正常重启联网/对时。真实语音暴露 HW-07 |
 | HW-07 | 首次真实语音连接与音频验证 | 已修正 WSS 栈/TLS 内存与公网发送/首包时序；用户确认真实回答正常且结束无错误，设备对应 32 包上行/73 包下行、105,120 个真实播放采样、IDLE/DRAINED | `5aecf0b` 已推送，远程 CI 七任务通过；WSS ASan/UBSan、隔离 default 与维护构建、烧录回读通过；剩余栈最小 16,404 B，音频/NVS 错误 0；连续失败继续见 HW-08，长稳/声学仍待验收 |
 | HW-08 | 连续语音、显示与输入实时预算 | 已实现并通过本地/实机：4 KiB 片内优先阈值、`-O2`、语音页按变化刷新及 DMA 余量诊断；隐私/超时保护保留 | 用户确认最终固件 5 轮全正常；USB 记录 7 轮 IDLE/DRAINED、显示失败 0；主机、LVGL/ASan/UBSan、隔离 default/维护构建与烧录回读通过。长回答欠载 24 次单列，长稳/OTA 待验收；提交与 CI 见末尾 |
-| HW-09 | 待机崩溃进入恢复模式 | 已修复并通过本地/实机：事件任务改为通知唤醒、持续优先扫描，避免过期 Queue Set 通知导致任务返回；恢复与存档保护保留 | 用户确认主页/3 轮完整回答；同一会话连续观察 5 分钟、5 轮 DRAINED，0 崩溃/重启/恢复锁定；主机/ASan/UBSan、default/维护构建和烧录回读通过。播放欠载单列，长期稳定性待验收；推送/CI 见末尾 |
+| HW-09 | 待机崩溃进入恢复模式 | 已修复并通过本地/实机：事件任务改为通知唤醒、持续优先扫描，避免过期 Queue Set 通知导致任务返回；恢复与存档保护保留 | 用户确认主页/3 轮完整回答；同一会话连续观察约 6 分钟、8 轮 DRAINED，0 崩溃/重启/恢复锁定；主机/ASan/UBSan、default/维护构建和烧录回读通过。播放欠载单列，长期稳定性待验收；推送/CI 见末尾 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -293,3 +293,7 @@ HW-09（2026-11-16）：用户确认无人操作待机自动进入恢复模式�
 隔离 default 构建 `python3 tools/build_matrix.py --profile default --build-root firmware/build-matrix-hw09 --jobs 3 --execute` 退出 0，应用 2,955,200 B、SHA256 `47454e4a449c4d89c573a30fd6c16731a408e725f4c3861005c1c942e7e0a335`；来源与实际产物逐项复核匹配。修正版首次启动通过 30 秒连续健康窗口，恢复 `active=false/healthy=true/failures=0`；同一串口会话继续观察至少 5 分钟，不把短启动成功写成长期稳定。
 
 实机验收：用户明确确认“主页正常，3 轮完整回答”；同一 USB 会话自动检查至 uptime 300,178 ms（481 次诊断采样），期间 0 panic、0 非预期重启，恢复持续 `active=false/healthy=true/failures=0`，已记录 5 轮 IDLE/DRAINED；显示失败 0、最大帧 94 ms，WSS/音频 error 为 0。较长回答期间播放缓冲欠载计数为 2，未把它写成全音频零欠载。只证明本次 5 分钟运行、待机和已记录轮次；不替代 24h/7d、掉电、实际 BOOT 双长按恢复或 OTA 回滚。原恢复流程未更改，使用 USB 清 RTC 标记后启动修正版，没有用关闭恢复保护绕过问题。
+
+HW-09 推送：`6f2cb31a509ab3437baafd50e695eaa10b1d8044` 已正常推送，并通过 `git ls-remote origin refs/heads/main` 核对远程分支包含该提交。对应 [43739157271](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43739157271) 当前运行中；不把 HW-08 已成功的 CI 沿用到本项事件总线修改。
+
+最终采样在 uptime 372,237 ms、IDLE/DRAINED 后关闭并释放串口；同一会话共记录 8 轮完整结束，628 包上行/1,080 包下行、1,555,200 个 24 kHz 播放采样（64.8 秒）。0 panic/非预期重启/显示失败，恢复锁与失败计数均为 0；显示最大帧 94 ms，WSS error/cleanupError、音频 error、MCP/NVS failures 均为 0。播放缓冲欠载累计 20，较长回答仍完整结束；采样所见片内最少 22,371 B、连续 DMA 最少 12,800 B，WSS 栈最少剩余 16,296 B。设备继续独立运行，原始日志/ELF/固件仅留忽略目录。远程 CI 七项中两项已通过，五个固件预设仍在构建，本次交付不宣称远程 CI 已完成。
