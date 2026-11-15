@@ -27,7 +27,7 @@
 | --- | --- | --- | --- |
 | HW-01 | 发行硬件与扩展基线 | 软件已验证；DHT11 默认关闭、菜单跳过、功放 LRC 改为 GPIO40，保留内部板型身份；见 [27](27-hardware-and-input.md) | 主机、10 项 LVGL、隔离 default 构建通过；`e034310` 已推送并核对 origin/main，实物待验收 |
 | HW-02 | 可选摇杆菜单输入 | 软件已验证；BOOT 保留、显式启用、方向与确认/返回、回中/消抖/连发及采样故障保护 | 主机、10 项 LVGL、ASan/UBSan 与隔离 full 构建通过；`7d14833` 已推送并核对 origin/main，ADC 与实物交互待验收 |
-| HW-03 | 可选光敏与硬件使用说明 | 实现与专项已验证；光敏 ADC1、平滑调光/手动上限/熄屏与异常回退；接线/配置及舵机保护同步 | 主机/LVGL/ASan/UBSan、default/full 通过；其余预设及本项 CI 正在核对，实物待验收 |
+| HW-03 | 可选光敏与硬件使用说明 | 软件已验证；光敏 ADC1、平滑调光/手动上限/熄屏与异常回退；接线/配置及舵机保护同步 | `acec2a5` 已推送并核对；本地五预设、主机/LVGL/ASan/UBSan、远程 CI 七任务全绿，实物待验收 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -205,4 +205,11 @@ HW-03（2026-11-15）：新增默认关闭的模拟光敏扩展（GPIO7，ADC1�
 
 先验证缺失光敏接口的失败反馈，再实现公开调光策略；暗端收敛测试发现 1% 死区会停在 16%，随后修复边界收敛，固定暗端/手动上限/熄屏/异常/时钟回绕检查通过。`bash tools/ci/test_host.sh`、`bash tools/ci/test_ui_host.sh`（10/10）及两入口 `PET_HOST_SANITIZE=1` 均退出 0，新增 BSP 五种组合覆盖摇杆独立、光敏独立、同时开启、均关闭及反相。原 servo/外部确认/消息/语音检查保持通过。契约 14 schema/1 profile/12 examples/2 extensions、19 组件无环、生成物、build CLI 4 项、Bash/差异与本地文档链接均通过。
 
-ESP-IDF v6.1 的 `python tools/build_matrix.py --all --build-root firmware/build-matrix-hw03 --ota-public-key firmware/build-hardware-check/ota-test-public.der --execute --jobs 4` 已完成 default/full，余下 off/tones/duplex 继续核对；本次来源和产物在忽略目录。default 应用 2,859,824 B，实际 nm 未见温湿度 init/start、光敏采样/ADC 或舵机启动符号，UI/菜单存在。全部构建为未签名测试产物，未烧录、未擦除、未采集真实音频或 ADC、未移动舵机；不能代替整机、声学、电源、背光或长期验收。本项远程 CI 随提交另行核对。
+ESP-IDF v6.1 的 `python tools/build_matrix.py --all --build-root firmware/build-matrix-hw03 --ota-public-key firmware/build-hardware-check/ota-test-public.der --execute --jobs 4` 已完成 default/full/off/tones/duplex 五预设，全部退出 0；本次来源和产物在忽略目录。default 应用 2,859,824 B，实际 nm 未见温湿度 init/start、光敏采样/ADC 或舵机启动符号，UI/菜单存在。全部构建为未签名测试产物，未烧录、未擦除、未采集真实音频或 ADC、未移动舵机；不能代替整机、声学、电源、背光或长期验收。本项远程 CI 随提交另行核对。
+
+
+HW-01–03 最终交付：实现分别为 `e034310`、`7d14833`、`acec2a5`，均已正常推送并逐次核对 origin/main。最终本地五预设均退出 0，应用大小 default/full/off/tones/duplex 分别为 2,859,824 / 3,632,096 / 225,760 / 2,902,752 / 2,886,544 B；每预设 6 个实际产物的大小/SHA256、源码清单与当前提交一致。default/off 不含温湿度/光敏/ADC 采样符号，full 含对应传感器符号；full 的 servo GPIO=-1 使启动调用及函数仍被裁剪，属于预期的非激活检查。一次将 full 预期误设为应有 servo 启动符号的验证断言失败，核对实际 GPIO=-1 与组合根后修正验证预期，未改动保护逻辑。
+
+[远程 CI 43717383447](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43717383447) 绑定 `acec2a5`，7 个 job 全部 success；五个固件预设构建与产物归档通过，full 的 ASan/UBSan 主机、协议、WSS、SR/DSP 与真实 LVGL 步骤通过。此前 `e034310` 与 `7d14833` 的运行被后续 push 取消，不计为成功；最终成功覆盖其累计源码。后续仅回填 docs，不改变已验证的源码、构建开关、工具或产物。14 份本轮改动文档的本地链接均可解析，契约/依赖/生成物/差异检查再核对通过。
+
+本轮硬件基线与可选输入的软件工作已完成；真实模块安装、背光驱动电路、麦克风/扬声器声学、ADC 方向与噪声、电源、舵机机械校准及实机长稳未验收。没有烧录、擦除、真实采集/消息/舵机动作或真实部署；ACC-01/ACC-02、二期与后续范围不因此自动完成。

@@ -85,3 +85,6 @@ idf.py -C firmware -B "$PWD/firmware/build-hardware" \
 ## 验证边界
 
 本轮只构建和执行主机验证，不烧录、不擦除设备。真实按键、ADC、电源、背光、声学、舵机限位及长期稳定性仍须按实物验收。历史 `firmware/sdkconfig` 可能保留旧显式开关；发行基线使用隔离 `default` 预设，不覆盖开发者现有配置。
+
+
+本轮软件验证：默认无扩展与 full 扩展组合、off/tones/duplex 五预设均完成 ESP-IDF v6.1 构建；主机/BSP 五种组合、输入/调光状态机与真实 LVGL 10 项及 ASan/UBSan 通过。[远程 CI](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43717383447) 绑定 `acec2a5`，7 个任务成功。此记录不代表实物接线或功能已验收，详细证据见 [18](18-requirements-and-progress.md)。
