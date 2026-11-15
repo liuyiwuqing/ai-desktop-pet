@@ -30,6 +30,14 @@ python3 "${repo_root}/tools/ci/test_voice_simulator.py"
 python3 "${repo_root}/tools/ci/test_sr_models.py"
 python3 "${repo_root}/tools/ci/test_control_gateway.py"
 
+build_and_run test_event_bus \
+    -I "${repo_root}/firmware/tests/host/support/event_bus" \
+    -I "${repo_root}/firmware/tests/host/support/ai_agent" \
+    -I "${repo_root}/firmware/tests/host/support" -I "${contracts_inc}" \
+    -I "${repo_root}/firmware/components/core/include" \
+    "${repo_root}/firmware/components/core/src/event_bus.c" \
+    "${repo_root}/firmware/tests/host/test_event_bus.c"
+
 build_and_run test_setup_policy \
     -I "${repo_root}/firmware/tests/host/support" \
     -I "${repo_root}/firmware/components/svc_setup/include" \

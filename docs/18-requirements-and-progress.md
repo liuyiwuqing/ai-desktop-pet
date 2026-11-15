@@ -33,6 +33,7 @@
 | HW-06 | 手机热点配网与小智官方连接配置 | 已实现独立 SoftAP/HTTP/LCD 设置、Wi-Fi-only/分组 CAS、菜单重开与离线退出、官方绑定/WSS 保存；见 [28](28-device-web-setup.md) | `317ad8f` 已推送，远程 CI 七任务通过；主机/ASan/UBSan、10 项 LVGL、手机浏览器、隔离构建通过；用户手机配网保存成功，设备取得官方 WSS 配置并正常重启联网/对时。真实语音暴露 HW-07 |
 | HW-07 | 首次真实语音连接与音频验证 | 已修正 WSS 栈/TLS 内存与公网发送/首包时序；用户确认真实回答正常且结束无错误，设备对应 32 包上行/73 包下行、105,120 个真实播放采样、IDLE/DRAINED | `5aecf0b` 已推送，远程 CI 七任务通过；WSS ASan/UBSan、隔离 default 与维护构建、烧录回读通过；剩余栈最小 16,404 B，音频/NVS 错误 0；连续失败继续见 HW-08，长稳/声学仍待验收 |
 | HW-08 | 连续语音、显示与输入实时预算 | 已实现并通过本地/实机：4 KiB 片内优先阈值、`-O2`、语音页按变化刷新及 DMA 余量诊断；隐私/超时保护保留 | 用户确认最终固件 5 轮全正常；USB 记录 7 轮 IDLE/DRAINED、显示失败 0；主机、LVGL/ASan/UBSan、隔离 default/维护构建与烧录回读通过。长回答欠载 24 次单列，长稳/OTA 待验收；提交与 CI 见末尾 |
+| HW-09 | 待机崩溃进入恢复模式 | 已修复并通过本地/实机：事件任务改为通知唤醒、持续优先扫描，避免过期 Queue Set 通知导致任务返回；恢复与存档保护保留 | 用户确认主页/3 轮完整回答；同一会话连续观察 5 分钟、5 轮 DRAINED，0 崩溃/重启/恢复锁定；主机/ASan/UBSan、default/维护构建和烧录回读通过。播放欠载单列，长期稳定性待验收；推送/CI 见末尾 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -280,3 +281,15 @@ HW-08（2026-11-16）：连续语音存在两类失败。修改前已捕捉 `esp
 最终去探针版本实机：用户明确确认“5 轮全部正常，无跳主页或错误”；同一连续 USB 会话实际记录 7 轮 IDLE/DRAINED，258 包上行/1,384 包下行，共提交 1,992,960 个 24 kHz 采样（约 83.04 秒）。显示失败 0、最大帧 100 ms；采样所见片内最少 33,519 B、连续 DMA 最少 21,504 B，WSS 栈最少剩余 16,316 B。WSS error/cleanupError、音频 error、MCP/NVS failures 均为 0；较长回答期间播放缓冲欠载计数 24，零填充后仍正常完成，不写成音频零欠载。端到端识别/回答/播放结束与用户听感已覆盖；不据此宣称 24h/7d、所有公网抖动、AEC/声学打断、掉电或 OTA 通过。
 
 HW-08 推送：`9bb1b37a01f7286ef43dfaa1ed0714ecedfba5f0` 已正常推送，并通过 `git ls-remote origin refs/heads/main` 核对远程包含该提交。对应 [43735670225](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43735670225) 当前运行中，不将既往 CI 成功沿用到本次 `-O2`/分配/绘制变更。USB 连续采样已关闭、端口释放，最后为 IDLE/DRAINED，设备继续独立运行。
+
+HW-08 CI 补查：[43735670225](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43735670225) 七任务均已成功，仍不替代待机长稳；用户随后反馈待机进入恢复，单列 HW-09，不将短时间连续语音通过扩张为整机稳定。
+
+HW-09（2026-11-16）：用户确认无人操作待机自动进入恢复模式。初次 USB 只读诊断确认 `active=true/failures=3`，运行 ELF SHA256 `94f55d9e0e889d2688b5913f412b573b65b236831f4fee6c15f68287b776121d` 与已烧维护 ELF 完全匹配；该维护配置关闭持久 coredump，没有事前转储。保存原 ELF/日志后，通过原 `PET_RECOVERY_CLEAR` 仅清 RTC 恢复标记并受控重启，不清空 NVS。持续 USB 监测复现三次 `IllegalInstruction`，PC `0x4204f88d`、回溯 `0x4204f88a`；使用匹配 ELF 的 addr2line/objdump 定位为 `event_bus_task` 函数尾部返回，随后再次锁入恢复。
+
+最小主机复现使用真实 `event_bus.c` 与 SDK 边界替身：发布多个不同优先级事件，处理完后应继续阻塞等待，旧实现在残留 Queue Set 成员上读到空队列并返回，断言退出 134。当前 SDK 文档明确要求先 `select` 返回某成员再读取该成员，不能直接遍历读成员后保留其通知。改为成功入队后唤醒专属任务，数据仅取自原四条队列，空/合并通知重新扫描，不让分发任务返回。回归覆盖 500 轮空闲再唤醒、空扫描与等待之间发布、优先级/FIFO、32 条容量与各优先级满队列计数；普通全量主机检查已退出 0。
+
+`PET_HOST_SANITIZE=1 ASAN_OPTIONS=detect_leaks=0 bash tools/ci/test_host.sh` 全量检查退出 0，包含新增真实分发器回归；契约与 20 组件依赖无环检查通过。维护 SDK 构建退出 0，应用 3,203,680 B、SHA256 `64a9514932d0ac3308a209b01eb1eb4100af38cf19ee96d3dbf2040654a9a52d`，ELF SHA256 `59761e347361387df2886b294b1c3b11cc36c15beeff37cea3d4516e49c46451`。原恢复标记通过现有维护命令解除后，仅写 `0x20000`，独立回读摘要匹配；bootloader/分区表/OTA 初值/模型仍与已烧基线逐字节一致，没有擦除或写入 NVS 配置。
+
+隔离 default 构建 `python3 tools/build_matrix.py --profile default --build-root firmware/build-matrix-hw09 --jobs 3 --execute` 退出 0，应用 2,955,200 B、SHA256 `47454e4a449c4d89c573a30fd6c16731a408e725f4c3861005c1c942e7e0a335`；来源与实际产物逐项复核匹配。修正版首次启动通过 30 秒连续健康窗口，恢复 `active=false/healthy=true/failures=0`；同一串口会话继续观察至少 5 分钟，不把短启动成功写成长期稳定。
+
+实机验收：用户明确确认“主页正常，3 轮完整回答”；同一 USB 会话自动检查至 uptime 300,178 ms（481 次诊断采样），期间 0 panic、0 非预期重启，恢复持续 `active=false/healthy=true/failures=0`，已记录 5 轮 IDLE/DRAINED；显示失败 0、最大帧 94 ms，WSS/音频 error 为 0。较长回答期间播放缓冲欠载计数为 2，未把它写成全音频零欠载。只证明本次 5 分钟运行、待机和已记录轮次；不替代 24h/7d、掉电、实际 BOOT 双长按恢复或 OTA 回滚。原恢复流程未更改，使用 USB 清 RTC 标记后启动修正版，没有用关闭恢复保护绕过问题。

@@ -14,7 +14,6 @@ static const UBaseType_t s_depths[PET_EVENT_PRIORITY_COUNT] = {
 };
 
 static QueueHandle_t s_queues[PET_EVENT_PRIORITY_COUNT];
-static QueueSetHandle_t s_queue_set;
 static TaskHandle_t s_task;
 static pet_event_handler_t s_handlers[PET_EVT_COUNT][PET_EVENT_MAX_HANDLERS];
 static uint8_t s_handler_count[PET_EVT_COUNT];
@@ -29,32 +28,22 @@ static void event_bus_destroy(void)
             s_queues[priority] = NULL;
         }
     }
-    if (s_queue_set != NULL) {
-        vQueueDelete(s_queue_set);
-        s_queue_set = NULL;
-    }
 }
 
 /* 高优先级先出队；同一优先级保持 FIFO。 */
-static bool receive_next(pet_event_t *event)
+static void receive_next(pet_event_t *event)
 {
-    for (int priority = PET_EVENT_PRIORITY_COUNT - 1; priority >= 0; priority--) {
-        if (xQueueReceive(s_queues[priority], event, 0) == pdTRUE) {
-            return true;
+    for (;;) {
+        for (int priority = PET_EVENT_PRIORITY_COUNT - 1; priority >= 0; priority--) {
+            if (xQueueReceive(s_queues[priority], event, 0) == pdTRUE) {
+                return;
+            }
         }
+        /* Queue Set 必须先 select 再读对应队列，与跨队列优先读取不兼容。
+         * 通知只唤醒拥有者，队列才是数据来源；合并/迟到通知后重新扫描。
+         * 发布发生在扫描和等待之间时，保留的通知让等待立即返回。 */
+        (void)ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     }
-
-    QueueSetMemberHandle_t member = xQueueSelectFromSet(s_queue_set, portMAX_DELAY);
-    if (member == NULL) {
-        return false;
-    }
-
-    for (int priority = PET_EVENT_PRIORITY_COUNT - 1; priority >= 0; priority--) {
-        if (member == (QueueSetMemberHandle_t)s_queues[priority]) {
-            return xQueueReceive(s_queues[priority], event, 0) == pdTRUE;
-        }
-    }
-    return false;
 }
 
 static void event_bus_task(void *arg)
@@ -62,7 +51,8 @@ static void event_bus_task(void *arg)
     (void)arg;
     pet_event_t event;
 
-    while (receive_next(&event)) {
+    for (;;) {
+        receive_next(&event);
         for (uint8_t i = 0; i < s_handler_count[event.id]; i++) {
             s_handlers[event.id][i](&event);
         }
@@ -71,20 +61,14 @@ static void event_bus_task(void *arg)
 
 esp_err_t pet_event_bus_init(void)
 {
-    if (s_queue_set != NULL) {
+    if (s_task != NULL) {
         return ESP_OK;
-    }
-
-    s_queue_set = xQueueCreateSet(PET_EVENT_QUEUE_DEPTH);
-    if (s_queue_set == NULL) {
-        return ESP_ERR_NO_MEM;
     }
 
     for (int priority = 0; priority < PET_EVENT_PRIORITY_COUNT; priority++) {
         s_queues[priority] =
             xQueueCreate(s_depths[priority], sizeof(pet_event_t));
-        if (s_queues[priority] == NULL ||
-            xQueueAddToSet(s_queues[priority], s_queue_set) != pdPASS) {
+        if (s_queues[priority] == NULL) {
             event_bus_destroy();
             return ESP_ERR_NO_MEM;
         }
@@ -116,7 +100,7 @@ esp_err_t pet_event_bus_publish(const pet_event_t *event)
     if (!pet_event_is_valid(event)) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (s_queue_set == NULL) {
+    if (s_task == NULL) {
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -128,6 +112,7 @@ esp_err_t pet_event_bus_publish(const pet_event_t *event)
         return ESP_ERR_NO_MEM;
     }
 
+    (void)xTaskNotifyGive(s_task);
     return ESP_OK;
 }
 
