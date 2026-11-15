@@ -34,7 +34,7 @@
 | HW-07 | 首次真实语音连接与音频验证 | 已修正 WSS 栈/TLS 内存与公网发送/首包时序；用户确认真实回答正常且结束无错误，设备对应 32 包上行/73 包下行、105,120 个真实播放采样、IDLE/DRAINED | `5aecf0b` 已推送，远程 CI 七任务通过；WSS ASan/UBSan、隔离 default 与维护构建、烧录回读通过；剩余栈最小 16,404 B，音频/NVS 错误 0；连续失败继续见 HW-08，长稳/声学仍待验收 |
 | HW-08 | 连续语音、显示与输入实时预算 | 已实现并通过本地/实机：4 KiB 片内优先阈值、`-O2`、语音页按变化刷新及 DMA 余量诊断；隐私/超时保护保留 | 用户确认最终固件 5 轮全正常；USB 记录 7 轮 IDLE/DRAINED、显示失败 0；主机、LVGL/ASan/UBSan、隔离 default/维护构建与烧录回读通过。长回答欠载 24 次单列，长稳/OTA 待验收；提交与 CI 见末尾 |
 | HW-09 | 待机崩溃进入恢复模式 | 已修复并通过本地/实机：事件任务改为通知唤醒、持续优先扫描，避免过期 Queue Set 通知导致任务返回；恢复与存档保护保留 | 用户确认主页/3 轮完整回答；同一会话连续观察约 6 分钟、8 轮 DRAINED，0 崩溃/重启/恢复锁定；主机/ASan/UBSan、default/维护构建和烧录回读通过。播放欠载单列，长期稳定性待验收；推送/CI 见末尾 |
-| HW-10 | 基础硬件“小爱同学”语音唤醒 | 已实现并完成初步实机验收；固定双模型、缓存/PSRAM 预算、延迟重建，PTT 与隐私/恢复保护保留 | 自动连续 3 轮通过；用户确认人声 2 轮+BOOT 1 轮均正常，无闪屏/卡住；本地主机/ASan/UBSan、10 项 LVGL、voice/default 构建通过。待机/提交/CI 见末尾 |
+| HW-10 | 基础硬件“小爱同学”语音唤醒 | 已实现并完成初步实机验收；固定双模型、缓存/PSRAM 预算、延迟重建，PTT 与隐私/恢复保护保留 | 自动连续 3 轮通过；用户确认人声 2 轮+BOOT 1 轮均正常，无闪屏/卡住；本地主机/ASan/UBSan、10 项 LVGL、voice/default 构建通过。同一会话约五分钟无重启/显示失败，已推送 `3eacd00`；远程 CI 运行中，见末尾 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -318,8 +318,12 @@ HW-10（2026-11-16）：基础硬件“小爱同学”语音唤醒已实现并�
 实机交付：
 
 - 已保留原 PTT 应用/ELF/sdkconfig，实际只读备份整个 1 MiB 模型分区，SHA256 `60d8edcc64359ba1347e9419ba515357f78e707098646ffe3086cba0a1190a9e`；不读取/导出凭据。生成包、日志和备份仅在忽略目录。
-- 最终应用 3,548,528 B、SHA256 `a5a943a98f5776a1d8a84f22b83e3b311187dda61cc071c1ec486e252bc4822c`，匹配 ELF SHA256 `71c649b3566e6a3335ce6c5ce70f67a778f454c4e2d631d9bf1c571150473421`；双模型 579,215 B、SHA256 `8f859601e0873438fa57553e648f25db5d64ce3ec2ba966a707e7d27ef8cd5cb`，应用 `0x20000` 与模型 `0xe20000` 独立回读匹配，未写 NVS，原 Wi-Fi/小智/成长保留。
+- 最终应用 3,548,528 B、SHA256 `a5a943a98f5776a1d8a84f22b83e3b311187dda61cc071c1ec486e252bc4822c`，匹配 ELF SHA256 `71c649b3566e6a3335ce6c5ce70f67a778f454c4e2d631d9bf1c571150473421`；双模型 579,215 B、SHA256 `8f859601e0873438fa57553e648f25db5d64ce3ec2ba966a707e7d27ef8cd5cb`，应用 `0x20000` 与模型 `0xe20000` 独立回读匹配，烧录未覆盖 NVS，原 Wi-Fi/小智/成长保留。
 - 同一 USB 会话电脑播词 3 轮（turn 2/3/4）均通过，显示失败/播放欠载 0，最大显示 76 ms、前端回调 44 ms；没有用录音文件或模拟成功响应替代真实设备收发。最后一轮结束时 227 包上行/768 包下行，用户另确认两轮人声唤醒+一轮 BOOT 均正常；USB 实际观测轮次与用户确认分别记录。
 - 启动未完成联网对时时曾触发一次失败，因此音频最近错误保留 `-1`，不声称所有启动阶段 error 为 0；完成对时后自动三轮 WSS error/cleanupError/MCP failures 为 0。使用说明明确等首页时间正常后再对话。当前半双工，无播放中声学打断；长距离识别率、物理静音延迟、OTA/掉电与 24h/7d 未验收。
 
-前置 HW-09 的 [43739157271](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43739157271) 已核对七个 job 全部成功；不沿用为 HW-10 证据。HW-10 当前保持同一会话继续待机观察，提交/推送及远程 CI 随后追加。
+前置 HW-09 的 [43739157271](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43739157271) 已核对七个 job 全部成功；不沿用为 HW-10 证据。HW-10 的最终待机、推送与远程 CI 结果见下文。
+
+HW-10 最终记录：同一 USB 会话观察至 uptime 317,023 ms（491 次诊断采样），0 panic/非预期重启、0 显示失败、0 播放欠载；恢复 `active=false/healthy=true/failures=0`，前端 13,383 次处理、最大 44 ms，显示最大 76 ms。采样所见内部空闲最少 12,383 B、连续 DMA 最大块最少 3,072 B；A4 栈最少剩余 4,412 B、WSS 栈 18,788 B。自动记录 3 个 WAKE/DRAINED 轮次和 1,105,920 个真实播放采样，用户另外确认人声与 PTT 三轮正常。仅证明本次约五分钟及已测试轮次；不能替代长稳或识别率验收。IDLE/DRAINED 后关闭监视器，`lsof /dev/cu.usbmodem1201` 无占用，设备继续独立运行。
+
+实现提交 `3eacd00c07db527e2aa663cdd6897f11aa7ff5ce` 已正常推送，并以 `git ls-remote origin refs/heads/main` 核对远程一致。对应 [43744450764](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43744450764) 已启动：两项辅助检查成功，default/voice/full/off/tones/duplex 六个固件 job 仍在构建；不宣称本项远程 CI 已全部通过。
