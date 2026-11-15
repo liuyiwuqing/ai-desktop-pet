@@ -343,6 +343,22 @@ config PET_EXT_JOYSTICK
       available and is still required for message/control/recovery confirmation.
       This is explicit configuration, not automatic hot-plug detection.
 
+config PET_EXT_LIGHT_SENSOR
+    bool "Enable optional ambient-light backlight control"
+    depends on PET_MODULE_UI_ENABLED
+    default n
+    help
+      3.3V analog light module AO on ADC1 GPIO7. Samples every 500 ms;
+      smooths relative light without claiming lux calibration. User brightness
+      remains a ceiling, 0 stays off, errors restore manual brightness.
+      Requires an active-high PWM backlight driver on GPIO42. Disabled by
+      default; recovery never reads this optional sensor.
+
+config PET_LIGHT_SENSOR_INVERT
+    bool "Invert light sensor (raw voltage falls as light increases)"
+    depends on PET_EXT_LIGHT_SENSOR
+    default n
+
 config PET_JOYSTICK_INVERT_X
     bool "Invert joystick X axis"
     depends on PET_EXT_JOYSTICK

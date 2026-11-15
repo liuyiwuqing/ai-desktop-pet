@@ -26,8 +26,8 @@
 | 编号 | 工作项 | 状态与证据 | 后续动作 |
 | --- | --- | --- | --- |
 | HW-01 | 发行硬件与扩展基线 | 软件已验证；DHT11 默认关闭、菜单跳过、功放 LRC 改为 GPIO40，保留内部板型身份；见 [27](27-hardware-and-input.md) | 主机、10 项 LVGL、隔离 default 构建通过；`e034310` 已推送并核对 origin/main，实物待验收 |
-| HW-02 | 可选摇杆菜单输入 | 软件已验证；BOOT 保留、显式启用、方向与确认/返回、回中/消抖/连发及采样故障保护 | 主机、10 项 LVGL、ASan/UBSan 与隔离 full 构建通过；提交/推送另核对，ADC 与实物交互待验收 |
-| HW-03 | 可选光敏与硬件使用说明 | 本轮待实现；光敏按需启用、舵机沿用既有限位/arm | 补齐接线/配置与边界；不烧录或驱动设备 |
+| HW-02 | 可选摇杆菜单输入 | 软件已验证；BOOT 保留、显式启用、方向与确认/返回、回中/消抖/连发及采样故障保护 | 主机、10 项 LVGL、ASan/UBSan 与隔离 full 构建通过；`7d14833` 已推送并核对 origin/main，ADC 与实物交互待验收 |
+| HW-03 | 可选光敏与硬件使用说明 | 实现与专项已验证；光敏 ADC1、平滑调光/手动上限/熄屏与异常回退；接线/配置及舵机保护同步 | 主机/LVGL/ASan/UBSan、default/full 通过；其余预设及本项 CI 正在核对，实物待验收 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -199,3 +199,10 @@ HW-01（2026-11-15）：按用户新要求调整基础发行硬件与可选扩�
 HW-02（2026-11-15）：二维摇杆采用 ADC1 GPIO4/5 与 SW GPIO6，显式开关默认关闭。先从缺失公开导航接口的编译失败建立反馈，再实现回中门控、消抖、上下限速连发、左右单次、正反向菜单及按住说话；生成器拒绝 ADC2 与跨模块冲突，启用 DHT11 的自定义 GPIO 与摇杆冲突时编译拒绝。BOOT 始终可用，消息已读、外部确认和恢复仍只接受 BOOT；初始化失败回退 BOOT，采样错误取消旧摇杆手势。板型 profile 新增可选 `joystick`（缺省 false），同步生成 TypeScript 契约。
 
 本项 `bash tools/ci/test_host.sh`、`bash tools/ci/test_ui_host.sh`（10/10）、`check_contracts.py`、`check_deps.py`、`board_codegen.py --check`、`test_board_codegen.py`、`test_build_matrix.py`（4/4）、Bash 语法与差异检查均退出 0。新增公开输入滤波/菜单及真实 BSP GPIO/ADC 边界故障测试通过，导航/菜单 ASan+UBSan 通过。已查看真实 LVGL 的摇杆成长菜单和语音菜单 PNG，布局断言在 240×320 内。ESP-IDF v6.1 的 `python tools/build_matrix.py --profile full --build-root firmware/build-matrix-hw02 --ota-public-key firmware/build-hardware-check/ota-test-public.der --execute --jobs 4` 退出 0，实际启用摇杆/DHT11，舵机 GPIO=-1，产物/源码证据在忽略目录。没有跑完整 UI FreeRTOS 任务端到端或真实 ADC/按键/显示；未烧录或擦除，未执行真实语音、舵机、外部消息。
+
+
+HW-03（2026-11-15）：新增默认关闭的模拟光敏扩展（GPIO7，ADC1），与摇杆共享同一 ADC1 实例；显式启用后按相对亮度平滑调光，手动亮度保留为上限、0 保持熄屏，采样错误恢复手动值。恢复界面从不读取可选光敏；舵机继续默认关闭、GPIO=-1、显式 arm/限位/急停。补齐 [27](27-hardware-and-input.md) 的全套接线、配置、独立构建与物理边界。新 profile 可选 `lightSensor` 缺省 false，同步生成 TypeScript。
+
+先验证缺失光敏接口的失败反馈，再实现公开调光策略；暗端收敛测试发现 1% 死区会停在 16%，随后修复边界收敛，固定暗端/手动上限/熄屏/异常/时钟回绕检查通过。`bash tools/ci/test_host.sh`、`bash tools/ci/test_ui_host.sh`（10/10）及两入口 `PET_HOST_SANITIZE=1` 均退出 0，新增 BSP 五种组合覆盖摇杆独立、光敏独立、同时开启、均关闭及反相。原 servo/外部确认/消息/语音检查保持通过。契约 14 schema/1 profile/12 examples/2 extensions、19 组件无环、生成物、build CLI 4 项、Bash/差异与本地文档链接均通过。
+
+ESP-IDF v6.1 的 `python tools/build_matrix.py --all --build-root firmware/build-matrix-hw03 --ota-public-key firmware/build-hardware-check/ota-test-public.der --execute --jobs 4` 已完成 default/full，余下 off/tones/duplex 继续核对；本次来源和产物在忽略目录。default 应用 2,859,824 B，实际 nm 未见温湿度 init/start、光敏采样/ADC 或舵机启动符号，UI/菜单存在。全部构建为未签名测试产物，未烧录、未擦除、未采集真实音频或 ADC、未移动舵机；不能代替整机、声学、电源、背光或长期验收。本项远程 CI 随提交另行核对。

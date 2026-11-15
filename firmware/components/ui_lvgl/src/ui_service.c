@@ -15,6 +15,9 @@
 #include "message_view.h"
 #include "ui_owner.h"
 #include "svc_focus/api.h"
+#if CONFIG_PET_EXT_LIGHT_SENSOR
+#include "pet/hal/ambient_light.h"
+#endif
 #if CONFIG_PET_EXT_DEVICE_CONTROL
 #include "pet_ext/control_service.h"
 #include "control_confirmation.h"
@@ -76,6 +79,12 @@ typedef struct {
     bool settings_valid;
     uint32_t home_updated_ms, feedback_until_ms;
     const char *feedback;
+#if CONFIG_PET_EXT_LIGHT_SENSOR
+    pet_ambient_filter_t ambient_filter;
+    uint32_t ambient_sampled_ms;
+    uint16_t ambient_raw;
+    bool ambient_sampled, ambient_valid;
+#endif
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
     pet_growth_input_t growth_input;
     pet_navigation_filter_t navigation_filter;
@@ -132,8 +141,30 @@ static void flush(lv_display_t *display, const lv_area_t *area, uint8_t *pixels)
     lv_display_flush_ready(display);
 }
 
+static uint8_t brightness(ui_context_t *ui)
+{
+    const uint8_t requested = ui->settings.config.brightness;
+#if CONFIG_PET_EXT_LIGHT_SENSOR
+    const uint32_t now = now_ms();
+    if (requested && ui->panel->ambient_read &&
+        (!ui->ambient_sampled || now - ui->ambient_sampled_ms >= 500)) {
+        const bool was_valid = ui->ambient_valid;
+        ui->ambient_valid = ui->panel->ambient_read(&ui->ambient_raw) == ESP_OK;
+        if (!ui->ambient_valid && (!ui->ambient_sampled || was_valid))
+            ESP_LOGW(TAG, "ambient light unavailable; restoring manual brightness");
+        ui->ambient_sampled = true;
+        ui->ambient_sampled_ms = now;
+    }
+    return pet_ambient_brightness(&ui->ambient_filter, ui->ambient_raw,
+        ui->ambient_valid, now, requested);
+#else
+    return requested;
+#endif
+}
+
 static bool refresh(ui_context_t *ui)
 {
+    const uint8_t applied_brightness = brightness(ui);
     ui->frame_failed = false;
     ui->strips = 0;
     ui->frame_started_ms = now_ms();
@@ -143,8 +174,8 @@ static bool refresh(ui_context_t *ui)
     if (elapsed>metrics.max_frame_ms) metrics.max_frame_ms=elapsed;
     portEXIT_CRITICAL(&metrics_lock);
     if (ui->frame_failed || elapsed > 100 ||
-        ui->settings.config.brightness == 0 ||
-        ui->panel->backlight(ui->settings.config.brightness) != ESP_OK) {
+        applied_brightness == 0 ||
+        ui->panel->backlight(applied_brightness) != ESP_OK) {
         ui->panel->backlight(0);
         ui->display_healthy = false;
         portENTER_CRITICAL(&metrics_lock);++metrics.failed_frames;portEXIT_CRITICAL(&metrics_lock);

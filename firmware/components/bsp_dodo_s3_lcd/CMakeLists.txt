@@ -5,6 +5,7 @@ idf_component_register(
         "src/bsp_display.c"
         "src/bsp_input.c"
         "src/bsp_analog.c"
+        "src/bsp_light.c"
         "src/bsp_pins.c"
     PRIV_INCLUDE_DIRS
         "private_include"

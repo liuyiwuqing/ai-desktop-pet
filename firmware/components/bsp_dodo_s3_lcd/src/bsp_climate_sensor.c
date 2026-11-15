@@ -10,6 +10,10 @@ _Static_assert(CONFIG_PET_CLIMATE_DHT11_GPIO != PET_BOARD_JOYSTICK_X &&
                CONFIG_PET_CLIMATE_DHT11_GPIO != PET_BOARD_JOYSTICK_SELECT,
                "DHT11 GPIO conflicts with the enabled joystick");
 #endif
+#if CONFIG_PET_EXT_LIGHT_SENSOR && !CONFIG_PET_CLIMATE_FAKE_SENSOR
+_Static_assert(CONFIG_PET_CLIMATE_DHT11_GPIO != PET_BOARD_LIGHT_GPIO,
+               "DHT11 GPIO conflicts with the enabled light sensor");
+#endif
 
 #if CONFIG_PET_CLIMATE_FAKE_SENSOR
 

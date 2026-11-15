@@ -50,7 +50,33 @@ DHT11 / KY-015：VCC→3V3，GND→GND，DATA→GPIO15，DATA 用 10kΩ 上拉�
 
 BOOT 始终保留。消息已读、外部控制确认和恢复重启继续要求 BOOT；摇杆方向不合成物理确认。开机、采样失败或弹窗抢占后，需要回中且松开 100 ms 才重新接受摇杆；方向消抖 30 ms，上下按住 400 ms 后每 160 ms 连发，左右不连发。采样错误使当前摇杆手势失效，BOOT 可继续操作；初始化失败则本次启动只使用 BOOT。不支持通过浮空电压推断模块热插拔，接线后显式启用并重启。
 
-光敏的配置与使用随本轮后续工作项补充，不将引脚预留当成驱动已完成。
+光敏模块：使用 3.3V 模拟输出模块（KY-018 类或带 AO 的光敏板），VCC→3V3、GND→GND、AO/S→GPIO7（ADC1）。DO 不作为模拟输入，不能把 5V 输出直接接 ADC。`CONFIG_PET_EXT_LIGHT_SENSOR=y` 启用相对亮度调光；如果光越亮电压越低，启用 `CONFIG_PET_LIGHT_SENSOR_INVERT=y`。默认关闭，板型 profile 的可选 `features.lightSensor` 缺省 false。
+
+正常 UI 刷新时以 500 ms 为最小间隔采样，与摇杆共享一个 ADC1 实例；实际周期受刷新调度影响。使用 EMA 和每步最多 5 个百分点的渐变，目标为 15%–100%；手动 `brightness` 始终是上限，低于 15% 时以上限为准，0 始终熄屏。读数错误或无适配器时回退手动值；不写入 NVS，不将相对 ADC 数值声称为 lux。恢复 UI 不采样光敏。使用此功能必须先确认 GPIO42 接的是高电平有效的背光驱动，BLK 固定供电的屏幕无法调光。
+
+舵机建议将 GPIO2 留作 PWM 扩展位（未启用时不输出），与摇杆和光敏不冲突。仍须按具体型号配置供电、角度和速度；`PET_SERVO_GPIO=-1` 与未 arm 的保护保持不变，不因接线而自动启动。
+
+## 选择扩展并构建
+
+| 配置 | 默认值 | 启用效果 |
+| --- | --- | --- |
+| `PET_MODULE_CLIMATE_ENABLED` | n | GPIO15 的 DHT11 采集、菜单与环境联动 |
+| `PET_EXT_JOYSTICK` | n | GPIO4/5/6 的二维摇杆菜单输入 |
+| `PET_EXT_LIGHT_SENSOR` | n | GPIO7 的光敏采样与背光调节 |
+| `PET_EXT_SERVO` | n | 编译舵机；另需 GPIO、限位与 arm |
+
+激活 ESP-IDF 6.1 后，在仓库根目录用独立配置打开菜单：
+
+```sh
+idf.py -C firmware -B "$PWD/firmware/build-hardware" \
+  -D SDKCONFIG="$PWD/firmware/build-hardware/sdkconfig" \
+  -D "SDKCONFIG_DEFAULTS=$PWD/firmware/sdkconfig.defaults;$PWD/firmware/profiles/default.defaults" \
+  menuconfig
+```
+
+在 `PET modules` / `PET extensions` 中只开启已安装的模块。保存后用相同参数将最后的 `menuconfig` 换为 `build`。该目录由手工配置拥有，不交给 `build_matrix.py` 复用。`default` 隔离预设保证所有扩展关闭；`full` 是软件适配器检查预设，会开启温湿度、摇杆和光敏，并编译 GPIO=-1 的舵机，不应当作无需配置的烧录包。
+
+已有 `firmware/sdkconfig` 的显式值不会被默认值悄悄覆盖；使用上面的独立目录，或主动在 menuconfig 调整原配置。没有新增热插拔协议、自动旧配置迁移或服务端硬件开关。
 
 ## 默认按键
 

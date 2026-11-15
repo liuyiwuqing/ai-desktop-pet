@@ -172,6 +172,9 @@ const pet_display_t *pet_bsp_display(void)
         .init = init,
         .write = write_pixels,
         .backlight = backlight,
+#if CONFIG_PET_EXT_LIGHT_SENSOR
+        .ambient_read = pet_bsp_ambient_read,
+#endif
     };
     return &display;
 }

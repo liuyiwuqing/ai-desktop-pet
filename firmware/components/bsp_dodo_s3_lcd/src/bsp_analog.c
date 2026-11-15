@@ -1,5 +1,5 @@
 #include "sdkconfig.h"
-#if CONFIG_PET_EXT_JOYSTICK
+#if CONFIG_PET_EXT_JOYSTICK || CONFIG_PET_EXT_LIGHT_SENSOR
 #include "bsp_analog.h"
 #include "esp_adc/adc_oneshot.h"
 

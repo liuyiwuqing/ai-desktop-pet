@@ -8,6 +8,7 @@
   },
   "input": {"boot": 0, "joystick": {"x": 4, "y": 5, "select": 6}},
   "climate": {"dht11": 15},
+  "light": {"gpio": 7},
   "audio": {
     "mic": {"i2s": 0, "bclk": 16, "ws": 17, "din": 18},
     "speaker": {"i2s": 1, "bclk": 21, "ws": 40, "dout": 39}

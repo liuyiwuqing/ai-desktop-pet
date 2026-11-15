@@ -10,7 +10,7 @@
 - `ci/build_firmware.sh`：依赖图检查 → 契约校验 → 主机测试 → `idf.py build` → `idf.py size` → 小智协议/codec、WSS 与模型前端边界主机测试。
 - `ci/check_deps.py`：组件依赖图无环。
 - `ci/check_contracts.py`：schema、profiles、examples、扩展 manifest、生成产物一致性。
-- `ci/test_host.sh`：契约、温湿度、消息解析/队列/存储、展示状态机、成长规则/事务/时钟、动画调度、音频 PCM/FIFO/录放音、显式并行诊断/隐私取消与 I²S 边界故障、AI 会话/CLI 及扩展的主机测试。
+- `ci/test_host.sh`：可选摇杆/光敏的真实 BSP GPIO/ADC 适配器（独立/组合/关闭/反相）、回中/菜单导航/按住说话与调光策略；契约、温湿度、消息解析/队列/存储、展示状态机、成长规则/事务/时钟、动画调度、音频 PCM/FIFO/录放音、显式并行诊断/隐私取消与 I²S 边界故障、AI 会话/CLI 及扩展的主机测试。
 - `simulate_growth.sh`：用主机 C 编译器运行同一套成长服务；可互动、推进时间、查看成就、注入环境（`climate 温度 湿度`）、模拟失效/断流（`climate-off` / `climate-loss`）、持久保存和重启恢复，不需要 ESP-IDF 或硬件。用法见 `docs/04-growth-game.md` G1/G3/G5/G6。
 - `simulate_voice.sh`：用主机 C 编译器运行同一套 AI 会话引擎；注入唤醒、合成 PCM、响应/播放完成与错误，演练端点、手动打断、静音及旧轮次。`wait` 不生成静音，输出 actions 仅为控制意图，无实际录音、网络或播放。用法见 `docs/01-ai-agent.md` A2；`ci/test_voice_simulator.py` 已纳入主机测试。
 - `ci/test_host.sh` 中的 `test_ai_runtime`：运行单一拥有者边界测试，验证 sink 动作顺序、WakeNet/VAD 注入、旧帧预检与音频/传输端口失败回送；替身不代表真实模型、FreeRTOS 或 I²S。

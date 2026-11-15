@@ -63,4 +63,13 @@ for field, pin in (("x", 13), ("y", 0), ("select", 39), ("select", 15)):
         pass
     else:
         raise AssertionError(f"accepted invalid joystick.{field}={pin}")
-print("board codegen: audio/joystick wiring, ADC1 and cross-peripheral conflicts passed")
+for pin in (13, 4, 15, 18, True):
+    invalid = copy.deepcopy(board)
+    invalid["light"]["gpio"] = pin
+    try:
+        generate(invalid)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"accepted invalid light.gpio={pin}")
+print("board codegen: audio/joystick/light wiring, ADC1 and cross-peripheral conflicts passed")

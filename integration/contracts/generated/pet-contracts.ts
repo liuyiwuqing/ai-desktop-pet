@@ -88,6 +88,7 @@ export interface DeviceProfileFeatures {
   deviceControl: boolean;
   servo: boolean;
   joystick?: boolean;
+  lightSensor?: boolean;
 }
 
 export interface DeviceProfile {

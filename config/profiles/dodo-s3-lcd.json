@@ -8,6 +8,7 @@
     "growth": true,
     "deviceControl": false,
     "servo": false,
-    "joystick": false
+    "joystick": false,
+    "lightSensor": false
   }
 }

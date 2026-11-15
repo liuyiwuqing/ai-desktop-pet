@@ -41,6 +41,10 @@
         "joystick": {
           "type": "boolean",
           "default": false
+        },
+        "lightSensor": {
+          "type": "boolean",
+          "default": false
         }
       }
     }

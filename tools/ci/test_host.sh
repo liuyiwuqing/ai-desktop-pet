@@ -324,13 +324,29 @@ build_and_run test_navigation \
     "${repo_root}/firmware/components/pet_hal/src/navigation.c" \
     "${repo_root}/firmware/tests/host/test_navigation.c"
 
-build_and_run test_bsp_input \
+build_and_run test_ambient_light \
+    -I "${hal_inc}" \
+    "${repo_root}/firmware/components/pet_hal/src/ambient_light.c" \
+    "${repo_root}/firmware/tests/host/test_ambient_light.c"
+
+for variant in both joystick light neither inverted; do
+    input_flags=()
+    case "${variant}" in
+        joystick) input_flags=(-DCONFIG_PET_EXT_LIGHT_SENSOR=0) ;;
+        light) input_flags=(-DCONFIG_PET_EXT_JOYSTICK=0) ;;
+        neither) input_flags=(-DCONFIG_PET_EXT_JOYSTICK=0 -DCONFIG_PET_EXT_LIGHT_SENSOR=0) ;;
+        inverted) input_flags=(-DCONFIG_PET_JOYSTICK_INVERT_X=1 -DCONFIG_PET_JOYSTICK_INVERT_Y=1 -DCONFIG_PET_LIGHT_SENSOR_INVERT=1) ;;
+    esac
+build_and_run "test_bsp_input_${variant}" \
+    ${input_flags[@]+"${input_flags[@]}"} \
     -I "${repo_root}/firmware/tests/host/support/input_bsp" \
     -I "${repo_root}/firmware/tests/host/support" -I "${hal_inc}" -I "${contracts_inc}" \
     -I "${repo_root}/firmware/components/bsp_dodo_s3_lcd/private_include" \
     "${repo_root}/firmware/components/bsp_dodo_s3_lcd/src/bsp_input.c" \
     "${repo_root}/firmware/components/bsp_dodo_s3_lcd/src/bsp_analog.c" \
+    "${repo_root}/firmware/components/bsp_dodo_s3_lcd/src/bsp_light.c" \
     "${repo_root}/firmware/tests/host/test_bsp_input.c"
+done
 
 build_and_run test_growth_input \
     -I "${hal_inc}" \

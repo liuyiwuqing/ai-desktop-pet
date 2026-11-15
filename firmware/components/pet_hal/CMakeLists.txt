@@ -10,6 +10,7 @@ idf_component_register(
         "src/audio_pcm.c"
         "src/climate_decode.c"
         "src/navigation.c"
+        "src/ambient_light.c"
         "src/fake_climate_sensor.c"
     INCLUDE_DIRS
         "include"
