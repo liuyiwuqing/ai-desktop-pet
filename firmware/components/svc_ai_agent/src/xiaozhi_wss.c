@@ -648,7 +648,8 @@ esp_err_t pet_xz_wss_start(const pet_xz_wss_config_t *config, pet_ai_transport_t
 {
     if (transport == NULL || !valid_config(config)) return ESP_ERR_INVALID_ARG;
     if (service != NULL) return ESP_ERR_INVALID_STATE; /* 组合根单一启动。 */
-    wss_owner_t *owner = heap_caps_malloc(sizeof(*owner), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    /* 控制报文、凭据和编解码暂存由任务访问，无内部/DMA 需求。 */
+    wss_owner_t *owner = heap_caps_malloc(sizeof(*owner), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (owner == NULL) return ESP_ERR_NO_MEM;
     memset(owner, 0, sizeof(*owner));
     memcpy(owner->uri, config->uri, strlen(config->uri) + 1);

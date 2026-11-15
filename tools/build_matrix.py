@@ -12,7 +12,7 @@ import sys
 
 ROOT=Path(__file__).resolve().parents[1]
 FW=ROOT/'firmware'
-PROFILES=('default','full','off','tones','duplex')
+PROFILES=('default','voice','full','off','tones','duplex')
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def invoke(command,**options):return subprocess.run(command,check=True,**options)
@@ -142,6 +142,10 @@ def main():
             'default':{'CONFIG_PET_AI_XIAOZHI_ON_BOOT':'n','CONFIG_PET_MODULE_AUDIO_ENABLED':'y',
                 'CONFIG_PET_MODULE_UI_ENABLED':'y','CONFIG_PET_MODULE_CLIMATE_ENABLED':'n','CONFIG_PET_EXT_SERVO':'n',
                 'CONFIG_PET_EXT_JOYSTICK':'n','CONFIG_PET_EXT_LIGHT_SENSOR':'n'},
+            'voice':{'CONFIG_PET_AI_XIAOZHI_ON_BOOT':'y','CONFIG_PET_AI_ESP_SR_ENABLED':'y',
+                'CONFIG_PET_MODULE_AUDIO_ENABLED':'y','CONFIG_PET_MODULE_UI_ENABLED':'y',
+                'CONFIG_PET_MODULE_CLIMATE_ENABLED':'n','CONFIG_PET_EXT_DEVICE_CONTROL':'n',
+                'CONFIG_PET_EXT_SERVO':'n','CONFIG_PET_EXT_JOYSTICK':'n','CONFIG_PET_EXT_LIGHT_SENSOR':'n'},
             'full':{'CONFIG_PET_AI_ESP_SR_ENABLED':'y','CONFIG_PET_OTA_ENABLED':'y','CONFIG_PET_EXT_SERVO':'y',
                 'CONFIG_PET_EXT_JOYSTICK':'y','CONFIG_PET_EXT_LIGHT_SENSOR':'y'}}[entry['profile']]
         for default in (FW/'sdkconfig.defaults',FW/'profiles'/f"{entry['profile']}.defaults"):

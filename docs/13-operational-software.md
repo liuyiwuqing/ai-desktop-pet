@@ -28,11 +28,11 @@ python tools/build_matrix.py --profile default
 python tools/build_matrix.py --all --ota-public-key /absolute/path/public.der --execute --jobs 2
 ```
 
-预设为 default、full、off、tones，以及 SW-07-A 新增的维护用 duplex；最后一项显式启动有限并行音频诊断，见 [22](22-audio-duplex-diagnostic.md)。full 编译 SR/DSP、维护、两种扩展、OTA 和崩溃诊断/恢复，GPIO=-1 且仍需物理校准授权。full 必须显式提供 RSA-3072 PKCS#1 公钥 DER。默认 OTA 根地址为 `.invalid`，测试钥与测试镜像不得当生产发布。其他预设可加 `--diagnostics` 单独启用崩溃功能；该参数与音频启动诊断是不同开关。
+预设为 default、voice、full、off、tones，以及维护用 duplex；最后一项显式启动有限并行音频诊断，见 [22](22-audio-duplex-diagnostic.md)。full 编译 SR/DSP、维护、两种扩展、OTA 和崩溃诊断/恢复，GPIO=-1 且仍需物理校准授权。full 必须显式提供 RSA-3072 PKCS#1 公钥 DER。默认 OTA 根地址为 `.invalid`，测试钥与测试镜像不得当生产发布。其他预设可加 `--diagnostics` 单独启用崩溃功能；该参数与音频启动诊断是不同开关。
 
 实际构建后生成 `build-evidence.json`（版本、Git 基线/变更文件清单、输入/源码及配套镜像/ELF 哈希、配置、SDK 与编译器）和 `dependency-licenses.json`（锁定依赖、声明许可证和许可证文件哈希）。变更清单描述相对 HEAD 的整个工作区状态，不将本轮修改与原有未提交修改混为一次提交。`NOASSERTION` 表示没有可直接读取的 SPDX 声明，需人工核对列出的许可证文本；清单不是法律结论或漏洞扫描。离线签名发布仍使用现有 `package_release.py`，构建脚本不签名、不烧录、不上传。
 
-`.github/workflows/software.yml` 使用固定的 ESP-IDF 容器 digest 和 Actions commit，各预设隔离执行；full 运行主机、协议、WSS、DSP 与 LVGL 检查。产物标记为未签名测试输出，保留 7 天。原四预设已多次远程通过，具体提交与运行见 [18](18-requirements-and-progress.md)；新增第五预设结果单独记录。不包含同级 CORE、真实云端或硬件验收。
+`.github/workflows/software.yml` 使用固定的 ESP-IDF 容器 digest 和 Actions commit，各预设隔离执行；full 运行主机、协议、WSS、DSP 与 LVGL 检查。产物标记为未签名测试输出，保留 7 天。原四预设已多次远程通过，具体提交与运行见 [18](18-requirements-and-progress.md)；duplex 和 voice 的新增预设结果单独记录。不包含同级 CORE、真实云端或硬件验收。
 
 ## 崩溃诊断与 USB 恢复
 
@@ -86,3 +86,14 @@ CORE 版本仍为 `0.1.0-SNAPSHOT`，最终 JAR 为 26,285,010 B，SHA256 为 `1
 2026-11-13 远程 CI 补充：Git 所有权修复后的运行已完成 full 目标编译，主机检查发现 `message_store_codec.c` 使用非 ISO C17 的 `strnlen`。以标准 C 有界扫描替换；现有存储编码/解码/版本夹具在受限 POSIX 声明环境通过。未改存储格式；远程主机入口是否全通过以后续运行结果为准。
 
 同日第三次远程执行进一步确认四种目标编译均通过；full 主机入口发现消息服务的 BSD `strlcpy`。三处改为标准 C 格式化复制，本地完整消息服务检查通过；消息存储与服务主机用例显式限制 POSIX 声明，防止 macOS 的扩展接口掩盖兼容性问题。
+
+## 基础硬件语音唤醒预设（HW-10）
+
+`voice` 只需要 ESP32-S3 N16R8、ST7789、INMP441、MAX98357A 与喇叭。启用小智开机服务、固定 `wn9_xiaoaitongxue`（“小爱同学”）和 `vadnet1_medium`，保留 BOOT 按住说话；温湿度、摇杆、光敏、舵机和远程控制均关闭，无需 OTA 签名钥。`voice` 使用 32 KiB 指令缓存、64 B 数据缓存行，将小对象优先内部堆阈值设为 512 B；A4 PCM/文本和 WSS 报文暂存使用 PSRAM，任务栈与 DMA 仍使用内部内存。待机本地检测，唤醒后发起云端对话；静音、免打扰及播放期间停止采集，半双工不支持播报中的声学打断。
+
+```bash
+source <ESP-IDF-6.1>/export.sh
+python3 tools/build_matrix.py --profile voice --build-root firmware/build-matrix-voice --jobs 3 --execute
+```
+
+构建不烧录，也不内置网络凭据。首次使用可通过热点设置 Wi-Fi 和小智服务。应用必须与该构建的 `srmodels/srmodels.bin` 配套，固定模型分区为 `0xe20000/0x100000`；不能只写应用后沿用无模型或其他唤醒词的旧模型包。维护记录与实机验收见 [当前台账](18-requirements-and-progress.md)。

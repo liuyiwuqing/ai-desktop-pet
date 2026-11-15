@@ -34,6 +34,7 @@
 | HW-07 | 首次真实语音连接与音频验证 | 已修正 WSS 栈/TLS 内存与公网发送/首包时序；用户确认真实回答正常且结束无错误，设备对应 32 包上行/73 包下行、105,120 个真实播放采样、IDLE/DRAINED | `5aecf0b` 已推送，远程 CI 七任务通过；WSS ASan/UBSan、隔离 default 与维护构建、烧录回读通过；剩余栈最小 16,404 B，音频/NVS 错误 0；连续失败继续见 HW-08，长稳/声学仍待验收 |
 | HW-08 | 连续语音、显示与输入实时预算 | 已实现并通过本地/实机：4 KiB 片内优先阈值、`-O2`、语音页按变化刷新及 DMA 余量诊断；隐私/超时保护保留 | 用户确认最终固件 5 轮全正常；USB 记录 7 轮 IDLE/DRAINED、显示失败 0；主机、LVGL/ASan/UBSan、隔离 default/维护构建与烧录回读通过。长回答欠载 24 次单列，长稳/OTA 待验收；提交与 CI 见末尾 |
 | HW-09 | 待机崩溃进入恢复模式 | 已修复并通过本地/实机：事件任务改为通知唤醒、持续优先扫描，避免过期 Queue Set 通知导致任务返回；恢复与存档保护保留 | 用户确认主页/3 轮完整回答；同一会话连续观察约 6 分钟、8 轮 DRAINED，0 崩溃/重启/恢复锁定；主机/ASan/UBSan、default/维护构建和烧录回读通过。播放欠载单列，长期稳定性待验收；推送/CI 见末尾 |
+| HW-10 | 基础硬件“小爱同学”语音唤醒 | 已实现并完成初步实机验收；固定双模型、缓存/PSRAM 预算、延迟重建，PTT 与隐私/恢复保护保留 | 自动连续 3 轮通过；用户确认人声 2 轮+BOOT 1 轮均正常，无闪屏/卡住；本地主机/ASan/UBSan、10 项 LVGL、voice/default 构建通过。待机/提交/CI 见末尾 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -297,3 +298,28 @@ HW-09（2026-11-16）：用户确认无人操作待机自动进入恢复模式�
 HW-09 推送：`6f2cb31a509ab3437baafd50e695eaa10b1d8044` 已正常推送，并通过 `git ls-remote origin refs/heads/main` 核对远程分支包含该提交。对应 [43739157271](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43739157271) 当前运行中；不把 HW-08 已成功的 CI 沿用到本项事件总线修改。
 
 最终采样在 uptime 372,237 ms、IDLE/DRAINED 后关闭并释放串口；同一会话共记录 8 轮完整结束，628 包上行/1,080 包下行、1,555,200 个 24 kHz 播放采样（64.8 秒）。0 panic/非预期重启/显示失败，恢复锁与失败计数均为 0；显示最大帧 94 ms，WSS error/cleanupError、音频 error、MCP/NVS failures 均为 0。播放缓冲欠载累计 20，较长回答仍完整结束；采样所见片内最少 22,371 B、连续 DMA 最少 12,800 B，WSS 栈最少剩余 16,296 B。设备继续独立运行，原始日志/ELF/固件仅留忽略目录。远程 CI 七项中两项已通过，五个固件预设仍在构建，本次交付不宣称远程 CI 已完成。
+
+HW-10（2026-11-16）：基础硬件“小爱同学”语音唤醒已实现并完成初步实机验收，后续待机/远程结果继续记录。用户确认最新版本两轮人声唤醒与一轮 BOOT 按住说话全部完整回答，无闪屏/卡住；独立的电脑播词连续三轮也全部通过，三个轮次记录 `WAKE→SILENCE→RESPONSE→DRAINED`，无需按键。以下事实分别标明自动记录与人工确认，不把短测写作 24h/7d 稳定性。
+
+实现与根因：
+
+- 新增 `voice` 预设，只启用基础硬件、小智开机服务、固定 `wn9_xiaoaitongxue` 与 `vadnet1_medium`、维护/恢复；扩展、DSP/AEC、OTA 关闭。PTT、静音/DND、播放停采集与原 100 ms 显示/断流保护保留；加入独立构建和 CI。
+- 首次实机连续三次 `LoadProhibited`，匹配 ELF 定位 `dl_convq_queue_bzero→WakeNet model_clean→reset_frontend`，EXCVADDR `0x10`；首次 reset 及已推理后的 reset 均能触发。固定 SDK 的 clean 不再调用，reset 清残帧/VAD 标签并使旧历史失效，下次空闲检测前用公开 destroy/create 重建；重建失败则停止检测并释放。同步重建会拖慢唤醒后的录音窗口，已移至空闲准备阶段。
+- 加模型后内部堆约 17 KB、DMA 最大块不足 2 KB；`voice` 使用 512 B 内部优先阈值，A4 PCM/文本与 WSS 报文暂存移到 PSRAM，任务栈/DMA 保持内部内存。显示/模型共享缓存导致预算争用，`voice` 使用 32 KiB 指令缓存、64 B 数据缓存行，数据缓存保持 32 KiB；依据[官方性能指南](https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/performance/speed.html)，仍以实测为验收。
+- 分核与内部 9,600 B 绘图缓冲实验均未通过，分别见过 437 ms 和 113 ms，已全部撤回；没有通过提高 100 ms 阈值或关闭保护掩盖问题。临时耗时探针已移除。
+
+软件验证：
+
+- `python3 tools/ci/test_build_matrix.py`：新 voice CLI 先因不支持预设失败，修改后 5 项通过；默认计划不写文件、不烧录、不需要 OTA 钥。
+- `PET_HOST_SANITIZE=1 ASAN_OPTIONS=detect_leaks=0 bash tools/ci/test_sr_frontend_host.sh`：旧 clean 边界回归先退出 134，修正后通过；覆盖新建后 reset、模式/残帧、恢复空闲重建、重建失败后封闭失败与资源回收。真实 SDK 头文件，推理边界替身，不能替代上板。
+- `PET_HOST_SANITIZE=1 ASAN_OPTIONS=detect_leaks=0 bash tools/ci/test_host.sh`、`IDF_PATH=/Users/lywq/esp/v6.1/esp-idf PET_HOST_SANITIZE=1 ASAN_OPTIONS=detect_leaks=0 bash tools/ci/test_ai_wss_host.sh`、`bash tools/ci/test_ui_host.sh` 均退出 0，LVGL 10 项通过；契约 14 schemas/1 profile/12 examples/2 extensions 与依赖 20 components 检查通过。
+- ESP-IDF v6.1 `python3 tools/build_matrix.py --profile voice --build-root firmware/build-matrix-hw10d --execute --jobs 2` 退出 0，源码清单/产物摘要已独立重算匹配。default 回归也退出 0；本轮没有在本机重复所有六预设，远程 CI 单独记录。构建为未签名测试产物。
+
+实机交付：
+
+- 已保留原 PTT 应用/ELF/sdkconfig，实际只读备份整个 1 MiB 模型分区，SHA256 `60d8edcc64359ba1347e9419ba515357f78e707098646ffe3086cba0a1190a9e`；不读取/导出凭据。生成包、日志和备份仅在忽略目录。
+- 最终应用 3,548,528 B、SHA256 `a5a943a98f5776a1d8a84f22b83e3b311187dda61cc071c1ec486e252bc4822c`，匹配 ELF SHA256 `71c649b3566e6a3335ce6c5ce70f67a778f454c4e2d631d9bf1c571150473421`；双模型 579,215 B、SHA256 `8f859601e0873438fa57553e648f25db5d64ce3ec2ba966a707e7d27ef8cd5cb`，应用 `0x20000` 与模型 `0xe20000` 独立回读匹配，未写 NVS，原 Wi-Fi/小智/成长保留。
+- 同一 USB 会话电脑播词 3 轮（turn 2/3/4）均通过，显示失败/播放欠载 0，最大显示 76 ms、前端回调 44 ms；没有用录音文件或模拟成功响应替代真实设备收发。最后一轮结束时 227 包上行/768 包下行，用户另确认两轮人声唤醒+一轮 BOOT 均正常；USB 实际观测轮次与用户确认分别记录。
+- 启动未完成联网对时时曾触发一次失败，因此音频最近错误保留 `-1`，不声称所有启动阶段 error 为 0；完成对时后自动三轮 WSS error/cleanupError/MCP failures 为 0。使用说明明确等首页时间正常后再对话。当前半双工，无播放中声学打断；长距离识别率、物理静音延迟、OTA/掉电与 24h/7d 未验收。
+
+前置 HW-09 的 [43739157271](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43739157271) 已核对七个 job 全部成功；不沿用为 HW-10 证据。HW-10 当前保持同一会话继续待机观察，提交/推送及远程 CI 随后追加。

@@ -66,4 +66,21 @@ class MatrixPlanTests(unittest.TestCase):
             self.assertNotIn('flash',command)
             self.assertFalse(output.exists())
 
+    def test_voice_plan_needs_no_ota_key_and_never_flashes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/'output'
+            result=subprocess.run([sys.executable,str(ROOT/'tools/build_matrix.py'),'--profile','voice',
+                '--build-root',str(output)],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            plan=json.loads(result.stdout)
+            self.assertFalse(plan['executed'])
+            command=plan['builds'][0]['command']
+            self.assertIn('-DSDKCONFIG='+str((output/'voice/sdkconfig').resolve()),command)
+            defaults=next(v for v in command if v.startswith('-DSDKCONFIG_DEFAULTS='))
+            self.assertIn(str(ROOT/'firmware/profiles/voice.defaults'),defaults)
+            self.assertNotIn('full.defaults',defaults)
+            self.assertNotIn('ota.defaults',defaults)
+            self.assertNotIn('flash',command)
+            self.assertFalse(output.exists())
+
 if __name__=='__main__':unittest.main()

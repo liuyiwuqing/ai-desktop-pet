@@ -24,6 +24,7 @@ typedef struct {
     unsigned mode;
     uint64_t last_ms;
     bool have_time;
+    bool wake_used, wake_pending_reset, vad_used;
     pet_ai_activity_t activity;
     /* 唤醒和会话 VAD 互斥，共享一个有界缓冲；不保存调用方 PCM。 */
     int16_t pcm[MAX_MODEL_SAMPLES];
@@ -95,7 +96,7 @@ static pet_ai_port_result_t open_frontend(void *context)
     state->wake = esp_wn_handle_from_name(wake_name);
     state->vad = esp_vadn_handle_from_name(vad_name);
     if (state->wake == NULL || state->vad == NULL || !state->wake->create || !state->vad->create ||
-        !state->wake->detect || !state->vad->detect || !state->wake->clean || !state->vad->clean ||
+        !state->wake->detect || !state->vad->detect || !state->vad->clean ||
         !state->wake->destroy || !state->vad->destroy || !state->wake->get_samp_chunksize ||
         !state->vad->get_samp_chunksize || !state->wake->get_samp_rate || !state->vad->get_samp_rate ||
         !state->wake->get_channel_num || !state->vad->get_channel_num) goto fail;
@@ -124,8 +125,11 @@ static pet_ai_port_result_t reset_frontend(void *context)
     pet_ai_sr_t *frontend = context;
     if (frontend == NULL || frontend->state == NULL) return PET_AI_PORT_INVALID;
     sr_state_t *state = frontend->state;
-    state->wake->clean(state->wake_data);
-    state->vad->clean(state->vad_data);
+    if (state->wake_data == NULL || state->vad_data == NULL) return PET_AI_PORT_FAILED;
+    /* WakeNet9 clean 在实机访问空队列；下次空闲检测前重建实例。
+     * 重建不能占用唤醒后的录音启动窗口，也不拖慢隐私/取消清理。 */
+    state->wake_pending_reset |= state->wake_used;
+    if (state->vad_used) state->vad->clean(state->vad_data);
     state->fill = state->mode = 0;
     state->have_time = false;
     state->activity = PET_AI_ACTIVITY_SILENCE;
@@ -140,11 +144,18 @@ static pet_ai_port_result_t process(pet_ai_sr_t *frontend, const int16_t *pcm, s
     if (frontend == NULL || frontend->state == NULL || pcm == NULL ||
         samples != PET_AUDIO_CAPTURE_SAMPLES) return PET_AI_PORT_INVALID;
     sr_state_t *state = frontend->state;
+    if (state->wake_data == NULL || state->vad_data == NULL) return PET_AI_PORT_FAILED;
     if (state->have_time && now <= state->last_ms) return PET_AI_PORT_INVALID;
     const unsigned mode = wake ? 1 : 2;
     if (mode != state->mode || (state->have_time && now - state->last_ms > PET_AI_FRAME_GAP_MS)) {
-        (void)reset_frontend(frontend);
+        if (reset_frontend(frontend) != PET_AI_PORT_OK) return PET_AI_PORT_FAILED;
         state->mode = mode;
+    }
+    if (wake && state->wake_pending_reset) {
+        state->wake->destroy(state->wake_data);
+        state->wake_data = state->wake->create(WAKE_MODEL, DET_MODE_95);
+        state->wake_used = state->wake_pending_reset = false;
+        if (state->wake_data == NULL) return PET_AI_PORT_FAILED;
     }
     state->last_ms = now;
     state->have_time = true;
@@ -160,11 +171,13 @@ static pet_ai_port_result_t process(pet_ai_sr_t *frontend, const int16_t *pcm, s
         if (state->fill != chunk) continue;
         if (wake) {
             const wakenet_state_t result = state->wake->detect(state->wake_data, state->pcm);
+            state->wake_used = true;
             if (result != WAKENET_NO_DETECT && result != WAKENET_DETECTED &&
                 result != WAKENET_CHANNEL_VERIFIED) return PET_AI_PORT_FAILED;
             *detected |= result == WAKENET_DETECTED;
         } else {
             const vad_state_t result = state->vad->detect(state->vad_data, state->pcm);
+            state->vad_used = true;
             if (result != VAD_SPEECH && result != VAD_SILENCE) return PET_AI_PORT_FAILED;
             speech |= result == VAD_SPEECH;
             classified = true;

@@ -658,7 +658,8 @@ esp_err_t pet_ai_agent_start(const pet_ai_agent_config_t *config)
         ((config->frontend.open == NULL) != (config->frontend.close == NULL)))
         return ESP_ERR_INVALID_ARG;
     if (agent != NULL) return ESP_ERR_INVALID_STATE; /* 组合根启动，不并发调用 start。 */
-    agent_t *owner = heap_caps_malloc(sizeof(*owner), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    /* PCM/预缓冲/文本不由 ISR 或 DMA 直接访问；内部堆留给 I2S、任务栈和 TLS DMA。 */
+    agent_t *owner = heap_caps_malloc(sizeof(*owner), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (owner == NULL) return ESP_ERR_NO_MEM;
     memset(owner, 0, sizeof(*owner));
     owner->config = *config;

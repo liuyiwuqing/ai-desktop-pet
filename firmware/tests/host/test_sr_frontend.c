@@ -17,6 +17,7 @@ static srmodel_list_t models = {.num = 2, .model_name = model_names};
 static esp_partition_t partition = {.size = 0x100000};
 static uint8_t flash[64];
 static unsigned allocations, loaded, live, mappings, wake_detections;
+static bool vad_used;
 static const char *failure = "";
 static bool failing(const char *name) { return strcmp(failure, name) == 0; }
 
@@ -74,14 +75,24 @@ static model_iface_data_t *create_vad_model(const void *name, vad_mode_t mode, i
     assert(strcmp(name, model_names[1]) == 0 && mode == VAD_MODE_1 && channels == 1);
     assert(speech == 32 && silence == 32);
     if (failing("vad-create")) return NULL;
+    vad_used = false;
     ++live;
     return (model_iface_data_t *)&vad_token;
 }
 static int chunk(model_iface_data_t *value) { return failing("chunk") ? 1008 : value == (void *)&wake_token ? 480 : 512; }
 static int rate(model_iface_data_t *value) { (void)value; return failing("rate") ? 8000 : 16000; }
 static int channels(model_iface_data_t *value) { (void)value; return failing("channels") ? 2 : 1; }
-static void clean(model_iface_data_t *value) { assert(value == (void *)&wake_token || value == (void *)&vad_token); }
-static void destroy(model_iface_data_t *value) { clean(value); assert(live); --live; }
+static void clean(model_iface_data_t *value)
+{
+    /* 固定 WakeNet9 的 clean 在首次及已推理后的 reset 均访问空队列。 */
+    assert(value == (void *)&vad_token && vad_used);
+}
+static void destroy(model_iface_data_t *value)
+{
+    assert(value == (void *)&wake_token || value == (void *)&vad_token);
+    assert(live);
+    --live;
+}
 static wakenet_state_t detect(model_iface_data_t *value, int16_t *pcm)
 {
     assert(value == (void *)&wake_token);
@@ -92,6 +103,7 @@ static wakenet_state_t detect(model_iface_data_t *value, int16_t *pcm)
 static vad_state_t classify(model_iface_data_t *value, int16_t *pcm)
 {
     assert(value == (void *)&vad_token && pcm);
+    vad_used = true;
     return VAD_SPEECH;
 }
 static const esp_wn_iface_t wake_iface = {
@@ -111,6 +123,7 @@ int main(void)
     pet_ai_runtime_frontend_t frontend = pet_ai_sr_frontend(&sr);
     assert(sr.state == NULL && allocations == 0 && loaded == 0);
     assert(frontend.open(frontend.context) == PET_AI_PORT_OK && mappings == 0);
+    assert(frontend.reset(frontend.context) == PET_AI_PORT_OK); /* Pristine models need no vendor clean. */
     int16_t pcm[320];
     for (unsigned i = 0; i < 320; ++i) pcm[i] = (int16_t)(i + 1);
     bool detected = true;
@@ -133,6 +146,12 @@ int main(void)
     /* gap 清掉上一个 20 ms 残帧及标签，不能和新的音频拼成模型帧。 */
     assert(frontend.classify_vad(frontend.context, pcm, 320, 1000, &activity) == PET_AI_PORT_OK);
     assert(activity == PET_AI_ACTIVITY_SILENCE);
+    /* 恢复空闲检测时重建成功；上一轮及 VAD 的残帧不得参与下一次唤醒。 */
+    for (unsigned i = 0; i < 320; ++i) pcm[i] = (int16_t)(i + 1);
+    assert(frontend.detect_wake(frontend.context, pcm, 320, 1020, &detected) == PET_AI_PORT_OK && !detected);
+    for (unsigned i = 0; i < 320; ++i) pcm[i] = (int16_t)(i + 321);
+    assert(frontend.detect_wake(frontend.context, pcm, 320, 1040, &detected) == PET_AI_PORT_OK && detected);
+    assert(wake_detections == 2 && live == 2);
     assert(frontend.close(frontend.context) == PET_AI_PORT_OK);
     assert(frontend.close(frontend.context) == PET_AI_PORT_OK);
     assert(sr.state == NULL && allocations == 0 && loaded == 0 && live == 0 && mappings == 0);
@@ -152,6 +171,15 @@ int main(void)
     partition.size = 0x100000;
     assert(frontend.open(frontend.context) == PET_AI_PORT_OK);
     assert(frontend.open(frontend.context) == PET_AI_PORT_INVALID);
+    for (unsigned i = 0; i < 320; ++i) pcm[i] = (int16_t)(i + 1);
+    assert(frontend.detect_wake(frontend.context, pcm, 320, 20, &detected) == PET_AI_PORT_OK);
+    for (unsigned i = 0; i < 320; ++i) pcm[i] = (int16_t)(i + 321);
+    assert(frontend.detect_wake(frontend.context, pcm, 320, 40, &detected) == PET_AI_PORT_OK);
+    failure = "wake-create";
+    /* 取消和进入 VAD 不能同步重建 WakeNet；失败须在恢复空闲检测时阻断。 */
+    assert(frontend.reset(frontend.context) == PET_AI_PORT_OK);
+    assert(frontend.classify_vad(frontend.context, pcm, 320, 60, &activity) == PET_AI_PORT_OK);
+    assert(frontend.detect_wake(frontend.context, pcm, 320, 80, &detected) == PET_AI_PORT_FAILED);
     assert(frontend.close(frontend.context) == PET_AI_PORT_OK && allocations == 0 && loaded == 0 && live == 0);
     puts("ESP-SR frontend: bounded PCM stitching and owner cleanup passed");
 }

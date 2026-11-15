@@ -608,7 +608,9 @@ UI 通过 `set_dnd`、`set_interrupted` 和单项 MUTE/UNMUTE 原子更新各自
 
 `svc_ai_agent/sr.h` 提供零初始化实例和前端工厂，固定使用 `wn9_xiaoaitongxue`（“小爱同学”）与 `vadnet1_medium`。ESP-SR 锁定为 2.5.5，通过公开模型接口调用；没有复制 03 的实现，也没有引入 AFE/AEC。官方 [更新记录](https://github.com/espressif/esp-sr/blob/master/CHANGELOG.md)记录了 IDF 6.1 兼容修复和 2.5.5 的镜像体积优化。
 
-唤醒词于 2026-11-12 按用户要求切换为内置“小爱同学”；构建项为 `CONFIG_SR_WN_WN9_XIAOAITONGXUE`，型号与文字对应关系同时核对了锁定 SDK 的 Kconfig/模型资源及官方 [WakeNet 说明](https://docs.espressif.com/projects/esp-sr/zh_CN/latest/esp32s3/wake_word_engine/README.html)。对话供应商、NVS `xiaozhi` 命名空间与 WSS 协议保持原接线。复用已有 `SDKCONFIG` 时须关闭先前唤醒模型再选新模型；仅追加 defaults 不会覆盖已有选项，同时打入旧模型会被固定双模型检查拒绝。
+唤醒词于 2026-11-12 按用户要求切换为内置“小爱同学”；构建项为 `CONFIG_SR_WN_WN9_XIAOAITONGXUE`，型号与文字对应关系同时核对了锁定 SDK 的 Kconfig/模型资源及官方 [WakeNet 说明](https://docs.espressif.com/projects/esp-sr/zh_CN/latest/esp32s3/wake_word_engine/README.html)。对话供应商、NVS `xiaozhi` 命名空间与 WSS 协议保持原有约定。复用已有 `SDKCONFIG` 时须关闭先前唤醒模型再选新模型；仅追加 defaults 不会覆盖已有选项，同时打入旧模型会被固定双模型检查拒绝。
+
+2026-11-16 实机更新：基础硬件新增 `voice` 构建预设（见 [13](13-operational-software.md)），用户已确认“小爱同学”可从主页唤醒并完整回答；连续使用的最终记录见 [18 HW-10](18-requirements-and-progress.md)。固定 ESP-SR 2.5.5 的 WakeNet9 `clean` 在本机重现空队列访问，reset 立即丢弃残帧/VAD 标签并使旧 WakeNet 历史失效，在恢复空闲检测时重建实例，避免阻塞录音启动；重建失败则停止并释放；VAD 清理、PCM 清零和原 100 ms 显示/隐私保护保留。A4 PCM/文本与 WSS 报文暂存移入 PSRAM，任务栈和 DMA 仍保留内部内存。`voice` 使用 32 KiB 指令缓存和 64 B 数据缓存行；保留原任务调度、PSRAM 绘图缓冲及刷新/隐私 100 ms 阈值。以下 A8 构建数字及当时未实机验证的边界为历史快照，不代表当前完成度。
 
 ### 显式启用与资源所有权
 
