@@ -68,7 +68,8 @@ void pet_growth_view_ui_show(pet_growth_view_ui_t *v, const pet_growth_view_t *s
     lv_obj_set_style_text_line_space(v->action, home ? 0 : 6, 0);
     lv_obj_set_y(v->footer, home ? 294 : 270);
     v->state = s ? s->state : PET_GROWTH_IDLE;
-    v->animate = home && s && s->time_ready && s->storage_ready;
+    /* 对时只门控成长结算；离线启动也应能看到宠物。 */
+    v->animate = home && s && s->storage_ready;
     if (!v->animate) pet_avatar_tick(&v->avatar, v->state, lv_tick_get(), false);
     pet_avatar_set_environment(&v->avatar, s ? (pet_growth_environment_t)s->environment : PET_GROWTH_ENV_NONE);
     lv_label_set_text(v->title, "NEXUS PET");

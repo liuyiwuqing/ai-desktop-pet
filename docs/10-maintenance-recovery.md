@@ -19,6 +19,10 @@ python3 tools/configure_device.py settings --file config/examples/device-config.
 
 首次配网准备权限 `600` 的私有 JSON 文件，再用 `provision --file <private.json> --revision <status返回值>`；字段见 [config](../config/README.md)。完整凭据包原子替换、不导出，已存在设备身份不能通过此入口更换。成功返回 `restartRequired=true`，由维护者另行重启。超时不能直接视为失败，应先读取 revision/状态。
 
+未配网的基础维护版可能显示“等待时间同步”，语音页显示“请先完成语音配置”。当前网络启动要求同时具备 Wi-Fi 与 MQTT 配置，取得 IP 后才启动 SNTP；真实对时前不结算成长，但主页仍应显示宠物。联网语音还要求私有包中的完整 `xiaozhi` 分组以及固件 `CONFIG_PET_AI_XIAOZHI_ON_BOOT=y`；只填写包或只开启编译开关都不能替代另一项。使用 WSS 传输不代表已完成供应商激活/协议验收。
+
+本机配置模板可放于 Git 忽略的 `data/device-setup/`，目录权限 `700`、JSON 权限 `600`；只在本机编辑，日志与提交不得包含密码/令牌。空字段模板不能作为完成配置的证据；提交凭据前应确认所有必填字段和 revision。填写后由维护者发送并显式重启，再分别检查 IP、SNTP、小智连接和真实对话。
+
 ## 成长备份与恢复
 
 ```bash

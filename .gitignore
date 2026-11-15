@@ -13,6 +13,7 @@ firmware/*.elf
 firmware/*.uf2
 
 # 本地配置与凭据
+/data/
 *.env
 *.local.json
 config/local/
