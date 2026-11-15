@@ -18,6 +18,7 @@ add_executable(test_message_view test_message_view.c
     "${PET_ROOT}/firmware/components/ui_lvgl/src/pet_avatar.c"
     "${PET_ROOT}/firmware/components/presentation/src/pet_motion.c")
 target_include_directories(test_message_view PRIVATE
+    "${PET_ROOT}/firmware/components/pet_hal/include"
     "${PET_ROOT}/firmware/components/contracts/include"
     "${PET_ROOT}/firmware/components/presentation/include"
     "${PET_ROOT}/firmware/components/ui_lvgl/src")

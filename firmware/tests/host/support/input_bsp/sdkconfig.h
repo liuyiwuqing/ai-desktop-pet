@@ -1,0 +1,3 @@
+#pragma once
+#define CONFIG_PET_MODULE_UI_ENABLED 1
+#define CONFIG_PET_EXT_JOYSTICK 1

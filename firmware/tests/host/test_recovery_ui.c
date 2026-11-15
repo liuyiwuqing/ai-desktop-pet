@@ -92,7 +92,7 @@ int main(int argc,char **argv)
 {
     assert(argc==2);scenario=argv[1];
     const pet_display_t panel={240,320,panel_init,panel_write,backlight};
-    const pet_button_input_t button={button_init,pressed};
+    const pet_button_input_t button={.init=button_init,.pressed=pressed};
     assert(pet_ui_recovery_start(NULL,&button,restart,&restarts)==ESP_ERR_INVALID_ARG);
     if(!strcmp(scenario,"allocation")||!strcmp(scenario,"task")) {
         fail_allocation=!strcmp(scenario,"allocation");fail_task=!strcmp(scenario,"task");

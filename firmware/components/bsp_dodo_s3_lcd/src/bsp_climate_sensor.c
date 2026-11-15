@@ -3,6 +3,13 @@
 #if CONFIG_PET_MODULE_CLIMATE_ENABLED
 
 #include "pet/hal/climate_sensor.h"
+#include "board_generated.h"
+#if CONFIG_PET_EXT_JOYSTICK && !CONFIG_PET_CLIMATE_FAKE_SENSOR
+_Static_assert(CONFIG_PET_CLIMATE_DHT11_GPIO != PET_BOARD_JOYSTICK_X &&
+               CONFIG_PET_CLIMATE_DHT11_GPIO != PET_BOARD_JOYSTICK_Y &&
+               CONFIG_PET_CLIMATE_DHT11_GPIO != PET_BOARD_JOYSTICK_SELECT,
+               "DHT11 GPIO conflicts with the enabled joystick");
+#endif
 
 #if CONFIG_PET_CLIMATE_FAKE_SENSOR
 

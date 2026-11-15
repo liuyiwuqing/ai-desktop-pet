@@ -140,8 +140,10 @@ def main():
             'duplex':{'CONFIG_PET_AUDIO_DIAGNOSTIC_ON_BOOT':'y','CONFIG_PET_AUDIO_DIAGNOSTIC_DUPLEX':'y',
                 'CONFIG_PET_MODULE_AI_ENABLED':'n'},
             'default':{'CONFIG_PET_AI_XIAOZHI_ON_BOOT':'n','CONFIG_PET_MODULE_AUDIO_ENABLED':'y',
-                'CONFIG_PET_MODULE_UI_ENABLED':'y','CONFIG_PET_MODULE_CLIMATE_ENABLED':'n','CONFIG_PET_EXT_SERVO':'n'},
-            'full':{'CONFIG_PET_AI_ESP_SR_ENABLED':'y','CONFIG_PET_OTA_ENABLED':'y','CONFIG_PET_EXT_SERVO':'y'}}[entry['profile']]
+                'CONFIG_PET_MODULE_UI_ENABLED':'y','CONFIG_PET_MODULE_CLIMATE_ENABLED':'n','CONFIG_PET_EXT_SERVO':'n',
+                'CONFIG_PET_EXT_JOYSTICK':'n'},
+            'full':{'CONFIG_PET_AI_ESP_SR_ENABLED':'y','CONFIG_PET_OTA_ENABLED':'y','CONFIG_PET_EXT_SERVO':'y',
+                'CONFIG_PET_EXT_JOYSTICK':'y'}}[entry['profile']]
         for default in (FW/'sdkconfig.defaults',FW/'profiles'/f"{entry['profile']}.defaults"):
             expected.update(config_values(default))
         if inputs['diagnostics']:expected.update(config_values(FW/'profiles/diagnostic.defaults'))

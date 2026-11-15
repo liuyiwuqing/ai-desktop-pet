@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "pet/growth.h"
+#include "pet/hal/navigation.h"
 enum {
     PET_GROWTH_MENU_ACHIEVEMENTS = PET_GROWTH_ACTION_COUNT,
     PET_GROWTH_MENU_CLIMATE,
@@ -25,7 +26,10 @@ typedef struct {
     bool initialized, raw, stable, armed, menu;
     bool voice_enabled, voice_only, voice_active, voice_ready;
     bool climate_enabled;
+    bool navigation_enabled;
     bool holding, press_voice;
 } pet_growth_input_t;
 /* AI 项复用同一个按键代次；被消息/显示故障遮挡后，必须重新松开再按。 */
 int pet_growth_input_update(pet_growth_input_t *input, bool pressed, bool blocked, uint32_t now);
+int pet_growth_input_navigate(pet_growth_input_t *input, pet_navigation_t direction,
+                             bool blocked, uint32_t now);

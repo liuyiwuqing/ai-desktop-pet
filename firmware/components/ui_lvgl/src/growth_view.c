@@ -126,7 +126,9 @@ void pet_growth_view_ui_show(pet_growth_view_ui_t *v, const pet_growth_view_t *s
         else lv_label_set_text(v->action, actions[choice]);
     } else if (feedback && *feedback) lv_label_set_text(v->action, feedback);
     else lv_label_set_text_fmt(v->action, "%u 条未读%s", unread, dnd ? " · 免打扰" : "");
-    lv_label_set_text(v->footer, input->menu && input->selection == PET_GROWTH_MENU_ACHIEVEMENTS ?
+    lv_label_set_text(v->footer, input->navigation_enabled ?
+                      (input->menu ? "上下选择 · 右确认 · 左返回" : "短按消息 · 右推菜单") :
+                      input->menu && input->selection == PET_GROWTH_MENU_ACHIEVEMENTS ?
                       "短按切换 · 长按返回" : input->menu ? "短按切换 · 长按执行" :
                       input->voice_enabled ? "短按消息 · 长按菜单" : "短按消息 · 长按互动");
 }

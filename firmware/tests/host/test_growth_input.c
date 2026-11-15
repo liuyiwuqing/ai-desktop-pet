@@ -19,6 +19,11 @@ int main(void)
         assert(base.selection != PET_GROWTH_MENU_CLIMATE);
     }
     assert(base.selection == PET_GROWTH_MENU_FOCUS);
+    assert(pet_growth_input_navigate(&base, PET_NAV_LEFT, false, 4000) == -1 && !base.menu);
+    assert(pet_growth_input_navigate(&base, PET_NAV_RIGHT, false, 4100) == -1 && base.menu);
+    pet_growth_input_navigate(&base, PET_NAV_DOWN, false, 4200);
+    assert(base.selection == PET_GROWTH_PET);
+    assert(pet_growth_input_navigate(&base, PET_NAV_RIGHT, false, 4300) == PET_GROWTH_PET && !base.menu);
 
     pet_growth_input_t p = {.climate_enabled = true};
     pet_growth_input_update(&p, false, false, 0);
@@ -92,5 +97,18 @@ int main(void)
     assert(p.selection == PET_GROWTH_MENU_RETURN);
     click(&p,6000,100);
     assert(p.selection==PET_GROWTH_MENU_AI_TALK);
+    /* Direction confirm cannot open the microphone; a fresh hold is required. */
+    assert(pet_growth_input_navigate(&p, PET_NAV_RIGHT, false, 6300) == -1 && p.menu && !p.holding);
+    assert(pet_growth_input_navigate(&p, PET_NAV_LEFT, false, 6400) == -1 && !p.menu);
+    p = (pet_growth_input_t){.voice_enabled = true, .voice_only = true};
+    pet_growth_input_navigate(&p, PET_NAV_RIGHT, false, 6500);
+    pet_growth_input_navigate(&p, PET_NAV_UP, false, 6600);
+    assert(p.selection == PET_GROWTH_MENU_RETURN);
+    pet_growth_input_navigate(&p, PET_NAV_UP, false, 6700);
+    assert(p.selection == PET_GROWTH_MENU_AI_CLEAR);
+    pet_growth_input_navigate(&p, PET_NAV_DOWN, false, 6800);
+    assert(p.selection == PET_GROWTH_MENU_RETURN);
+    pet_growth_input_navigate(&p, PET_NAV_RIGHT, true, 6900);
+    assert(!p.menu);
     puts("growth input: navigation, submit, cancel, preemption and held boot passed");
 }

@@ -25,8 +25,8 @@
 
 | 编号 | 工作项 | 状态与证据 | 后续动作 |
 | --- | --- | --- | --- |
-| HW-01 | 发行硬件与扩展基线 | 软件已验证；DHT11 默认关闭、菜单跳过、功放 LRC 改为 GPIO40，保留内部板型身份；见 [27](27-hardware-and-input.md) | 主机、10 项 LVGL、隔离 default 构建通过；提交/推送另核对，实物待验收 |
-| HW-02 | 可选摇杆菜单输入 | 本轮待实现；BOOT 保留、显式启用、方向与确认/返回、空闲与故障保护 | 按公开输入接口、真实 UI 和目标构建验证 |
+| HW-01 | 发行硬件与扩展基线 | 软件已验证；DHT11 默认关闭、菜单跳过、功放 LRC 改为 GPIO40，保留内部板型身份；见 [27](27-hardware-and-input.md) | 主机、10 项 LVGL、隔离 default 构建通过；`e034310` 已推送并核对 origin/main，实物待验收 |
+| HW-02 | 可选摇杆菜单输入 | 软件已验证；BOOT 保留、显式启用、方向与确认/返回、回中/消抖/连发及采样故障保护 | 主机、10 项 LVGL、ASan/UBSan 与隔离 full 构建通过；提交/推送另核对，ADC 与实物交互待验收 |
 | HW-03 | 可选光敏与硬件使用说明 | 本轮待实现；光敏按需启用、舵机沿用既有限位/arm | 补齐接线/配置与边界；不烧录或驱动设备 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
@@ -194,3 +194,8 @@ CONSOLE-09-A 的 CORE `cb18ba2` / 04 `e728aeb` 已正常推送并核对远端。
 HW-01（2026-11-15）：按用户新要求调整基础发行硬件与可选扩展。先以公开菜单接口复现基础版仍可选中未安装的温湿度，新增断言失败后增加功能门控；已启用温湿度、语音按住/释放/取消、启动按住与消息抢占回归均通过。功放 LRC 从 GPIO38 改为 GPIO40，并由生成器拒绝 N16R8 存储、USB、UART、绑带及两版 RGB 保留引脚。JSON profile 与默认预设均关闭温湿度，full 显式保留其覆盖。
 
 本项 `bash tools/ci/test_host.sh`、`bash tools/ci/test_ui_host.sh`（10/10）、`python3 tools/ci/test_build_matrix.py`（4/4）、`check_contracts.py`、`check_deps.py`、`board_codegen.py --check` 与差异检查均退出 0。显式设置 `IDF_PYTHON_ENV_PATH` 后，以 ESP-IDF v6.1 执行 `python tools/build_matrix.py --profile default --build-root firmware/build-matrix-hw01 --execute --jobs 4` 退出 0，实际 sdkconfig 中 UI/音频开启、温湿度/舵机关闭，产物/来源证据保存在忽略目录。本机 export.sh 最初错误查找未安装的 py3.14 环境，改用仓库已说明的现有 v6.1 venv 后成功，无安装或依赖变更。未烧录、未擦除、未接入真实模块；背光驱动与物理接线仍须验收。
+
+
+HW-02（2026-11-15）：二维摇杆采用 ADC1 GPIO4/5 与 SW GPIO6，显式开关默认关闭。先从缺失公开导航接口的编译失败建立反馈，再实现回中门控、消抖、上下限速连发、左右单次、正反向菜单及按住说话；生成器拒绝 ADC2 与跨模块冲突，启用 DHT11 的自定义 GPIO 与摇杆冲突时编译拒绝。BOOT 始终可用，消息已读、外部确认和恢复仍只接受 BOOT；初始化失败回退 BOOT，采样错误取消旧摇杆手势。板型 profile 新增可选 `joystick`（缺省 false），同步生成 TypeScript 契约。
+
+本项 `bash tools/ci/test_host.sh`、`bash tools/ci/test_ui_host.sh`（10/10）、`check_contracts.py`、`check_deps.py`、`board_codegen.py --check`、`test_board_codegen.py`、`test_build_matrix.py`（4/4）、Bash 语法与差异检查均退出 0。新增公开输入滤波/菜单及真实 BSP GPIO/ADC 边界故障测试通过，导航/菜单 ASan+UBSan 通过。已查看真实 LVGL 的摇杆成长菜单和语音菜单 PNG，布局断言在 240×320 内。ESP-IDF v6.1 的 `python tools/build_matrix.py --profile full --build-root firmware/build-matrix-hw02 --ota-public-key firmware/build-hardware-check/ota-test-public.der --execute --jobs 4` 退出 0，实际启用摇杆/DHT11，舵机 GPIO=-1，产物/源码证据在忽略目录。没有跑完整 UI FreeRTOS 任务端到端或真实 ADC/按键/显示；未烧录或擦除，未执行真实语音、舵机、外部消息。

@@ -117,7 +117,9 @@ void pet_ai_view_ui_show(pet_ai_view_ui_t *v, const pet_ai_screen_t *m,
     else if (listening) lv_label_set_text_fmt(v->detail, "输入电平 %u%%", level);
     else if (m->unread) lv_label_set_text_fmt(v->detail, "%u 条未读", m->unread);
     else lv_label_set_text(v->detail, "");
-    lv_label_set_text(v->footer, input->menu ?
+    lv_label_set_text(v->footer, input->navigation_enabled && input->menu ?
+        (input->selection == PET_GROWTH_MENU_AI_TALK ? "上下选择 · 按住中键说话" : "上下选择 · 右确认 · 左返回") :
+        input->menu ?
         (input->selection == PET_GROWTH_MENU_AI_TALK ? "短按切换 · 按住说话" : "短按切换 · 长按执行") :
         m->faulted ? "短按返回 · 长按菜单" :
         listening && m->session.push_to_talk ? "松开发送" :

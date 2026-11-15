@@ -54,4 +54,13 @@ for field, value in [("i2s", 0), ("dout", 49), ("dout", True),
         pass
     else:
         raise AssertionError(f"accepted invalid speaker.{field}={value}")
-print("board codegen: audio wiring and cross-peripheral conflicts passed")
+for field, pin in (("x", 13), ("y", 0), ("select", 39), ("select", 15)):
+    invalid = copy.deepcopy(board)
+    invalid["input"]["joystick"][field] = pin
+    try:
+        generate(invalid)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"accepted invalid joystick.{field}={pin}")
+print("board codegen: audio/joystick wiring, ADC1 and cross-peripheral conflicts passed")

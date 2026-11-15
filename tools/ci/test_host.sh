@@ -319,7 +319,21 @@ for ext_dir in "${repo_root}"/extensions/*/; do
         "${ext_dir}/test/host/test_${ext_id}_contract.c"
 done
 
+build_and_run test_navigation \
+    -I "${hal_inc}" \
+    "${repo_root}/firmware/components/pet_hal/src/navigation.c" \
+    "${repo_root}/firmware/tests/host/test_navigation.c"
+
+build_and_run test_bsp_input \
+    -I "${repo_root}/firmware/tests/host/support/input_bsp" \
+    -I "${repo_root}/firmware/tests/host/support" -I "${hal_inc}" -I "${contracts_inc}" \
+    -I "${repo_root}/firmware/components/bsp_dodo_s3_lcd/private_include" \
+    "${repo_root}/firmware/components/bsp_dodo_s3_lcd/src/bsp_input.c" \
+    "${repo_root}/firmware/components/bsp_dodo_s3_lcd/src/bsp_analog.c" \
+    "${repo_root}/firmware/tests/host/test_bsp_input.c"
+
 build_and_run test_growth_input \
+    -I "${hal_inc}" \
     -I "${contracts_inc}" \
     -I "${repo_root}/firmware/components/ui_lvgl/src" \
     "${repo_root}/firmware/components/ui_lvgl/src/growth_input.c" \

@@ -37,6 +37,10 @@
         },
         "servo": {
           "type": "boolean"
+        },
+        "joystick": {
+          "type": "boolean",
+          "default": false
         }
       }
     }

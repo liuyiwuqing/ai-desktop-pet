@@ -4,6 +4,7 @@ idf_component_register(
         "src/bsp_climate_sensor.c"
         "src/bsp_display.c"
         "src/bsp_input.c"
+        "src/bsp_analog.c"
         "src/bsp_pins.c"
     PRIV_INCLUDE_DIRS
         "private_include"
@@ -19,4 +20,5 @@ idf_component_register(
         "heap"
     PRIV_REQUIRES
         "esp_timer"
+        "esp_adc"
 )

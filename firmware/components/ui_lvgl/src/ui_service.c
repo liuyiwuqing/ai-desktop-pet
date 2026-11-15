@@ -78,6 +78,9 @@ typedef struct {
     const char *feedback;
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
     pet_growth_input_t growth_input;
+    pet_navigation_filter_t navigation_filter;
+    pet_navigation_sample_t navigation_sample;
+    bool navigation_available;
 #endif
 #if PET_UI_AI
     pet_ai_view_ui_t ai_view;
@@ -452,6 +455,12 @@ static void ui_task(void *arg)
         ESP_LOGE(TAG, "BOOT input init failed");
         goto fail;
     }
+#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
+    if (ui->button->navigation_init && ui->button->navigation_read) {
+        ui->navigation_available = ui->button->navigation_init() == ESP_OK;
+        if (!ui->navigation_available) ESP_LOGW(TAG, "joystick unavailable; using BOOT");
+    }
+#endif
     lv_init();
     lv_tick_set_cb(now_ms);
     ui->font16 = lv_binfont_create_from_buffer((void *)font16_start, font16_end - font16_start);
@@ -524,8 +533,23 @@ static void ui_task(void *arg)
         for (size_t i = 0; i < count; ++i)
             if (ui->snapshot[i].delivery.event_id[0]) ui->snapshot[i].duration_ms = ui->settings.config.message.duration_ms;
         const bool pressed = ui->button->pressed();
+#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
+        const bool navigation_was_valid = ui->navigation_sample.valid;
+        ui->navigation_sample = (pet_navigation_sample_t){0};
+        if (ui->navigation_available &&
+            ui->button->navigation_read(&ui->navigation_sample) != ESP_OK) {
+            ui->navigation_sample.valid = false;
+            if (navigation_was_valid) ESP_LOGW(TAG, "joystick sample failed; using BOOT until neutral");
+        }
+        const bool navigation_lost = navigation_was_valid && !ui->navigation_sample.valid;
+#endif
 #if CONFIG_PET_EXT_DEVICE_CONTROL
-        if(control_modal(ui,pressed,ui->snapshot,count)){vTaskDelay(pdMS_TO_TICKS(20));continue;}
+        if(control_modal(ui,pressed,ui->snapshot,count)) {
+#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
+            (void)pet_navigation_update(&ui->navigation_filter, &ui->navigation_sample, true, now_ms());
+#endif
+            vTaskDelay(pdMS_TO_TICKS(20));continue;
+        }
 #endif
 #if CONFIG_PET_MODULE_CLIMATE_ENABLED
         bool climate_input=ui->climate_panel;
@@ -597,13 +621,27 @@ static void ui_task(void *arg)
         voice_inhibited |= ui->reset_gesture;
         ui->reset_gesture = false;
 #endif
-        const int selected = pet_growth_input_update(&ui->growth_input, pressed,
-            ui->presenter.id[0] != '\0' || interaction_pending || !ui->home_rendered || voice_inhibited
+        const bool navigation_blocked = ui->presenter.id[0] != '\0' || interaction_pending ||
+            !ui->home_rendered || voice_inhibited || navigation_lost;
+        const pet_navigation_t direction = pet_navigation_update(&ui->navigation_filter,
+            &ui->navigation_sample, navigation_blocked, now_ms());
+        ui->growth_input.navigation_enabled = ui->navigation_available && ui->navigation_filter.armed;
+        const bool menu_pressed = pressed || (ui->growth_input.navigation_enabled &&
+            ui->navigation_sample.valid && ui->navigation_sample.pressed);
+        int selected = pet_growth_input_update(&ui->growth_input, menu_pressed,
+            navigation_blocked
 #if CONFIG_PET_MODULE_CLIMATE_ENABLED
             || climate_input
 #endif
             ,
             now_ms());
+#if CONFIG_PET_MODULE_CLIMATE_ENABLED
+        if (climate_input) {
+            if (direction == PET_NAV_LEFT) ui->climate_panel = false;
+        } else
+#endif
+        if (selected < 0 && direction != PET_NAV_NONE)
+            selected = pet_growth_input_navigate(&ui->growth_input, direction, navigation_blocked, now_ms());
 #if PET_UI_AI
         if (was_menu && !ui->growth_input.menu && ui->growth_input.selection == PET_GROWTH_MENU_RETURN)
             ui->voice_panel = false;

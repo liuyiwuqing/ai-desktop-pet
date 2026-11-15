@@ -2,10 +2,14 @@
 
 #include <stdbool.h>
 #include "esp_err.h"
+#include "pet/hal/navigation.h"
 
 typedef struct {
     esp_err_t (*init)(void);
     bool (*pressed)(void);
+    /* Optional extension; recovery and physical confirmations use BOOT only. */
+    esp_err_t (*navigation_init)(void);
+    esp_err_t (*navigation_read)(pet_navigation_sample_t *out);
 } pet_button_input_t;
 
 const pet_button_input_t *pet_bsp_confirm_button(void);

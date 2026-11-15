@@ -664,3 +664,6 @@ PET_HOST_SANITIZE=1 ASAN_OPTIONS=detect_leaks=0 bash tools/ci/test_sr_frontend_h
 新增 100 ms 播放预缓冲、欠载计数/静音/超时、尾部淡出、转写/回复、电平口型与点头。RAM 保存最多 8 轮，旧轮合并为有界提取式摘要；人设和宠物状态经 self.get_context 提供，隐私/超时/主动清除丢弃本地上下文，不宣称删除云端历史。MCP 路由温湿度、未读、成长、专注与可选扩展，严格参数和幂等。
 
 NS/AEC 适配已接锁定 ESP-SR 算法；当前半双工 BSP 不提供同步参考，AEC 回退 NS，未实现可验收的声学全双工打断。AI 未启用时可通过 PET_MESSAGE_TONES_ON_BOOT 仅启动提示音拥有者，不创建录音/云端会话。详细测试与边界见 [09](09-software-delivery.md)。
+
+
+2026-11-15 可选摇杆菜单：由 HAL 提供 ADC1 方向与中键输入，UI 复用原菜单/隐私/按住说话规则。右推说话项不会开启麦克风；必须使用中键或 BOOT 新的持续按住，松开结束。采样失败、消息遮挡和显示故障均取消旧手势，消息/外部控制确认及恢复仍仅用 BOOT。默认不启用摇杆，接线与操作见 [27](27-hardware-and-input.md)。

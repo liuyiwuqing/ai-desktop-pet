@@ -87,6 +87,7 @@ export interface DeviceProfileFeatures {
   growth: boolean;
   deviceControl: boolean;
   servo: boolean;
+  joystick?: boolean;
 }
 
 export interface DeviceProfile {

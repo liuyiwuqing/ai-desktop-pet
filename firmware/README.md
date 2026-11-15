@@ -32,7 +32,7 @@ python3 ../tools/ci/check_contracts.py  # schema、profile、example、扩展 ma
 
 ## 扩展开关
 
-两个扩展默认关闭，关闭时二进制不含 `pet_ext_*_init`：
+设备控制、舵机、摇杆均默认关闭。摇杆通过 `CONFIG_PET_EXT_JOYSTICK=y` 接入菜单，故障时回退 BOOT；接线与操作见 [27](../docs/27-hardware-and-input.md)。设备控制与舵机关闭时二进制不含对应 `pet_ext_*_init`：
 
 ```bash
 # 启用示例：复制 sdkconfig 后追加，再用独立 build 目录构建

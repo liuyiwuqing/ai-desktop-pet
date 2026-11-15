@@ -145,6 +145,13 @@ int main(int argc, char **argv)
     assert(lv_obj_has_flag(growth.avatar.object, LV_OBJ_FLAG_HIDDEN));
     assert(strstr(lv_label_get_text(growth.action), "1800"));
     screenshot(argv[2], "growth-menu", display);
+    input.navigation_enabled = true;
+    pet_growth_view_ui_show(&growth, &stats, &input, 3, false, false, NULL);
+    assert(strstr(lv_label_get_text(growth.footer), "右确认"));
+    screenshot(argv[2], "growth-joystick-menu", display);
+    lv_obj_update_layout(growth.root);
+    assert(lv_obj_get_y(growth.footer) + lv_obj_get_height(growth.footer) <= 320);
+    input.navigation_enabled = false;
     input.selection = PET_GROWTH_CLAIM_PET;
     stats.task_day = 20833;
     stats.task_progress[0] = 1; stats.task_progress[1] = 3; stats.task_claimed = 1;
@@ -299,6 +306,11 @@ int main(int argc, char **argv)
     pet_ai_view_ui_show(&ai, &model, &input, 2400);
     assert(strcmp(lv_label_get_text(ai.detail), "关闭免打扰") == 0);
     screenshot(argv[2], "ai-menu", display);
+    input.navigation_enabled = true;
+    input.selection = PET_GROWTH_MENU_AI_TALK;
+    pet_ai_view_ui_show(&ai, &model, &input, 2400);
+    assert(strstr(lv_label_get_text(ai.footer), "中键说话"));
+    screenshot(argv[2], "ai-joystick-menu", display);
     lv_obj_update_layout(ai.root);
     assert(lv_obj_get_y(ai.detail) + lv_obj_get_height(ai.detail) < lv_obj_get_y(ai.footer));
     assert(lv_obj_get_y(ai.footer) + lv_obj_get_height(ai.footer) <= 320);

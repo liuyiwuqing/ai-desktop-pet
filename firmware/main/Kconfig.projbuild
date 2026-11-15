@@ -332,6 +332,27 @@ endmenu
 
 menu "PET extensions"
 
+config PET_EXT_JOYSTICK
+    bool "Enable optional analog joystick menu input"
+    depends on PET_MODULE_UI_ENABLED
+    default n
+    help
+      KY-023 style 3.3V joystick: X GPIO4, Y GPIO5, active-low SW GPIO6.
+      Up/down select, right opens/executes, left returns; hold SW for voice.
+      Requires released neutral after boot/fault/preemption. BOOT remains
+      available and is still required for message/control/recovery confirmation.
+      This is explicit configuration, not automatic hot-plug detection.
+
+config PET_JOYSTICK_INVERT_X
+    bool "Invert joystick X axis"
+    depends on PET_EXT_JOYSTICK
+    default n
+
+config PET_JOYSTICK_INVERT_Y
+    bool "Invert joystick Y axis"
+    depends on PET_EXT_JOYSTICK
+    default n
+
 config PET_EXT_DEVICE_CONTROL
     bool "Enable device_control extension"
     depends on PET_MODULE_NET_ENABLED && PET_MODULE_UI_ENABLED
