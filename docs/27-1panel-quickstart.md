@@ -4,6 +4,8 @@
 
 ## 首次安装
 
+如果已通过 `docker save/load` 导入镜像，或服务器访问 GHCR 镜像层出现 TLS 超时，使用新增的[本地镜像部署文件](../deployment/1panel/docker-compose.yml)和[配套步骤](../deployment/1panel/README.md)。它以完整提交标签引用 CORE，并设置 `pull_policy: never`；私有初始化、基础服务下载、代理和已有卷保护按该说明操作。下文保留按 digest 在线拉取的原方案。
+
 GHCR 当前为私有镜像。在终端登录，并在 1Panel 的镜像仓库配置相同 GHCR 读取账号；登录密码使用有包读取权限的 `read:packages` PAT，不要放进命令、编排或聊天：
 
 ```sh

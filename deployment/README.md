@@ -4,6 +4,8 @@
 
 ## 1Panel 镜像部署（DEL-07）
 
+本机导入 CORE 镜像使用新增的 [1Panel 编排](1panel/docker-compose.yml)和[使用说明](1panel/README.md)：完整提交标签、`linux/amd64`、CORE 禁止自动拉取，PostgreSQL/MQTT 缺失时拉取，继续复用 `/etc/nexus/docker`。适用于服务器拉取 GHCR 镜像层 TLS 超时的情况；初始化和基础镜像仍需按说明准备。下文保留原在线 digest 方案。
+
 1Panel 部署使用 CORE 的 [镜像部署说明](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/1panel-deployment.md)：服务器只拉取同次发布的 CORE/初始化镜像，无需上传源码或安装 Python/Java/Node/Maven。初始化容器不挂载 Docker socket，只在明确挂载的新目录生成服务器自己的密码、MQTT CA/证书和完整 `compose.1panel.yml`，拒绝覆盖已有配置；之后直接把生成的编排粘贴到面板。
 
 该编排使用普通 `env_file`，不带旧版 1Panel 不支持的 `format: raw`，不含 `build`、禁止拉取策略、Caddy 或 80/443 映射。CORE 默认只发布 `127.0.0.1:18088`，HTTPS 由 1Panel 的现有反向代理提供；OpenResty 为 bridge 网络时需使用同一 edge 网络的服务地址，不能把容器内回环地址当宿主机。数据库仅内部访问，MQTT/TLS 可按设备上线需要发布 8883。
