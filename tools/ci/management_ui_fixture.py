@@ -118,10 +118,10 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     heap=100000+(i*7919)%12000
                     points.append({'observedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(start+i*step)),
                         'receivedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(start+i*step+1)),'count':1,
-                        'firmwareVersion':'0.4.0-ui-fixture','configRevision':state['revision'],'volume':state['config']['volume'],
+                        'firmwareVersion':'0.4.0-ui-fixture','configRevision':state['revision'],'volume':10+(i*7)%40,
                         'brightness':state['config']['brightness'],'muted':False,'dnd':False,'unread':i%3,
                         'freeHeap':heap,'freeHeapMin':heap,'freeHeapMax':heap,'minFreeHeap':90000-(i%5)*100,
-                        'audioUnderruns':0,'inferenceMaxMs':200+i,'displayMaxMs':20,'audioFaulted':False})
+                        'audioUnderruns':(i*13)%4,'inferenceMaxMs':200+i,'displayMaxMs':20,'audioFaulted':i%17==5})
                 value={'deviceId':'dodo-ui-fixture','from':query.get('from',[''])[0] or time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(start)),
                     'to':query.get('to',[''])[0] or time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(end)),'bucket':bucket,
                     'sampleSeconds':30,'retentionDays':30,'truncated':False,'points':points}

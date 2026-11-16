@@ -49,6 +49,9 @@ async function tap(text) {
 async function range(index,value) {
   await js(`(()=>{const input=document.querySelectorAll('.management-form input[type=range]')[${index}];input.value=${JSON.stringify(String(value))};input.dispatchEvent(new Event('input',{bubbles:true}));return input.value;})()`);
 }
+async function hover(ratio) {
+  await js(`(()=>{const svg=document.querySelector('.telemetry-chart');if(!svg)return false;const rect=svg.getBoundingClientRect();svg.dispatchEvent(new MouseEvent('mousemove',{clientX:rect.left+rect.width*${ratio},clientY:rect.top+rect.height*0.5,bubbles:true}));return true;})()`);
+}
 await fixture({reset:true});
 await openOrReuseTab(base,{wait:true,timeout:15});
 await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
@@ -92,11 +95,26 @@ await expect("document.querySelector('.telemetry-history .history-empty')?.inner
 await fixture({mode:'fresh'});await tap('刷新状态');
 await expect("document.querySelectorAll('.management-form input[type=range]').length===2",'fresh readback is editable');
 await expect("document.querySelector('.telemetry-history')?.innerText.includes('状态历史') && document.querySelector('.telemetry-history')?.innerText.includes('来自设备已上报的遥测')",'history section explains its source');
-await expect("!!document.querySelector('.telemetry-chart .series-heap') && document.querySelector('.chart-legend')?.innerText.includes('可用内存') && document.querySelector('.chart-legend')?.innerText.includes('启动以来最小')",'history chart renders both series and legend');
+await expect("!!document.querySelector('.telemetry-chart .series-primary') && !!document.querySelector('.telemetry-chart .series-secondary') && document.querySelector('.chart-legend')?.innerText.includes('可用内存') && document.querySelector('.chart-legend')?.innerText.includes('启动以来最小')",'history chart renders both series and legend');
 await expectState(snapshot=>snapshot.telemetryRequests.some(path=>path.includes('/devices/dodo-ui-fixture/telemetry') && path.includes('bucket=5m')),'default range queries a 5m bucket');
 await expect("document.body.innerText.includes('实时快照') && !document.querySelector('.telemetry-history')?.innerText.includes('实时')",'live snapshot is labelled, history is not');
-await js("(()=>{const svg=document.querySelector('.telemetry-chart');const rect=svg.getBoundingClientRect();svg.dispatchEvent(new MouseEvent('mousemove',{clientX:rect.left+rect.width*0.55,clientY:rect.top+rect.height*0.5,bubbles:true}));return true;})()");
+await hover(0.55);
 await expect("document.querySelector('.chart-tooltip')?.textContent.includes('KB')",'chart hover reads a real sample');
+await expect("document.querySelector('.history-metrics')?.innerText.includes('内存') && document.querySelector('.history-metrics')?.innerText.includes('音量') && document.querySelector('.history-metrics')?.innerText.includes('未读') && document.querySelector('.history-metrics')?.innerText.includes('音频')",'metric switcher exposes all history metrics');
+await tap('音量');
+await expect("document.querySelector('.chart-legend')?.innerText.includes('音量') && document.querySelector('.chart-legend')?.innerText.includes('%') && !document.querySelector('.telemetry-chart .series-secondary')",'volume metric draws a single percent series');
+await hover(0.55);
+await expect("document.querySelector('.chart-tooltip')?.textContent.includes('%')",'volume tooltip uses percent');
+await tap('未读');
+await expect("document.querySelector('.chart-legend')?.innerText.includes('未读消息') && document.querySelector('.chart-legend')?.innerText.includes('条')",'unread metric is available');
+await hover(0.55);
+await expect("document.querySelector('.chart-tooltip')?.textContent.includes('条')",'unread tooltip uses message count');
+await tap('音频');
+await expect("document.querySelector('.chart-legend')?.innerText.includes('音频欠载') && document.querySelector('.chart-legend')?.innerText.includes('音频异常') && document.querySelectorAll('.telemetry-chart .dot-fault').length>0",'audio metric marks faulted samples');
+await js("(()=>{const svg=document.querySelector('.telemetry-chart');const dot=document.querySelector('.telemetry-chart .dot-fault');const rect=svg.getBoundingClientRect();const box=svg.viewBox.baseVal;const cx=parseFloat(dot.getAttribute('cx')),cy=parseFloat(dot.getAttribute('cy'));svg.dispatchEvent(new MouseEvent('mousemove',{clientX:rect.left+cx/box.width*rect.width,clientY:rect.top+cy/box.height*rect.height,bubbles:true}));return true;})()");
+await expect("document.querySelector('.chart-tooltip')?.textContent.includes('音频异常')",'audio fault is explained in tooltip');
+await tap('内存');
+await expect("document.querySelector('.chart-legend')?.innerText.includes('可用内存') && !!document.querySelector('.telemetry-chart .series-secondary')",'heap metric restores both series');
 await tap('24 小时');
 await expectState(snapshot=>snapshot.telemetryRequests.some(path=>path.includes('bucket=15m')),'range switch queries a 15m bucket');
 await expect("document.querySelector('.telemetry-history')?.innerText.includes('24 小时 · 15 分钟桶')",'history states active range and bucket');
