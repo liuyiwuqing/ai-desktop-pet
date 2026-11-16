@@ -49,8 +49,12 @@ await fillInput('#remote-ota-panel input[pattern]','release-ui');await uploadFil
 await expect("[...document.querySelectorAll('#remote-ota-panel button')].some(b=>b.innerText==='登记'&&!b.disabled)",'manifest file enables registration');await tap('登记');
 await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('版本已登记') && !document.querySelector('#remote-ota-panel input[type=file]')",'manifest registration closes after acknowledgment');
 await control({otaReset:true,otaMode:'fresh'});await tap('刷新状态');await selectRelease();
-await control({otaLastError:'ota_boot_changed'});await tap('安装版本');await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('设备已经重新启动')",'explicit conflict is shown');
-await control({otaLastError:'',otaDrop:true});await tap('安装版本');await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('提交结果未确认') && document.querySelector('#remote-ota-panel select').disabled",'unknown outcome retains request and blocks another install');
+const installLabel=await js("(()=>{const s=document.querySelector('#remote-ota-panel select');const o=s&&s.selectedOptions[0];return ((o&&o.textContent)||'').split(' · ')[0].trim();})()");
+if(!installLabel)throw new Error('Selected release has no visible version');
+await expect("(()=>{const p=document.querySelector('#remote-ota-panel .form-footer');const b=p&&[...p.querySelectorAll('button')].find(b=>b.innerText.trim().indexOf('安装 ')===0);return !!b && b.innerText.trim()===" + JSON.stringify('安装 '+installLabel) + " && p.innerText.includes('将安装到 回归测试设备');})()",'install button names the version and footer names the device');
+await control({otaLastError:'ota_boot_changed'});
+await tap('安装 '+installLabel);await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('设备已经重新启动')",'explicit conflict is shown');
+await control({otaLastError:'',otaDrop:true});await tap('安装 '+installLabel);await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('提交结果未确认') && document.querySelector('#remote-ota-panel select').disabled",'unknown outcome retains request and blocks another install');
 await tap('重试同一请求');await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('等待下发')",'retry creates visible request record');
 let observed=await state();if(observed.otaSubmissions.length!==3||observed.otaSubmissions[1].requestId!==observed.otaSubmissions[2].requestId)throw new Error('Unknown retry changed request ID');checks.push('unknown retry preserves exact request ID');
 await control({otaStage:true});await tap('刷新状态');await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('安装完成，等待确认重启')",'staging does not automatically reboot');

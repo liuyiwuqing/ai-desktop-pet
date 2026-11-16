@@ -73,7 +73,7 @@ await input('收件开始','2026-11-14T16:00');await input('来源标识','missi
 await fixture({queryError:'messages'});await input('来源标识','manual');await tap('应用筛选');await expect("document.querySelector('h2')?.innerText==='消息读取失败' && document.querySelectorAll('.message-row').length===0 && [...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='导出元数据').disabled",'read failure hides stale rows and disables export');
 await fixture({queryError:''});await tap('重试');await ready();await expect("document.querySelector('.section-heading p')?.innerText==='31 条消息' && document.querySelector('input[aria-label=来源标识]')?.value==='manual'",'read recovery keeps the selected source and range');
 await freshDownloadDir();
-for(const [mode,text]of [['large','结果超过 5000 条'],['error','请求失败（HTTP 503）'],['invalid','未能导出元数据']]){
+for(const [mode,text]of [['large','结果超过 5000 条'],['error','CORE 处理失败'],['invalid','未能导出元数据']]){
  await fixture({exportMode:mode});await tap('导出元数据');await expect(`document.querySelector('.feedback.error')?.innerText.includes(${JSON.stringify(text)}) && ![...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='导出元数据').disabled`,'export failure is actionable: '+mode);
  if(files().length!==2)throw new Error('Failed export created a file');results.push('failed export creates no download: '+mode);
 }
