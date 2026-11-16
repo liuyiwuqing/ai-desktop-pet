@@ -354,3 +354,5 @@ CONSOLE-14 交付核对：CORE `9dc7ad9717dbf9c44a1bef7d3ad952c339aeefe0` 已正
 未做并记入待办：错误文案映射与反馈吸顶、`StatusNote` 统一、按页请求与 `defineAsyncComponent` 分割、设备设置面板内联、OTA 安装门槛、token 守卫脚本、空挂类清理。理由分别是：涉及 `mutate()` 未确认分支（被 750 次跨仓断言覆盖）、属模板契约变更、或会给 build 增加失败面，需单独立项回归。未执行 `run_local.py build`（需独立 PostgreSQL/MQTT 与 Maven）、远程 CI、部署与实机视觉终验。
 
 CORE 提交 `b3150bc` 已推送，`origin/codex/core-baseline` 已确认包含；诊断与规范见 CORE `docs/console-ui-refinement.md`、`docs/console-ui.md`。
+
+CONSOLE-15 追加（CORE `004c2db`，已推送）：三张表格容器补 `tabindex="0" role="region"` 与作用域 `aria-label`，键盘可进入横向滚动区；投递与操作审计两处实测生效（`aria-label` 分别为"投递记录/操作审计…"，焦点落在 `.table-shell`），"最近执行"表因夹具无执行记录未渲染，属性随源码与 `vue-tsc`/构建通过。文档补两条约定：抽屉关闭后 `focusContent()` 只认 `.content h1`，不得放宽到 `h2`；`.section-heading` 不叠加 `:focus-visible` 轮廓。下一轮建议加"12 页 `h1` 文本指纹"断言作为兜底。OTA 安装按钮显性化目标与"完成并结算"二次确认、空挂类清理分别留在 P1/P2，按用户的"不为一次性改动增加机制"原则不并入本批。
