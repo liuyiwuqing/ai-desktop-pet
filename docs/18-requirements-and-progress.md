@@ -444,6 +444,6 @@ CONSOLE-15 追加（CORE `004c2db`，已推送）：三张表格容器补 `tabin
 - **实时/历史区分**：快照徽标只读 `management` 的 `fresh`，文案改为「实时快照 / 快照已过期」并带 90 秒口径的原生 `title`；历史区块只写「来自设备已上报的遥测」，不出现「实时」，脚注说明最后一条不代表在线。概览页脚同步改为「数据库快照 … 页面每 5 秒重新读取」，避免把轮询说成设备刷新。
 - **窄屏**：图表外层 `.chart-scroll` 横向滚动、SVG `min-width:560px`；390px 下文档无横向溢出，图内滚动承载可读字号。
 - **验证**：`npm run check`（78 token，无散落 hex）与 `npm run build` 通过。04 夹具新增 `/telemetry` 端点（按 `bucket` 生成点、记录请求、支持空态），`test_management_ui.sh` 新增空态、图例/双序列、默认 `5m` 请求、切 24 小时请求 `15m`、悬停取值、历史不含「实时」及 390px 无溢出断言；完整 46 项浏览器断言通过。夹具时间解析同时修正为接受 `toISOString()` 的小数秒，避免历史接口整条失败。
-- **未做**：图表仅展示可用内存与启动以来最小，未画音量/未读/音频指标；没有缩放、游标联动或导出；未执行 `run_local.py build`、真实库迁移、部署与实机长期采样/视觉终验。
+- **未做**：图表仅展示可用内存与启动以来最小，未画音量/未读/音频指标；没有缩放、游标联动或导出；未迁移真实库、部署与实机长期采样/视觉终验。收尾补跑 `python3 tools/run_local.py build`：120 条中 115 通过、5 条条件跳过，V21 在隔离 PostgreSQL 17 应用成功并产出 jar，前端构建包含在产物中。
 
 远程 CI：本项推送后的 [CORE Docker CI 43877392638](https://github.com/liuyiwuqing/nexus-core/actions/runs/43877392638) 与 [04 CI 43877407916](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43877407916) 均在约 2 秒内失败：job 已创建但 `steps` 为空、无日志可读，与 TELEMETRY-01 的计费/额度阻断一致。非代码失败，不把本地 46 项写作远程通过，待额度恢复后补跑。
