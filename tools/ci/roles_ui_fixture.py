@@ -4,6 +4,7 @@ import argparse
 import functools
 import http.server
 import json
+import socket
 from urllib.parse import urlparse
 from sources_ui_fixture import SourcesFixture
 from management_ui_fixture import TOKEN
@@ -34,11 +35,21 @@ class RolesFixture(SourcesFixture):
             with self.lock:
                 state = type(self).qa
                 state['requests'].append({'method': 'POST', 'path': path, 'body': body})
+                mode = state.get('next_write', 'success')
+                state['next_write'] = 'success'
                 if path.endswith('/revoke'):
                     state['role_tokens'][0]['revokedAt'] = '2026-11-15T00:00:00Z'
                     return self.json_response(204, None)
+                if mode == 'error':
+                    return self.json_response(503, {'error': 'unavailable'})
                 item = {'tokenId': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'name': body['name'], 'role': body['role'], 'expiresAt': body['expiresAt'], 'revokedAt': None, 'version': 1}
                 state['role_tokens'].append(item)
+                if mode == 'drop_after':
+                    # 令牌已写入但响应丢失：前端必须停在"签发结果未确认"，不能当成功。
+                    self.close_connection = True
+                    self.connection.shutdown(socket.SHUT_RDWR)
+                    self.connection.close()
+                    return
                 return self.json_response(200, {**item, 'token': 'fixture-role-token-not-a-real-secret'})
         return super().do_POST()
 
