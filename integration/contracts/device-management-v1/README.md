@@ -32,13 +32,16 @@
 
 ## CORE 管理接口
 
-路径前缀 `/api/v1/devices/<deviceId>/management`，沿用管理员 Bearer 鉴权：
+路径前缀 `/api/v1/devices/<deviceId>/management`，沿用管理员 Bearer 鉴权；遥测历史位于同级 `/telemetry`：
 
 | 接口 | 行为 |
 | --- | --- |
-| GET `/` | 遥测、fresh、canConfigure/configBlock、最近 25 条配置记录及请求内容 |
-| POST `/config-requests` | `{requestId, expectedRevision, config}`；首次 202，同 ID 同内容 200，异内容/版本冲突 409 |
-| GET `/config-requests/<requestId>/audit` | 最多 100 条 admin/core/device 状态审计，不保存令牌 |
+| GET `/management` | 遥测、fresh、canConfigure/configBlock、最近 25 条配置记录及请求内容 |
+| GET `/telemetry` | 只读历史；`from`/`to`（ISO-8601）与 `bucket=raw\|1m\|5m\|15m\|1h\|1d`，默认最近 6 小时、5 分钟桶 |
+| POST `/management/config-requests` | `{requestId, expectedRevision, config}`；首次 202，同 ID 同内容 200，异内容/版本冲突 409 |
+| GET `/management/config-requests/<requestId>/audit` | 最多 100 条 admin/core/device 状态审计，不保存令牌 |
+
+历史样本不是新的设备主题：它由既有 retained `telemetry` 消息追加，变化即记（5 秒下限）、稳定期 30 秒一条、保留 30 天；`raw` 窗口最多 12 小时和 2000 点，聚合桶最多约 2000 点。空桶不补零，最后一条历史不代表设备在线。字段语义与配置见 CORE 的 [遥测历史](../../../../nexus-core/docs/device-telemetry-history.md)。
 
 必须有 90 秒内的完整、可写配置回读才允许新提交。相同时间戳只接受更高 revision，旧遥测不能覆盖新观察；未来超过 5 秒拒绝。retained 不是在线证明，设备 online/last_seen 仍只由原 state/LWT 更新。devices.enabled 继续只控制新消息投递，不被扩展成配置授权开关。
 

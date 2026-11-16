@@ -424,3 +424,13 @@ CONSOLE-15 追加（CORE `004c2db`，已推送）：三张表格容器补 `tabin
 `NButton` 不暴露 `focus()`（`@vue-ignore` 的类型里只有 `focusable`），改成给按钮一个 id、`nextTick` 后按 id 取 DOM —— 与设备页 `device-manage-<id>` 同一做法。
 
 同时给 `roles_ui_fixture` 补了写失败通道（`next_write=drop_after` 写后断连、`error` 走 503）：这个夹具此前没有任何签发失败注入点，`pendingIssue` 那条路径在跨仓断言里是空白 —— 也就是说"签发结果未确认"这个状态从来没被自动验证过。现在 roles 35→39、sources 34→38、templates 27→32，20 个脚本累计 805 条断言全绿。
+
+## TELEMETRY-01 · 遥测历史 API 与采样口径（2026-11-16，CORE `377813e`）
+
+设备管理此前只有 `management` 的实时快照，无法回答「过去几小时堆内存/音量/未读怎么变」。本轮只补 CORE 侧历史与查询，不改设备主题、遥测 Schema、ACL 或管理台：CORE 从既有 retained `telemetry` 追加样本，快照与历史分开写入。
+
+- **采样**：`observedAt` 必须晚于该设备最新历史点；`firmwareVersion/configRevision/volume/brightness/muted/dnd/unread/audioFaulted` 变化即记（距上一点至少 5 秒），稳定值 30 秒最多一条。堆内存波动只随心跳进入历史。retained 重放、乱序和重复时间戳不写。
+- **保留**：默认 30 天，每天 04:20 UTC 分批删除，只动样本表；启动校验 5–3600 秒 / 1–采样间隔 / 1–365 天。
+- **接口**：`GET /api/v1/devices/{id}/telemetry?from&to&bucket`，`bucket` 为 `raw|1m|5m|15m|1h|1d`，默认最近 6 小时、5 分钟桶；窗口最大 30 天，`raw` 最大 12 小时且最多 2000 点（`truncated`），聚合桶最多约 2000 个。空桶不补零；最后一点不代表在线。字段聚合语义（last/avg/min/max/bool_or）与 400/404 见 CORE 文档。
+- **验证**：`DeviceManagementFlowTest` 新增 2 项真实 HTTP/PostgreSQL/MQTT 用例（变化下限、心跳、原始/聚合、空窗口、401/404、四类 400；40 天样本清理）。完整构建 120 条中 115 通过、5 条条件跳过，V21 在隔离库应用成功。
+- **未做**：图表/仪表盘页面、前端「实时 vs 快照」标识、真实库迁移、目标机部署、ESP32 长期采样/时钟回退/30 天规模与掉电验收。
