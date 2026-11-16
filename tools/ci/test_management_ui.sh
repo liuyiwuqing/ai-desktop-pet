@@ -33,6 +33,10 @@ async function expect(expression,label) {
   for(let i=0;i<50;i++) {if(await js(expression).catch(()=>false)){results.push(label);return;} await wait(0.1);}
   throw new Error('UI assertion failed: '+label);
 }
+async function expectState(predicate,label) {
+  for(let i=0;i<50;i++) {const snapshot=await state();if(predicate(snapshot)){results.push(label);return;} await wait(0.1);}
+  throw new Error('State assertion failed: '+label);
+}
 async function tap(text) {
   // 面板由按需加载的 chunk 渲染，按钮可能晚一拍出现；有限次重试，断言仍是"存在且可点"。
   for(let i=0;i<50;i++) {
@@ -84,8 +88,18 @@ results.push('unknown rename never resends automatically');
 await tap('加载当前名称');await tap('取消');
 await tap('设置与状态');
 await expect("document.querySelector('#device-management-panel')?.innerText.includes('尚未收到设备状态')",'empty device state');
+await expect("document.querySelector('.telemetry-history .history-empty')?.innerText.includes('没有采样点') && !document.querySelector('.telemetry-chart')",'history empty state is explicit');
 await fixture({mode:'fresh'});await tap('刷新状态');
 await expect("document.querySelectorAll('.management-form input[type=range]').length===2",'fresh readback is editable');
+await expect("document.querySelector('.telemetry-history')?.innerText.includes('状态历史') && document.querySelector('.telemetry-history')?.innerText.includes('来自设备已上报的遥测')",'history section explains its source');
+await expect("!!document.querySelector('.telemetry-chart .series-heap') && document.querySelector('.chart-legend')?.innerText.includes('可用内存') && document.querySelector('.chart-legend')?.innerText.includes('启动以来最小')",'history chart renders both series and legend');
+await expectState(snapshot=>snapshot.telemetryRequests.some(path=>path.includes('/devices/dodo-ui-fixture/telemetry') && path.includes('bucket=5m')),'default range queries a 5m bucket');
+await expect("document.body.innerText.includes('实时快照') && !document.querySelector('.telemetry-history')?.innerText.includes('实时')",'live snapshot is labelled, history is not');
+await js("(()=>{const svg=document.querySelector('.telemetry-chart');const rect=svg.getBoundingClientRect();svg.dispatchEvent(new MouseEvent('mousemove',{clientX:rect.left+rect.width*0.55,clientY:rect.top+rect.height*0.5,bubbles:true}));return true;})()");
+await expect("document.querySelector('.chart-tooltip')?.textContent.includes('KB')",'chart hover reads a real sample');
+await tap('24 小时');
+await expectState(snapshot=>snapshot.telemetryRequests.some(path=>path.includes('bucket=15m')),'range switch queries a 15m bucket');
+await expect("document.querySelector('.telemetry-history')?.innerText.includes('24 小时 · 15 分钟桶')",'history states active range and bucket');
 await range(0,60);await fixture({advance:true});await tap('刷新状态');
 await expect("document.body.innerText.includes('你的编辑仍保留') && document.querySelector('.management-form input[type=range]').value==='60' && document.querySelector('.management-form fieldset').disabled",'dirty draft survives changed revision');
 await tap('加载设备新设置');
@@ -111,7 +125,7 @@ results.push('unknown outcome retries identical request ID');
 await fixture({mode:'readonly'});await tap('刷新状态');
 await expect("document.body.innerText.includes('设备存储不可写') && document.querySelector('.management-form fieldset').disabled",'readonly storage disables editing');
 await fixture({mode:'stale'});await tap('刷新状态');
-await expect("document.body.innerText.includes('状态已过期') && document.querySelector('.management-form fieldset').disabled",'stale readback disables editing');
+await expect("document.body.innerText.includes('快照已过期') && document.querySelector('.management-form fieldset').disabled",'stale readback disables editing');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
 await expect("window.innerWidth===390 && document.documentElement.scrollWidth<=390",'390 CSS px has no horizontal overflow');
 await cdp('Emulation.clearDeviceMetricsOverride');

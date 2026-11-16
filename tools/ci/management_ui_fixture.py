@@ -8,6 +8,7 @@ import copy
 import http.server
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 import socket
 import secrets
@@ -28,7 +29,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
     state={'mode':'empty','config':copy.deepcopy(CONFIG),'revision':1,'requests':[],'submissions':[],'dropNext':False,
         'otaMode':'disabled','otaRequests':[],'otaSubmissions':[],'otaDrop':False,'otaBoot':'1'*32,'otaLastError':'','growthMode':'disabled',
         'messageSubmissions':[],'manualMessages':[],'messageNext':'success','deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success',
-        'listMode':False,'listMessages':[],'listDeliveries':[],'listRequests':[],'listError':'','listDelay':0}
+        'telemetryRequests':[],'listMode':False,'listMessages':[],'listDeliveries':[],'listRequests':[],'listError':'','listDelay':0}
     def log_message(self,*args):pass
     def json_response(self,status,value):
         payload=json.dumps(value,ensure_ascii=False).encode()
@@ -102,6 +103,28 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 value={'enabled':mode!='disabled','deviceId':'dodo-ui-fixture','fresh':mode not in ('empty','stale'), 'canInstall':mode in ('fresh','no_releases') and not requests,
                     'installBlock':'ota_device_unavailable' if mode=='unavailable' else 'ota_readback_required' if mode in ('empty','stale') else 'ota_deployment_in_progress' if requests else '',
                     'canReboot':mode=='pending_reboot','observation':observation,'deployments':requests}
+            elif path.endswith('/telemetry'):
+                query=parse_qs(urlparse(self.path).query);bucket=query.get('bucket',['5m'])[0]
+                state['telemetryRequests'].append(self.path)
+                step={'1m':60,'5m':300,'15m':900,'1h':3600,'1d':86400}.get(bucket,300)
+                def moment(value,fallback):
+                    # 控制台发的是 toISOString()，可能带小数秒；只认整秒会让整条历史接口失败。
+                    try:return datetime.fromisoformat(value.replace('Z','+00:00')).timestamp()
+                    except ValueError:return fallback
+                start=moment(query.get('from',[''])[0],now-6*3600);end=moment(query.get('to',[''])[0],now)
+                count=max(2,int((end-start)//step)+1) if mode!='empty' else 0
+                points=[]
+                for i in range(count):
+                    heap=100000+(i*7919)%12000
+                    points.append({'observedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(start+i*step)),
+                        'receivedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(start+i*step+1)),'count':1,
+                        'firmwareVersion':'0.4.0-ui-fixture','configRevision':state['revision'],'volume':state['config']['volume'],
+                        'brightness':state['config']['brightness'],'muted':False,'dnd':False,'unread':i%3,
+                        'freeHeap':heap,'freeHeapMin':heap,'freeHeapMax':heap,'minFreeHeap':90000-(i%5)*100,
+                        'audioUnderruns':0,'inferenceMaxMs':200+i,'displayMaxMs':20,'audioFaulted':False})
+                value={'deviceId':'dodo-ui-fixture','from':query.get('from',[''])[0] or time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(start)),
+                    'to':query.get('to',[''])[0] or time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(end)),'bucket':bucket,
+                    'sampleSeconds':30,'retentionDays':30,'truncated':False,'points':points}
             elif path.endswith('/management'):
                 telemetry=None if mode=='empty' else {'observedAt':now-(120 if mode=='stale' else 0),'firmwareVersion':'0.4.0-ui-fixture',
                     'configRevision':state['revision'],'configWritable':mode!='readonly','muted':False,'dnd':False,'volume':state['config']['volume'],
@@ -128,7 +151,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if self.headers.get('X-QA-Key')!=CONTROL:return self.json_response(401,{'error':'unauthorized'})
                 if value.get('reset'):
                     state.update(mode='empty',config=copy.deepcopy(CONFIG),revision=1,requests=[],submissions=[],dropNext=False,
-                        deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',growthMode='disabled',
+                        deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',telemetryRequests=[],growthMode='disabled',
                         listMode=False,listMessages=[],listDeliveries=[],listRequests=[],listError='',listDelay=0)
                 if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success')
                 if value.get('listReset'):
