@@ -454,3 +454,10 @@ TELEMETRY-02 的图只画内存。本轮在「状态历史」时间范围下加�
 
 - **验证**：`npm run check`（78 token）与 `npm run build` 通过；夹具让 volume/audioUnderruns/audioFaulted 随点变化，`test_management_ui.sh` 新增 8 项断言（指标组、音量单序列与 `%`、未读 `条`、音频故障点/图例/提示、切回内存），46→54 项通过，390px 无横向溢出仍覆盖。全量 `python3 tools/run_local.py build`：120 条中 115 通过、5 条条件跳过，V21 在隔离 PostgreSQL 17 应用成功并产出 jar。
 - **未做**：缩放、导出、图表游标联动；未迁移真实库、部署、烧录与实机视觉终验。CORE `ef98bc8` 与 04 `1dcd617` 已推送并核对远端；[CORE Docker CI 43893638155](https://github.com/liuyiwuqing/nexus-core/actions/runs/43893638155) 与 [04 Software checks 43893666019](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43893666019) 均在约 2 秒内失败、`steps` 为空且无日志，仍是 GitHub 计费/额度阻断，非代码失败，待恢复后补跑。
+
+## TELEMETRY-04 · 状态历史缩放与 CSV 导出（2026-11-17，CORE `f13c4f5`、04 `a7de938`）
+
+TELEMETRY-03 之后补图表交互。图内拖拽选区放大时间窗口，只放大已取回并聚合的桶、不重新请求历史；纵轴按窗口内采样自适应，`clipPath` 裁掉窗外线段/故障点/游标，跨度小于 3 小时轴标签精确到秒。缩放后出现「重置缩放」，双击图表也可恢复；每分钟刷新时窗口仍在查询范围内则保留。按当前范围导出全部 18 列桶数据（采样/接收时间、样本数、固件与配置版本、音量/亮度/静音/免打扰/未读、内存四值、音频欠载、推理/显示最长耗时、音频异常），UTF-8 BOM + CRLF，文件名 `telemetry-<设备>-<范围>-<UTC>.csv`，无点时按钮禁用。
+
+- **验证**：`npm run check`（78 token）与 `npm run build` 通过；`test_management_ui.sh` 新增 5 项断言（CSV 下载文件名与大小、CSV 头与 70+ 行、拖拽缩放、缩放后悬停、重置），54→59 项通过，390px 无横向溢出仍覆盖。全量 `python3 tools/run_local.py build`：120 条中 115 通过、5 条条件跳过，V21 在隔离 PostgreSQL 17 应用成功并产出 jar。
+- **未做**：缩放为已取回桶的放大而非重新采样，未做多序列联动；未迁移真实库、部署、烧录与实机视觉终验。CORE `f13c4f5` 与 04 `a7de938` 已推送并核对远端；[CORE Docker CI 43908329517](https://github.com/liuyiwuqing/nexus-core/actions/runs/43908329517) 与 [04 Software checks 43908339990](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43908339990) 仍约 2–3 秒失败、`steps` 为空且无日志，属 GitHub 计费/额度阻断，非代码失败，待恢复后补跑。
