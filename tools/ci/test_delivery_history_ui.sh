@@ -69,12 +69,12 @@ const retry=(await fixture({})).requests.filter(r=>r.method==='POST');if(retry.l
 await reset();await history();await fixture({next_cancel:'conflict'});await tap('取消投递');await tap('确认取消');
 await expect("document.querySelector('.delivery-history-panel')?.innerText.includes('不能取消') && !document.querySelector('.delivery-cancel-confirm') && document.querySelectorAll('.delivery-timeline li').length===2",'claim conflict refreshes state and removes cancellation');
 await reset();await fixture({many:true});await history();
-await expect("document.querySelectorAll('.delivery-timeline li').length===30 && document.querySelector('.delivery-history-panel .pagination span')?.innerText==='1 / 2'",'history is bounded and paginated');
+await expect("document.querySelectorAll('.delivery-timeline li').length===30 && document.querySelector('.delivery-history-panel .pagination > span')?.innerText==='1 / 2'",'history is bounded and paginated');
 await js("[...document.querySelectorAll('.delivery-history-panel .pagination button')].find(b=>b.innerText==='下一页').click()");
-await expect("document.querySelectorAll('.delivery-timeline li').length===1 && document.querySelector('.delivery-history-panel .pagination span')?.innerText==='2 / 2'",'second history page contains the remaining event');
+await expect("document.querySelectorAll('.delivery-timeline li').length===1 && document.querySelector('.delivery-history-panel .pagination > span')?.innerText==='2 / 2'",'second history page contains the remaining event');
 await fixture({history_mode:'error'});await tap('刷新时间线');
 await expect("!!document.querySelector('.delivery-history-panel [role=alert]') && !document.querySelector('.delivery-timeline')",'history read failure hides stale events');
-await fixture({history_mode:'empty'});await tap('刷新时间线');await expect("document.querySelector('.delivery-history-panel')?.innerText.includes('尚无可读取的变化记录') && !document.querySelector('.delivery-history-panel [role=alert]') && document.querySelector('.delivery-history-panel .pagination span')?.innerText==='1 / 1'",'empty history is distinct from failure');
+await fixture({history_mode:'empty'});await tap('刷新时间线');await expect("document.querySelector('.delivery-history-panel')?.innerText.includes('尚无可读取的变化记录') && !document.querySelector('.delivery-history-panel [role=alert]') && document.querySelector('.delivery-history-panel .pagination > span')?.innerText==='1 / 1'",'empty history is distinct from failure');
 await fixture({history_mode:'success',history_delay:1});await tap('刷新时间线');
 await expect("document.querySelector('.delivery-history-panel [aria-busy=true]')?.innerText==='正在读取时间线…' && document.querySelector('.delivery-history-panel button').disabled",'history loading prevents duplicate reads');
 await expect("document.querySelectorAll('.delivery-timeline li').length===30",'history refresh recovers');await fixture({history_delay:0});

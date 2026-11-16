@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import secrets
 import threading
 import time
 from urllib.parse import parse_qs, urlparse
@@ -44,7 +45,17 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
             if self.headers.get('X-QA-Key')!=CONTROL:return self.json_response(401,{'error':'unauthorized'})
             with self.lock:return self.json_response(200,self.state)
         if not path.startswith('/api/'):
-            if path=='/':self.path='/index.html'
+            if path in ('/', '/index.html'):
+                # Match the real console response policy so CSS-in-JS failures
+                # cannot pass browser regressions only because CSP was absent.
+                nonce=secrets.token_urlsafe(24)
+                payload=(Path(self.directory)/'index.html').read_text().replace('__NEXUS_STYLE_NONCE__',nonce).encode()
+                self.send_response(200)
+                self.send_header('Content-Type','text/html; charset=utf-8')
+                self.send_header('Content-Length',str(len(payload)))
+                self.send_header('Cache-Control','no-store')
+                self.send_header('Content-Security-Policy',"default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; style-src 'self' 'nonce-"+nonce+"'")
+                self.end_headers();self.wfile.write(payload);return
             return super().do_GET()
         if self.headers.get('Authorization')!='Bearer '+TOKEN:return self.json_response(401,{'error':'unauthorized'})
         with self.lock:

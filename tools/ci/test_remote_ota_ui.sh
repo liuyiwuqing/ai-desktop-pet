@@ -37,7 +37,7 @@ await control({reset:true,otaReset:true});await openOrReuseTab(base,{wait:true,t
 const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
 if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
 
-await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await click('.login-card button.primary');await waitForElement('.sidebar');await click('.sidebar nav button:nth-child(3)');await tap('固件升级');
+await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await click('.login-card button.primary');await waitForElement('.sidebar');await click('.sidebar nav button[data-tab=devices]');await tap('固件升级');
 await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('远程升级尚未启用') && !document.querySelector('#remote-ota-panel select')",'disabled OTA has no action controls');
 await control({otaMode:'empty'});await tap('刷新状态');await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('尚未收到设备升级状态') && document.querySelector('#remote-ota-panel select')?.disabled",'missing readback disables installation');
 await control({otaMode:'no_releases'});await tap('刷新状态');await expect("document.querySelector('#remote-ota-panel')?.innerText.includes('没有匹配设备身份')",'empty compatible catalog is explained');

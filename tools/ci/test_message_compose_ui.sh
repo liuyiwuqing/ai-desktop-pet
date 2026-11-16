@@ -65,7 +65,7 @@ if(observed.manualMessages.length!==2 || observed.messageSubmissions[2].eventId=
 results.push('acknowledged submission releases its ID for the next message');
 await draft('未保存就断线','导航后仍保留请求');await fixture({messageNext:'drop_before_save'});await send();
 await expect("document.querySelector('.inline-form input')?.readOnly && document.querySelector('.inline-form textarea')?.readOnly && document.querySelector('.inline-form button.primary')?.innerText==='重试同一消息'",'unknown submission freezes its payload and offers explicit retry');
-await click('.sidebar nav button:nth-child(3)');await expect("document.querySelector('h1')?.innerText==='设备'",'navigation remains available');await click('.sidebar nav button:first-child');
+await click('.sidebar nav button[data-tab=devices]');await expect("document.querySelector('h1')?.innerText==='设备'",'navigation remains available');await click('.sidebar nav button[data-tab=inbox]');
 await expect("document.querySelector('.inline-form input')?.value==='未保存就断线' && document.querySelector('.inline-form textarea')?.value==='导航后仍保留请求' && document.querySelector('.inline-form input')?.readOnly",'unknown payload survives tab navigation');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
 await expect("document.documentElement.scrollWidth<=390 && !!document.querySelector('.inline-form [role=status]')",'unknown result fits 390 CSS px and exposes a status');

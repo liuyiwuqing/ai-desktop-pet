@@ -52,6 +52,7 @@
 | SW-07 | 全双工/播放中声学打断 | SW-07-A 并行 HAL/有限诊断软件已验证，`9376eda` 已推送；主机 ASan/UBSan、隐私门控、五预设及源码/产物核对通过；见 [22](22-audio-duplex-diagnostic.md) | 后续 `82edd36` 的 [43389006975](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43389006975) 七个 job 全绿；普通 AI 仍半双工，真实并行 I/O、参考对齐/漂移/声学打断仍待验收 |
 | SW-08 | 资源/多语言/更多平台 | 后续范围；中文 UI 和 Mac 扩展已实现 | 当前优先运维闭环，不擅自引入新基础设施 |
 | CONSOLE-01 | 测试消息未知结果重试 | CORE `07e3c53` 已推送；固定逻辑提交 ID/正文、导航恢复、确认后释放、拒绝/退出清理。新增浏览器 33 项与既有 78 项通过，CORE 59 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md) | 页面刷新/关闭后不恢复正文，应先核对列表；不是跨浏览器或设备展示保证。04 配套检查/文档同项提交 |
+| CONSOLE-14 | Naive UI 与管理台界面统一 | 软件本地已验证：三组导航/手机抽屉、消息筛选与导出、设备卡片、统一按钮与样式 nonce；见 [23](23-console-completion.md#console-14--naive-ui-与界面统一) | 完整 CORE 113 通过/5 条件跳过，19 组原页面 750 次与新增主题 21 次检查通过；CORE `9dc7ad9` 已推送并核对远端；JAR 三资源/20 迁移一致，04 配套与 CI 见末尾，部署/设备验收独立 |
 | CONSOLE-02 | 管理台完成度与验收清单 | `65eb2ef` 已推送；已按八导航、原完整规划及真实控制器核对；当前功能/验证/缺项见 [23](23-console-completion.md#console-02--当前实现与完整规划的差距) | 完整规划尚未全部实现；文档核对不算缺项完成。状态筛选已单独交付 CONSOLE-03 |
 | CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；更多筛选/元数据导出见 CONSOLE-13，取消/时间线见 CONSOLE-04 |
 | CONSOLE-04 | 投递状态时间线与受限取消 | CORE `109b83f` / 04 `0dec4b6` 已推送并核对远程；HTTP/worker/隔离 SQL 6 项，实际 Vue 新增 62/既有 191 项，Java→固件 C→Java 契约通过；完整构建 70 通过/5 跳过、JAR 一致；见 [23](23-console-completion.md#console-04--事务状态时间线与受限取消) | CORE [43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) Docker job、04 [43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job 全绿；V13 只在隔离库验证，旧行历史未知，无设备撤回或生产迁移 |
@@ -327,3 +328,17 @@ HW-10（2026-11-16）：基础硬件“小爱同学”语音唤醒已实现并�
 HW-10 最终记录：同一 USB 会话观察至 uptime 317,023 ms（491 次诊断采样），0 panic/非预期重启、0 显示失败、0 播放欠载；恢复 `active=false/healthy=true/failures=0`，前端 13,383 次处理、最大 44 ms，显示最大 76 ms。采样所见内部空闲最少 12,383 B、连续 DMA 最大块最少 3,072 B；A4 栈最少剩余 4,412 B、WSS 栈 18,788 B。自动记录 3 个 WAKE/DRAINED 轮次和 1,105,920 个真实播放采样，用户另外确认人声与 PTT 三轮正常。仅证明本次约五分钟及已测试轮次；不能替代长稳或识别率验收。IDLE/DRAINED 后关闭监视器，`lsof /dev/cu.usbmodem1201` 无占用，设备继续独立运行。
 
 实现提交 `3eacd00c07db527e2aa663cdd6897f11aa7ff5ce` 已正常推送，并以 `git ls-remote origin refs/heads/main` 核对远程一致。对应 [43744450764](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43744450764) 已启动：两项辅助检查成功，default/voice/full/off/tones/duplex 六个固件 job 仍在构建；不宣称本项远程 CI 已全部通过。
+
+
+## CONSOLE-14 · 管理台界面统一（2026-11-16）
+
+按用户确认的 Naive UI 方案落地：CORE 固定 Naive UI 2.45.3 / `@lucide/vue` 1.73.0，三组导航与手机抽屉、统一按钮/主题、登录与消息输入、设备状态与接收开关；消息筛选/导出分层，保留原字段和结果未知时的原身份重试。`ConsoleShell`/`ConsoleNavigation` 与导航定义独立，API/待确认提交仍由 App 管理。静态 HTML 每次生成独立 CSP 样式 nonce，无 unsafe-inline 或外部脚本放行。
+
+`python3 tools/run_local.py build` 退出 0：118 条中 113 通过、5 条可选环境跳过，新增静态页 nonce/缓存及原资源策略 2 项通过；CLI 的 `python3 -m unittest discover -s tools -p 'test_*.py'` 11 项通过。真实 Vue/回环 RAM HTTP 的原 19 组页面共 750 次检查通过；新增 `bash tools/ci/test_console_theme_ui.sh` 21 次检查通过，含实际 CSP、独立 nonce、十二导航、390px 抽屉与导出范围、Escape/外部点击、重复开关与焦点返回。已查看消息、设备、概览和手机导航的实际截图；样例数据不代表真实设备状态。
+
+迁移后部分脚本曾命中 Naive 按钮内部 span，而非分页计数；改为直接分页文字/稳定导航身份并完整重跑失败专项，保留全部原业务断言。手机导航新增检查发现抽屉自身焦点恢复覆盖目标标题，改为等待组件卸载后的 nextTick，再转移焦点；该检查已通过。补充实际 CSP 到既有公共浏览器夹具，不以无 CSP 页面代替正式样式验收。
+
+最终 `npm run check` / `npm run build` 通过；清理生成的旧静态资源后重新执行 Maven package，最终 JAR 静态资源及迁移与源码逐字节核对，结果与提交记录见下。没有生产迁移、消息、设备操作或目标机部署，旧镜像和离线包保持原快照；剩余用户视觉验收及真实环境验收不计作完成。
+
+
+CONSOLE-14 交付核对：CORE `9dc7ad9717dbf9c44a1bef7d3ad952c339aeefe0` 已正常推送并确认包含于 `origin/codex/core-baseline`；04 配套为本项文档/公共浏览器夹具/主题专项及既有脚本的语义定位调整。最终 JAR SHA-256 `a7f1e04d74322f3634c37d0bb8aa5766586bebd62a6088eff2229d8ce8b10d07`，三份 Vue 资源与 20 份迁移逐字节一致；补充独立静态页策略 2 项再次通过。首次远程 [CORE Docker CI 43799072343](https://github.com/liuyiwuqing/nexus-core/actions/runs/43799072343) 正在运行，其结果独立于上述本地验证；04 CI 随配套提交触发。未发布新镜像、未更新固定的 1Panel 镜像标签或部署服务器。

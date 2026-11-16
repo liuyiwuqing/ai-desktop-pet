@@ -56,7 +56,7 @@ await expect("!!document.querySelector('.sidebar')",'authenticated app');
 await expect("document.body.innerText.includes('内容已按保留期限清除')",'purged message list explains removal');
 await click('.message-row');
 await expect("document.querySelector('.message-detail')?.innerText.includes('清除正文和分析结果') && !document.querySelector('.analysis-section')",'purged message hides analysis');
-await click('.sidebar nav button:nth-child(3)');
+await click('.sidebar nav button[data-tab=devices]');
 await tap('修改名称');
 await fillInput('.device-name-form input','书房伙伴');
 await fixture({deviceName:'另一窗口的名称'});await tap('刷新');

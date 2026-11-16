@@ -31,10 +31,10 @@ async function state() {return JSON.parse(await serverFetch(base+'/__qa/state',{
 async function tap(text) {
   if(!await js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()===${JSON.stringify(text)});if(!b||b.disabled)return false;b.click();return true;})()`))throw new Error('Button unavailable: '+text);
 }
-async function navigate(index) {
+async function navigate(tab) {
   // Viewport emulation can leave cached mouse coordinates in the browser helper.
   // Use the public DOM button, without accessing component internals.
-  await js(`document.querySelector('.sidebar nav button:nth-child(${index})').click()`);
+  await js(`document.querySelector('.sidebar nav button[data-tab=${tab}]').click()`);
 }
 async function choose(label,value) {
   const selector=`select[aria-label="${label}"]`;
@@ -52,31 +52,31 @@ await expect("!!document.querySelector('select[aria-label=消息状态]')",'mess
 if((await state()).listRequests.some(path=>path.includes('readStatus=')||path.includes('status=')))throw new Error('Default lists must omit the optional filters');
 results.push('default HTTP requests omit filters');
 await choose('消息状态','unread');
-await expect("document.querySelector('.section-heading p')?.innerText==='31 条消息' && document.querySelectorAll('.message-row').length===30 && document.querySelectorAll('.message-row:not(.unread)').length===0 && document.querySelector('.pagination span')?.innerText==='1 / 2'",'unread filter shares rows, total and pagination');
+await expect("document.querySelector('.section-heading p')?.innerText==='31 条消息' && document.querySelectorAll('.message-row').length===30 && document.querySelectorAll('.message-row:not(.unread)').length===0 && document.querySelector('.pagination > span')?.innerText==='1 / 2'",'unread filter shares rows, total and pagination');
 await tap('下一页');
-await expect("document.querySelectorAll('.message-row').length===1 && document.querySelector('.message-title')?.innerText==='未读消息 30' && document.querySelector('.pagination span')?.innerText==='2 / 2'",'filtered message next page is accurate');
+await expect("document.querySelectorAll('.message-row').length===1 && document.querySelector('.message-title')?.innerText==='未读消息 30' && document.querySelector('.pagination > span')?.innerText==='2 / 2'",'filtered message next page is accurate');
 await choose('消息状态','read');
-await expect("document.querySelector('.section-heading p')?.innerText==='2 条消息' && document.querySelectorAll('.message-row').length===2 && document.querySelectorAll('.message-row.unread').length===0 && document.querySelector('.pagination span')?.innerText==='1 / 1'",'switching filter resets the message page');
-await navigate(5);
+await expect("document.querySelector('.section-heading p')?.innerText==='2 条消息' && document.querySelectorAll('.message-row').length===2 && document.querySelectorAll('.message-row.unread').length===0 && document.querySelector('.pagination > span')?.innerText==='1 / 1'",'switching filter resets the message page');
+await navigate('deliveries');
 await expect("document.querySelector('h1')?.innerText==='投递' && document.querySelectorAll('tbody tr').length===30",'default delivery list is unchanged');
 for(const [value,name,total] of [['pending','等待投递',1],['sent','等待设备确认',1],['received','设备已保存',1],['displayed','设备已展示',1],['read','用户已读',1],['expired','已结束',1],['failed','投递失败',31]]) {
   await choose('投递状态',value);
   await expect(`document.querySelector('.section-heading p')?.innerText.startsWith('${total} 条投递') && document.querySelectorAll('tbody tr').length===${Math.min(total,30)} && [...document.querySelectorAll('tbody .badge')].every(b=>b.innerText===${JSON.stringify(name)})`,'delivery filter: '+value);
 }
-await navigate(1);
+await navigate('inbox');
 await expect("document.querySelector('select[aria-label=消息状态]')?.value==='read' && document.querySelectorAll('.message-row').length===2",'message filter survives navigation');
 await tap('刷新');
 await expect("!document.querySelector('.list-filters select').disabled && document.querySelector('.list-filters select').value==='read' && document.querySelectorAll('.message-row').length===2",'manual refresh retains the message filter');
 await choose('消息状态','unread');
-await expect("document.querySelector('.pagination span')?.innerText==='1 / 2'",'unread list is ready for last-page action');await tap('下一页');
-await expect("document.querySelectorAll('.message-row').length===1 && document.querySelector('.pagination span')?.innerText==='2 / 2'",'last message page contains one row');
+await expect("document.querySelector('.pagination > span')?.innerText==='1 / 2'",'unread list is ready for last-page action');await tap('下一页');
+await expect("document.querySelectorAll('.message-row').length===1 && document.querySelector('.pagination > span')?.innerText==='2 / 2'",'last message page contains one row');
 await click('.message-row');await tap('标记已读');
-await expect("document.querySelector('.section-heading p')?.innerText==='30 条消息' && document.querySelector('.pagination span')?.innerText==='1 / 1' && document.querySelectorAll('.message-row').length===30 && document.querySelector('.list-filters select').value==='unread' && !document.body.innerText.includes('未读消息 30')",'marking the final filtered row read reloads the valid page');
-await navigate(5);
-await expect("document.querySelector('select[aria-label=投递状态]')?.value==='failed' && document.querySelector('.pagination span')?.innerText==='1 / 2'",'delivery filter survives navigation');await tap('下一页');
-await expect("document.querySelectorAll('tbody tr').length===1 && document.querySelector('.pagination span')?.innerText==='2 / 2'",'last delivery page contains one failed row');
+await expect("document.querySelector('.section-heading p')?.innerText==='30 条消息' && document.querySelector('.pagination > span')?.innerText==='1 / 1' && document.querySelectorAll('.message-row').length===30 && document.querySelector('.list-filters select').value==='unread' && !document.body.innerText.includes('未读消息 30')",'marking the final filtered row read reloads the valid page');
+await navigate('deliveries');
+await expect("document.querySelector('select[aria-label=投递状态]')?.value==='failed' && document.querySelector('.pagination > span')?.innerText==='1 / 2'",'delivery filter survives navigation');await tap('下一页');
+await expect("document.querySelectorAll('tbody tr').length===1 && document.querySelector('.pagination > span')?.innerText==='2 / 2'",'last delivery page contains one failed row');
 await click('tbody button');
-await expect("document.querySelector('.section-heading p')?.innerText.startsWith('30 条投递') && document.querySelector('.pagination span')?.innerText==='1 / 1' && document.querySelectorAll('tbody tr').length===30 && document.querySelector('.list-filters select').value==='failed'",'retrying the final failed row reloads the valid page');
+await expect("document.querySelector('.section-heading p')?.innerText.startsWith('30 条投递') && document.querySelector('.pagination > span')?.innerText==='1 / 1' && document.querySelectorAll('tbody tr').length===30 && document.querySelector('.list-filters select').value==='failed'",'retrying the final failed row reloads the valid page');
 await choose('投递状态','pending');
 await expect("document.querySelectorAll('tbody tr').length===2 && [...document.querySelectorAll('tbody .badge')].every(b=>b.innerText==='等待投递')",'retried delivery appears in pending results');
 await fixture({listError:'deliveries'});await choose('投递状态','expired');
@@ -87,7 +87,7 @@ await fixture({listDelay:1});await choose('投递状态','failed');
 await expect("document.querySelector('.empty-state[role=status]')?.innerText==='正在加载投递…' && document.querySelector('.list-filters select').disabled && !document.body.innerText.includes('没有符合条件的投递')",'delivery loading is distinct from empty or failed');
 await expect("document.querySelectorAll('tbody tr').length===30 && !document.querySelector('.list-filters select').disabled",'delayed delivery filter finishes');await fixture({listDelay:0});
 await choose('投递状态','expired');await expect("document.querySelectorAll('tbody tr').length===1 && !document.querySelector('.list-filters select').disabled",'delivery filter restores the narrow result');
-await navigate(1);await fixture({listError:'messages'});await choose('消息状态','read');
+await navigate('inbox');await fixture({listError:'messages'});await choose('消息状态','read');
 await expect("document.querySelector('h2')?.innerText==='消息读取失败' && document.querySelector('.list-filters select').value==='read' && document.querySelectorAll('.message-row').length===0 && !document.body.innerText.includes('没有符合条件的消息')",'failed message filter does not show stale rows or a false empty result');
 await fixture({listError:''});await tap('重试');
 await expect("document.querySelectorAll('.message-row').length===3 && document.querySelector('.list-filters select').value==='read' && !document.querySelector('.feedback.error')",'message read failure recovers with its filter');
@@ -96,13 +96,13 @@ await expect("document.querySelector('.empty-state[role=status]')?.innerText==='
 await expect("document.querySelectorAll('.message-row').length===30 && !document.querySelector('.list-filters select').disabled",'delayed message filter finishes');await fixture({listDelay:0});
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
 await expect("document.documentElement.scrollWidth<=390 && document.querySelector('.list-filters select').getBoundingClientRect().right<=390",'message filter fits 390 CSS pixels');
-await navigate(5);
+await navigate('deliveries');
 await expect("document.querySelector('h1')?.innerText==='投递' && document.documentElement.scrollWidth<=390 && document.querySelector('.list-filters select').getBoundingClientRect().right<=390 && document.querySelectorAll('tbody tr').length===1",'delivery filter fits 390 CSS pixels with a scrollable table');
 await cdp('Emulation.clearDeviceMetricsOverride');
 await fixture({listEmpty:true});await tap('刷新');
 await expect("document.querySelector('h2')?.innerText==='没有符合条件的投递' && document.querySelector('.list-filters select').value==='expired'",'empty filtered delivery result is explicit');
 await choose('投递状态','');await expect("document.querySelector('h2')?.innerText==='还没有投递记录'",'unfiltered delivery empty state is preserved');
-await navigate(1);
+await navigate('inbox');
 await expect("document.querySelector('h2')?.innerText==='没有符合条件的消息' && document.querySelector('.list-filters select').value==='unread'",'empty filtered message result is explicit');
 await choose('消息状态','');await expect("document.querySelector('h2')?.innerText==='消息会从这里开始'",'unfiltered message empty state is preserved');
 await fixture({listDelay:1});await choose('消息状态','read');
@@ -112,7 +112,7 @@ await fixture({listDelay:0});await wait(1.2);
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.sidebar') && document.querySelector('.token-label input').value===''",'late filtered response cannot restore a logged-out session');
 await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
 await expect("document.querySelector('select[aria-label=消息状态]')?.value===''",'new login resets the message filter');
-await navigate(5);await expect("document.querySelector('select[aria-label=投递状态]')?.value===''",'new login resets the delivery filter');
+await navigate('deliveries');await expect("document.querySelector('select[aria-label=投递状态]')?.value===''",'new login resets the delivery filter');
 const requests=(await state()).listRequests;
 if(!requests.includes('/api/v1/messages?page=2&readStatus=unread') || !requests.includes('/api/v1/deliveries?page=2&status=failed'))throw new Error('Pagination lost its HTTP filter');
 results.push('public pagination requests retain both filter parameters');

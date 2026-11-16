@@ -28,7 +28,7 @@ const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js
 if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
 
 await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await click('.login-card button.primary');
-await expect("!!document.querySelector('.sidebar')",'authenticated');await click('.sidebar nav button:nth-child(2)');
+await expect("!!document.querySelector('.sidebar')",'authenticated');await click('.sidebar nav button[data-tab=pet]');
 const panel="document.querySelector('[aria-labelledby=device-growth-title]')";
 await expect(`${panel}?.innerText.includes('同步未启用')`,'disabled feature has an explicit state');
 await refresh('empty');await expect(`${panel}?.innerText.includes('暂无已注册设备')`,'no registered devices');
