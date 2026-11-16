@@ -447,3 +447,10 @@ CONSOLE-15 追加（CORE `004c2db`，已推送）：三张表格容器补 `tabin
 - **未做**：图表仅展示可用内存与启动以来最小，未画音量/未读/音频指标；没有缩放、游标联动或导出；未迁移真实库、部署与实机长期采样/视觉终验。收尾补跑 `python3 tools/run_local.py build`：120 条中 115 通过、5 条条件跳过，V21 在隔离 PostgreSQL 17 应用成功并产出 jar，前端构建包含在产物中。
 
 远程 CI：本项推送后的 [CORE Docker CI 43877392638](https://github.com/liuyiwuqing/nexus-core/actions/runs/43877392638) 与 [04 CI 43877407916](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43877407916) 均在约 2 秒内失败：job 已创建但 `steps` 为空、无日志可读，与 TELEMETRY-01 的计费/额度阻断一致。非代码失败，不把本地 46 项写作远程通过，待额度恢复后补跑。
+
+## TELEMETRY-03 · 状态历史指标切换与音频故障标记（2026-11-16，CORE `ef98bc8`、04 `1dcd617`）
+
+TELEMETRY-02 的图只画内存。本轮在「状态历史」时间范围下加指标组（内存默认/音量/未读/音频），复用同一条 `GET .../telemetry` 响应，切换只换本地序列、不发请求；内存保留双序列（`freeHeap` 实线 `--accent`、`minFreeHeap` 虚线 `--info`），音量 `%`、未读 `条`、音频欠载 `次` 为单序列。`audioFaulted=true` 的桶在音频视图叠加 `--danger` 圆点，图例出现「音频异常」，悬停该点写明；`audioUnderruns` 为 `null` 的桶不画，1.8 倍桶宽断线规则不变。计数/百分比下界钳 0，全 0 时刻度不出现负值。
+
+- **验证**：`npm run check`（78 token）与 `npm run build` 通过；夹具让 volume/audioUnderruns/audioFaulted 随点变化，`test_management_ui.sh` 新增 8 项断言（指标组、音量单序列与 `%`、未读 `条`、音频故障点/图例/提示、切回内存），46→54 项通过，390px 无横向溢出仍覆盖。全量 `python3 tools/run_local.py build`：120 条中 115 通过、5 条条件跳过，V21 在隔离 PostgreSQL 17 应用成功并产出 jar。
+- **未做**：缩放、导出、图表游标联动；未迁移真实库、部署、烧录与实机视觉终验。CORE `ef98bc8` 与 04 `1dcd617` 已推送并核对远端；[CORE Docker CI 43893638155](https://github.com/liuyiwuqing/nexus-core/actions/runs/43893638155) 与 [04 Software checks 43893666019](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43893666019) 均在约 2 秒内失败、`steps` 为空且无日志，仍是 GitHub 计费/额度阻断，非代码失败，待恢复后补跑。
