@@ -446,4 +446,4 @@ CONSOLE-15 追加（CORE `004c2db`，已推送）：三张表格容器补 `tabin
 - **验证**：`npm run check`（78 token，无散落 hex）与 `npm run build` 通过。04 夹具新增 `/telemetry` 端点（按 `bucket` 生成点、记录请求、支持空态），`test_management_ui.sh` 新增空态、图例/双序列、默认 `5m` 请求、切 24 小时请求 `15m`、悬停取值、历史不含「实时」及 390px 无溢出断言；完整 46 项浏览器断言通过。夹具时间解析同时修正为接受 `toISOString()` 的小数秒，避免历史接口整条失败。
 - **未做**：图表仅展示可用内存与启动以来最小，未画音量/未读/音频指标；没有缩放、游标联动或导出；未执行 `run_local.py build`、真实库迁移、部署与实机长期采样/视觉终验。
 
-远程 CI：本项推送后的 Docker/固件 job 另行核对；沿用 TELEMETRY-01 的额度阻断，不把本地结果写作远程通过。
+远程 CI：本项推送后的 [CORE Docker CI 43877392638](https://github.com/liuyiwuqing/nexus-core/actions/runs/43877392638) 与 [04 CI 43877407916](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43877407916) 均在约 2 秒内失败：job 已创建但 `steps` 为空、无日志可读，与 TELEMETRY-01 的计费/额度阻断一致。非代码失败，不把本地 46 项写作远程通过，待额度恢复后补跑。
