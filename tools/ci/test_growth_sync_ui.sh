@@ -21,7 +21,7 @@ if(existing&&existing.ownership!=='agent')throw new Error('Existing space needs 
 const task=await useOrCreateTaskSpace(name);cliLog({taskSpaceId:task.id});
 const base='http://127.0.0.1:18802',checks=[];
 async function control(body){return JSON.parse(await serverFetch(base+'/__qa/state',{method:'POST',headers:{'Content-Type':'application/json','X-QA-Key':'isolated-ui-fixture-control'},body:JSON.stringify(body)}));}
-async function expect(expression,label){for(let i=0;i<60;i++){if(await js(expression)){checks.push(label);return;}await wait(0.1);}throw new Error(label);}
+async function expect(expression,label){for(let i=0;i<60;i++){if(await js(expression).catch(()=>false)){checks.push(label);return;}await wait(0.1);}throw new Error(label);}
 async function refresh(mode){await control({growthMode:mode});await js("[...document.querySelectorAll('button')].find(b=>b.innerText==='刷新设备成长').click()");}
 await control({reset:true});await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
 const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];

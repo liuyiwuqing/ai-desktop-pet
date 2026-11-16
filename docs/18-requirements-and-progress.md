@@ -356,3 +356,15 @@ CONSOLE-14 交付核对：CORE `9dc7ad9717dbf9c44a1bef7d3ad952c339aeefe0` 已正
 CORE 提交 `b3150bc` 已推送，`origin/codex/core-baseline` 已确认包含；诊断与规范见 CORE `docs/console-ui-refinement.md`、`docs/console-ui.md`。
 
 CONSOLE-15 追加（CORE `004c2db`，已推送）：三张表格容器补 `tabindex="0" role="region"` 与作用域 `aria-label`，键盘可进入横向滚动区；投递与操作审计两处实测生效（`aria-label` 分别为"投递记录/操作审计…"，焦点落在 `.table-shell`），"最近执行"表因夹具无执行记录未渲染，属性随源码与 `vue-tsc`/构建通过。文档补两条约定：抽屉关闭后 `focusContent()` 只认 `.content h1`，不得放宽到 `h2`；`.section-heading` 不叠加 `:focus-visible` 轮廓。下一轮建议加"12 页 `h1` 文本指纹"断言作为兜底。OTA 安装按钮显性化目标与"完成并结算"二次确认、空挂类清理分别留在 P1/P2，按用户的"不为一次性改动增加机制"原则不并入本批。
+
+## CONSOLE-16 · 按页请求与代码分割（2026-11-16）
+
+推进 CONSOLE-15 未落地的 O12/O13。刷新改为三档：轮询/可见/切页/操作回读走当前标签页的 `tabResources`；SSE `invalidate` 在其上补 `devices`（顶栏"设备视图"是外壳级依赖，事件不说明变了什么）；顶栏刷新、错误重试、登录走全量。`loading` 只在实际取数据时置位，纯 `status` 探测不再让顶栏每 5 秒闪"刷新中"；筛选/搜索守卫从 `loading || busy || exporting` 收窄为 `busy || exporting`，竞态统一交给 `readGeneration`。
+
+面板改为按需加载：`src/panels.ts` 集中 14 个加载器，`asyncPanel()` 统一产出 `defineAsyncComponent`（`delay:200` 内不闪骨架、`timeout:20000` 给失败态），`App.vue` 只同步保留外壳与默认页；导航项 `@pointerenter`/`@focus` 做意图预取，`watch(tab)` 兜底；新增 `PanelSkeleton` 骨架；`focusContent()` 改为有限次轮询等 `.content h1`（异步挂载晚于一次 `nextTick`，否则"焦点进入 h1"会静默失效）。
+
+实测（概览夹具，单钩子统计 `fetch`，16 秒窗口）：概览页 refresh 请求 15→3（每 tick 5→1，仅 status）；消息页 20→8（5→2）；投递 15→6；设备 20→8。构建产物 CSS 26.70 kB、首屏 JS 181.62 kB + 共享 Button 142.26 kB（471.07→323.88，−31%），其余 14 个按页 chunk 2.8–49.3 kB。
+
+面板异步化后"点导航→下一句找按钮"不再成立，改了三处等待方式、断言内容不变：20 个 UI 脚本的 `expect()` 改为 `js(expr).catch(()=>false)`（元素未渲染时 `.find(...).disabled` 会抛 `TypeError` 直接中止脚本）；3 个脚本的单发 `tap()` 改有限次重试；`test_roles_ui.sh` 的 `nav()` 加"页面已挂载"门（否则"只读角色看不到某按钮"的否定断言会假通过）。回归 20 个控制台脚本 / 779 条断言全部通过。
+
+取舍：非设备类页的设备下拉依赖 SSE 失效或进入设备页才更新（下拉只显示设备名，不含在线态）；不采用"登录后预取全部 chunk"，以免抵消分割收益。

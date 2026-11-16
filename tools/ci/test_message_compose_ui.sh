@@ -28,12 +28,17 @@ async function fixture(value) {
 }
 async function state() {return JSON.parse(await serverFetch(base+'/__qa/state',{headers:{'X-QA-Key':'isolated-ui-fixture-control'}}));}
 async function expect(expression,label) {
-  for(let i=0;i<50;i++){if(await js(expression)){results.push(label);return;}await wait(0.1);}
+  for(let i=0;i<50;i++){if(await js(expression).catch(()=>false)){results.push(label);return;}await wait(0.1);}
   const observed=await state();cliLog({failed:label,requests:observed.messageSubmissions.length,saved:observed.manualMessages.length});
   throw new Error('UI assertion failed: '+label);
 }
 async function tap(text) {
-  if(!await js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()===${JSON.stringify(text)});if(!b||b.disabled)return false;b.click();return true;})()`))throw new Error('Button unavailable: '+text);
+  // 面板由按需加载的 chunk 渲染，按钮可能晚一拍出现；有限次重试，断言仍是"存在且可点"。
+  for(let i=0;i<50;i++) {
+    if(await js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()===${JSON.stringify(text)});if(!b||b.disabled)return false;b.click();return true;})()`))return;
+    await wait(0.1);
+  }
+  throw new Error('Button unavailable: '+text);
 }
 async function draft(title,content) {
   await tap('发送测试消息');await fillInput('.inline-form input',title);await fillInput('.inline-form textarea',content);

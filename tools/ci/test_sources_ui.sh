@@ -18,7 +18,7 @@ ego-browser nodejs <<'EOF'
 const name='NEXUS webhook sources',base='http://127.0.0.1:18816';
 const prior=(await listTaskSpaces()).find(s=>s.name===name);if(prior&&prior.ownership!=='agent')throw new Error('Space requires confirmation');await useOrCreateTaskSpace(name);await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});let checks=[];
 async function qa(body={}){return JSON.parse(await serverFetch(base+'/__qa/operations',{method:'POST',headers:{'Content-Type':'application/json','X-QA-Key':'isolated-ui-fixture-control'},body:JSON.stringify(body)}));}
-async function expect(e,label){for(let i=0;i<100;i++){if(await js(e)){checks.push(label);return;}await wait(.1);}cliLog(await snapshotText());throw new Error(label);}
+async function expect(e,label){for(let i=0;i<100;i++){if(await js(e).catch(()=>false)){checks.push(label);return;}await wait(.1);}cliLog(await snapshotText());throw new Error(label);}
 async function tap(label){await expect(`(()=>{const b=[...document.querySelectorAll('.content button')].find(b=>b.textContent.trim()===${JSON.stringify(label)});if(!b||b.disabled)return false;b.click();return true;})()`,'click '+label);}
 async function nav(label){await js(`(()=>{[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith(${JSON.stringify(label)})).click();})()`);}
 async function create(){await tap('新增来源');await fillInput('[aria-label=新建来源] label:nth-child(2) input','隔离来源');await js("(()=>{const e=document.querySelector('[aria-label=新建来源] select');e.options[0].selected=true;e.dispatchEvent(new Event('change',{bubbles:true}));})()");}

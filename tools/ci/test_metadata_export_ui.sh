@@ -28,7 +28,7 @@ async function freshDownloadDir(){const dir=fs.mkdtempSync(path.join(os.tmpdir()
 await cdp('Emulation.setTimezoneOverride',{timezoneId:'Asia/Shanghai'});
 async function fixture(value){return JSON.parse(await serverFetch(base+'/__qa/query',{method:'POST',headers:{'Content-Type':'application/json','X-QA-Key':'isolated-ui-fixture-control'},body:JSON.stringify(value)}));}
 async function state(){return JSON.parse(await serverFetch(base+'/__qa/state',{headers:{'X-QA-Key':'isolated-ui-fixture-control'}}));}
-async function expect(expression,label){for(let i=0;i<70;i++){if(await js(expression)){results.push(label);return;}await wait(0.1);}cliLog(await snapshotText());throw new Error('UI assertion failed: '+label);}
+async function expect(expression,label){for(let i=0;i<70;i++){if(await js(expression).catch(()=>false)){results.push(label);return;}await wait(0.1);}cliLog(await snapshotText());throw new Error('UI assertion failed: '+label);}
 async function ready(){for(let i=0;i<70;i++){if(await js("!!document.querySelector('.list-filters select') && !document.querySelector('.list-filters select').disabled"))return;await wait(0.1);}throw new Error('List did not settle');}
 async function tap(text){if(text==='导出元数据')await js("document.querySelector('.export-actions').open=true");for(let i=0;i<70;i++){if(await js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)});if(!b||b.disabled)return false;b.click();return true;})()`))return;await wait(0.1);}throw new Error('Button unavailable: '+text);}
 async function navigate(label){await js(`(()=>{[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith(${JSON.stringify(label)})).click();})()`);}

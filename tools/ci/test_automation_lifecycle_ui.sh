@@ -24,7 +24,7 @@ await useOrCreateTaskSpace(name);await openOrReuseTab(base,{wait:true,timeout:15
 await cdp('Network.setCacheDisabled',{cacheDisabled:true});
 const checks=[];
 async function qa(value={}){return JSON.parse(await serverFetch(base+'/__qa/operations',{method:'POST',headers:{'Content-Type':'application/json','X-QA-Key':'isolated-ui-fixture-control'},body:JSON.stringify(value)}));}
-async function expect(expression,label){for(let i=0;i<100;i++){if(await js(expression)){checks.push(label);return;}await wait(.1);}cliLog(await snapshotText());throw new Error(label);}
+async function expect(expression,label){for(let i=0;i<100;i++){if(await js(expression).catch(()=>false)){checks.push(label);return;}await wait(.1);}cliLog(await snapshotText());throw new Error(label);}
 async function tap(label,scope='.content > section'){await expect(`(()=>{const b=[...document.querySelectorAll(${JSON.stringify(scope)}+' button')].find(b=>b.textContent.trim()===${JSON.stringify(label)});if(!b||b.disabled)return false;b.click();return true;})()`,'click '+label);}
 async function nav(label){await js(`(()=>{[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith(${JSON.stringify(label)})).click();})()`);}
 async function reset(){await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});await qa({reset:true});await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'login');await nav('自动化');await expect(`document.getElementById('delete-rule-${id}')?.disabled===false`,'deletion becomes available');}

@@ -27,7 +27,7 @@ await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
 const fs=await import('node:fs'),path=await import('node:path');
 const screenshots='/tmp/nexus-console-theme';fs.mkdirSync(screenshots,{recursive:true});
 const checks=[];
-async function expect(expression,label){for(let i=0;i<80;i++){if(await js(expression)){checks.push(label);return;}await wait(.1);}cliLog(await snapshotText());throw new Error(label);}
+async function expect(expression,label){for(let i=0;i<80;i++){if(await js(expression).catch(()=>false)){checks.push(label);return;}await wait(.1);}cliLog(await snapshotText());throw new Error(label);}
 async function shot(name,width,height=1000,mobile=false){await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile});await wait(.3);const result=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(screenshots,name+'.png'),Buffer.from(result.data,'base64'));}
 await expect("!!document.querySelector('.login-card .n-input input[required]')",'login keeps native required validation');
 await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await click('.login-card button.primary');

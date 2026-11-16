@@ -30,7 +30,7 @@ const task=await useOrCreateTaskSpace(name);cliLog({taskSpaceId:task.id});
 const base='http://127.0.0.1:18801',checks=[];
 async function control(body){return JSON.parse(await serverFetch(base+'/__qa/state',{method:'POST',headers:{'Content-Type':'application/json','X-QA-Key':'isolated-ui-fixture-control'},body:JSON.stringify(body)}));}
 async function state(){return JSON.parse(await serverFetch(base+'/__qa/state',{headers:{'X-QA-Key':'isolated-ui-fixture-control'}}));}
-async function expect(expression,label){for(let i=0;i<60;i++){if(await js(expression)){checks.push(label);return;}await wait(0.1);}throw new Error(label);}
+async function expect(expression,label){for(let i=0;i<60;i++){if(await js(expression).catch(()=>false)){checks.push(label);return;}await wait(0.1);}throw new Error(label);}
 async function tap(label){for(let i=0;i<60;i++){const ok=await js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()===${JSON.stringify(label)});if(!b||b.disabled)return false;b.click();return true;})()`);if(ok)return;await wait(0.1);}throw new Error('Unavailable '+label);}
 async function selectRelease(){await js("(()=>{const el=document.querySelector('#remote-ota-panel select');el.value='release-ui';el.dispatchEvent(new Event('change',{bubbles:true}));})()");}
 await control({reset:true,otaReset:true});await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});

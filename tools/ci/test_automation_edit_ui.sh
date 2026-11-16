@@ -27,7 +27,7 @@ else await openOrReuseTab(base,{wait:true,timeout:15});
 await cdp('Network.setCacheDisabled',{cacheDisabled:true});
 const results=[],daily='11111111-1111-4111-8111-111111111111',active='22222222-2222-4222-8222-222222222222',comment='33333333-3333-4333-8333-333333333333',running='44444444-4444-4444-8444-444444444444';
 async function fixture(value={}){return JSON.parse(await serverFetch(base+'/__qa/operations',{method:'POST',headers:{'Content-Type':'application/json','X-QA-Key':'isolated-ui-fixture-control'},body:JSON.stringify(value)}));}
-async function expect(expression,label){for(let i=0;i<80;i++){if(await js(expression)){results.push(label);return;}await wait(0.1);}cliLog(await snapshotText());throw new Error('UI assertion failed: '+label);}
+async function expect(expression,label){for(let i=0;i<80;i++){if(await js(expression).catch(()=>false)){results.push(label);return;}await wait(0.1);}cliLog(await snapshotText());throw new Error('UI assertion failed: '+label);}
 async function tap(text,scope='.content > section'){for(let i=0;i<80;i++){if(await js(`(()=>{const b=[...document.querySelectorAll(${JSON.stringify(scope)}+' button')].find(b=>b.innerText.trim()===${JSON.stringify(text)});if(!b||b.disabled)return false;b.click();return true;})()`))return;await wait(0.1);}throw new Error('Button unavailable: '+text);}
 async function navigate(label){await js(`(()=>{[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith(${JSON.stringify(label)})).click();})()`);}
 async function ready(){for(let i=0;i<80;i++){if(await js("!!document.querySelector('.content > section') && !document.querySelector('.content > section [aria-busy=true]')"))return;await wait(0.1);}throw new Error('Panel did not settle');}
