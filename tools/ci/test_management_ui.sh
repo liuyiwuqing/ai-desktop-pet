@@ -115,6 +115,18 @@ await js("(()=>{const svg=document.querySelector('.telemetry-chart');const dot=d
 await expect("document.querySelector('.chart-tooltip')?.textContent.includes('音频异常')",'audio fault is explained in tooltip');
 await tap('内存');
 await expect("document.querySelector('.chart-legend')?.innerText.includes('可用内存') && !!document.querySelector('.telemetry-chart .series-secondary')",'heap metric restores both series');
+await js("(()=>{window.__csv=null;window.__csvName='';window.__csvText='';const original=URL.createObjectURL;URL.createObjectURL=blob=>{window.__csv=blob;return original.call(URL,blob);};HTMLAnchorElement.prototype.click=function(){window.__csvName=this.download;};return true;})()");
+await tap('导出 CSV');
+await expect("window.__csvName.startsWith('telemetry-dodo-ui-fixture-6h-') && window.__csvName.endsWith('.csv') && window.__csv?.size>500",'history export downloads a CSV');
+await js("(()=>{window.__csv.text().then(text=>{window.__csvText=text;});return true;})()");
+await expect("window.__csvText.includes('采样时间') && window.__csvText.includes('音频欠载') && window.__csvText.split('\\r\\n').length>=70",'exported CSV has a header and every bucket row');
+await js("(()=>{delete HTMLAnchorElement.prototype.click;return true;})()");
+await js("(()=>{const svg=document.querySelector('.telemetry-chart');const rect=svg.getBoundingClientRect();const at=ratio=>[rect.left+rect.width*ratio,rect.top+rect.height*0.5];const [x1,y1]=at(0.35),[x2,y2]=at(0.6);svg.dispatchEvent(new MouseEvent('mousedown',{button:0,clientX:x1,clientY:y1,bubbles:true}));svg.dispatchEvent(new MouseEvent('mousemove',{clientX:x2,clientY:y2,bubbles:true}));window.dispatchEvent(new MouseEvent('mouseup',{button:0,clientX:x2,clientY:y2,bubbles:true}));return true;})()");
+await expect("!!document.querySelector('.chart-reset')",'drag selection zooms the history chart');
+await js("(()=>{const svg=document.querySelector('.telemetry-chart');const rect=svg.getBoundingClientRect();svg.dispatchEvent(new MouseEvent('mousemove',{clientX:rect.left+rect.width*0.5,clientY:rect.top+rect.height*0.5,bubbles:true}));return true;})()");
+await expect("!!document.querySelector('.chart-tooltip')",'tooltip still works after zoom');
+await tap('重置缩放');
+await expect("!document.querySelector('.chart-reset')",'zoom resets to the full range');
 await tap('24 小时');
 await expectState(snapshot=>snapshot.telemetryRequests.some(path=>path.includes('bucket=15m')),'range switch queries a 15m bucket');
 await expect("document.querySelector('.telemetry-history')?.innerText.includes('24 小时 · 15 分钟桶')",'history states active range and bucket');
