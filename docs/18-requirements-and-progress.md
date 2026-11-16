@@ -399,4 +399,20 @@ CONSOLE-15 追加（CORE `004c2db`，已推送）：三张表格容器补 `tabin
 
 **守卫缺口**。改②时多写一个 `}`，`vue-tsc` 与 token 四条规则全过，只有 lightningcss 在 build 阶段报 `Invalid empty selector`。`check-tokens.mjs` 因此加规则 0（花括号必须成对），负例验证过会红。
 
-回归：20 个脚本 / 780 条断言全绿，受本批直接影响并单独重跑的是 message_compose(33)、management(38)、remote_ota(23)、operations(96)、automation_edit(99)、growth_sync(18)。退化的 12 页 `h1` 文本指纹断言见 CONSOLE-19。未执行 `run_local.py build`、远程 CI、部署与实机验收。
+回归：20 个脚本 / 780 条断言全绿，受本批直接影响并单独重跑的是 message_compose(33)、management(38)、remote_ota(23)、operations(96)、automation_edit(99)、growth_sync(18)。未执行 `run_local.py build`、远程 CI、部署与实机验收。
+
+## CONSOLE-19 · 十二页 h1 文本指纹断言（2026-11-16，04 `517ec18`）
+
+`App.vue` 的 `focusContent()` 按 `.content h1` 找落点：导航标题一旦回退成 `h2` 或文案漂移，焦点会静默落回 `body`，而 20 个脚本里没有一条会红。这是 `console-ui-refinement.md` 登记的「下一步值得做」第一条。
+
+做在 `test_console_theme_ui.sh` 里（本仓没有脚本总登记处，新建脚本不会被任何入口跑到），插在「三组十二项」「SVG 图标族」「nonce 授权」之后、导出步骤之前：顺序点 12 个导航项，逐页断言 `.content h1` 文案等于期望值，且 `document.activeElement` 就是它。check 由 21 增至 33。
+
+三个实现细节值得留档：
+
+1. **点击活动节点而不是坐标**：导航按钮会随角色数据重渲染，坐标点击偶尔落到已脱离文档的旧节点（实测撞到一次，`h1` 停在「消息」8 秒没切过去）。
+2. **循环后回 inbox 而不是 overview**：紧接着的 `.export-actions` 断言依赖消息页的 `ListSearchForm`（`export-actions` 只在这个组件里），而登录后的默认 tab 本来就是 `inbox` —— 回 overview 会改变后续步骤的起点。
+3. **把焦点交还 `body`**：循环结束时焦点按设计停在 `h1` 上，而原脚本跑到导出步骤时是 `body`。不还原的话 `Escape` 落在 `h1` 而不是 `<details>` 里的 summary，`Escape closes exports and returns focus` 会红 —— 不是断言过期，是插入改变了前置焦点状态。
+
+负例验证：把「运行概览」临时改成「概览」，报 `page overview heading/focus: h1="运行概览" active=H1` 并退出 1；回填后连跑 4 次、每次 33 checks 全绿。原有 21 条一字未改。
+
+累计：20 个脚本 / 792 条断言。
