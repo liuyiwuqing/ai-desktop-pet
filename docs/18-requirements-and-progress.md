@@ -386,3 +386,17 @@ CONSOLE-15 追加（CORE `004c2db`，已推送）：三张表格容器补 `tabin
 **O16 token 守卫（CORE `3148ede`，04 `89327ed` 同批）**。新增 `scripts/check-tokens.mjs` 并接入 `npm run check`：hex 只许出现在 `:root`、组件 `<style>` 不许有 hex、`var(--x)` 必须已定义、定义过的 token 必须有人用。最后一条当场找出 5 个死 token 并删除（现 53 个）。用注入的 `#dce5e0` 与 `var(--text-xl)` 做过负例验证。**O17 结论为不改**：`.primary/.secondary/.text-button/.compact` 保持零字节，视觉由 Naive 决定、跨仓断言以它们为选择器。
 
 回归：20 个控制台脚本 / 780 条断言全部通过（`test_remote_ota_ui.sh` 由 22 增至 23，新增"按钮自报版本、页脚自报设备"一条）。未执行 `run_local.py build`、远程 CI、部署与实机验收。
+
+## CONSOLE-18 · 只读评审驱动的可达性与视觉收口（2026-11-16）
+
+两轮只读评审（交互侧 + 视觉侧，1440×900 / 390×844 实测，另补 559/560/600/700/899/900/1000/1100 边界）指出 5 条必须修、7 条建议修。按"每完成一项即提交"逐条落地。
+
+**可达性（CORE `47ef9ef`）**。三条同源：面板由脚本拉开，但焦点与播报没跟着走。①`StatusNote` 暴露 `focus()`，失败分支 `await nextTick(); note.value?.focus()` —— 提交期间按钮 `disabled` 会把焦点丢到 `body`，键盘用户得从头 Tab 才知道发生了什么；②`warn`/`danger` 改 `role="alert"` + `aria-atomic`，这档提示只在失败那刻插入，`polite` 会排在"正在加载"之后被吞；③内联面板 `@keydown.esc` 关闭，设置与升级互斥、再点收起（同开时 Tab 从升级按钮串进设置面板，卡内出现两组同名按钮）。另修：`.management-panel` 焦点环从常驻改 `:focus`（常驻会把内联面板框成"第二个盒子"）、`html { scroll-padding-top }`、`staleDraft` 从成功绿的 `.feedback` 改 `tone="warn"`。04 侧同步 `test_operations_ui.sh` / `test_automation_edit_ui.sh` / `test_message_compose_ui.sh` 的 role 断言（`563d6c3`），其中 390px 那条原来只查 `!!querySelector('[role=status]')`（有播报就算过），改成要求选中提示且文案正确。
+
+**视觉（CORE `8de4e70`）**。①展开的设备卡撑满整行后宽 1148px，卡内三处 `space-between` 把「标签↔控件」拆到 1012px/993px，中间全是空白；`≥900px` 改两栏（左 `minmax(260px,34%)`、右 `minmax(0,1fr)`、`column-gap:32px`），实测回到 287px/268px，左/间距/右 = 373/32/693 精确闭合。②嵌套面板 h2 与卡片标题同为 16px，层级只靠 1px 分隔线扛不住；降 14px 并去掉重复设备名。③≤560 的换行断点实测漏掉 561–760（这段 h2 仍被压成两行），改无断点 `min-width:18ch`，559 与 560 两档现在一致。④删 `.notice*` 五条死规则（与 `.status-note--warn` 逐值重复，0 个调用点）。⑤`--topbar-h` 窄屏 60→63（实测顶栏 63px，写 60 会压掉吸顶工具栏 3px 底边框）。⑥OTA 提交未知时红字与黄块说同一件事，改 `v-if="error && !pending"` 并把事实并进提示正文。
+
+**两栏带出的两条新回归，都是评审在 900–1100 抓到、当批修掉（CORE `8514b1f`、`43f09b0`）**：①`.management-metrics` 写死 4 列，面板被压到 302–492px 后每列只剩 62px、固件版本断 3 行 → `repeat(auto-fit,minmax(140px,1fr))`；②单列表单最初写在 `min-width:900px` 里，对 1440 也生效（音量滑杆被拉成 693px、卡高 +143px）→ 收窄到 `900–1150`。
+
+**守卫缺口**。改②时多写一个 `}`，`vue-tsc` 与 token 四条规则全过，只有 lightningcss 在 build 阶段报 `Invalid empty selector`。`check-tokens.mjs` 因此加规则 0（花括号必须成对），负例验证过会红。
+
+回归：20 个脚本 / 780 条断言全绿，受本批直接影响并单独重跑的是 message_compose(33)、management(38)、remote_ota(23)、operations(96)、automation_edit(99)、growth_sync(18)。退化的 12 页 `h1` 文本指纹断言见 CONSOLE-19。未执行 `run_local.py build`、远程 CI、部署与实机验收。
