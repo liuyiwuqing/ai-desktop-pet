@@ -35,6 +35,14 @@ await expect("!!document.querySelector('.app-layout')",'authenticated console lo
 await expect("document.querySelectorAll('.app-layout > .sidebar [data-tab]').length===12 && document.querySelectorAll('.app-layout > .sidebar .nav-group').length===3",'all twelve pages remain in three groups');
 await expect("[...document.querySelectorAll('.app-layout > .sidebar nav button')].every(b=>!!b.querySelector('svg'))",'navigation uses one SVG icon family');
 await expect("[...document.querySelectorAll('style[cssr-id]')].every(s=>s.nonce===document.querySelector('meta[name=nexus-style-nonce]').content && !!s.sheet)",'Naive styles are authorized by this document nonce');
+/* 十二页标题指纹：App.vue 的 focusContent 靠 .content h1 找落点，标题退化或文案漂移会让焦点静默落回 body。 */
+const pageHeadings=[['overview','运行概览'],['inbox','消息'],['devices','设备'],['pet','一起成长'],['connectors','接入'],['deliveries','投递'],['routing','路由'],['templates','模板'],['automation','自动化'],['memory','长期记忆'],['tools','Mac 工具'],['access','权限与审计']];
+async function settle(expression){for(let i=0;i<80;i++){if(await js(expression).catch(()=>false))return true;await wait(.1);}return false;}
+/* 导航按钮会随角色数据重渲染，按当前 DOM 里的活动节点点击，避免点到已脱离文档的旧节点。 */
+async function goTab(id){const ok=await settle(`(()=>{const b=[...document.querySelectorAll('.app-layout > .sidebar nav button')].find(b=>b.dataset.tab===${JSON.stringify(id)});if(!b||b.disabled)return false;b.click();return true;})()`);if(!ok)throw new Error('page '+id+' navigation entry is not clickable');}
+for(const [id,heading] of pageHeadings){await goTab(id);const ok=await settle(`(()=>{const h=document.querySelector('.content h1');return !!h&&h.innerText.trim()===${JSON.stringify(heading)}&&document.activeElement===h})()`);if(!ok){const seen=await js("document.querySelector('.content h1')?.innerText??'(no h1)'");const focus=await js("document.activeElement===document.body?'body':(document.activeElement?.tagName??'(none)')");throw new Error(`page ${id} heading/focus: h1=${JSON.stringify(seen)} active=${focus}`);}checks.push('page '+id+' h1 is '+heading+' and holds focus');}
+/* 后面的导出断言依赖消息页的 .export-actions，回到登录后的原点，避免改变现有步骤的起点。 */
+await goTab('inbox');await settle("document.querySelector('.content h1')?.innerText==='消息' && !!document.querySelector('.export-actions') && !document.querySelector('.loading-state') && !!document.querySelector('.message-list .message-row, .empty-state')");await js("document.activeElement instanceof HTMLElement && document.activeElement.blur()");
 await expect("document.querySelector('.export-actions')?.open===false",'secondary export actions start collapsed');
 await click('.export-actions summary');await expect("document.querySelector('.export-menu button').getBoundingClientRect().width>0",'export actions open through their visible disclosure');
 await pressKey('Escape');await expect("!document.querySelector('.export-actions').open && document.activeElement.tagName==='SUMMARY'",'Escape closes exports and returns focus');
