@@ -78,7 +78,7 @@ await fixture({read_mode:'success',read_delay:0});await tap('刷新');await expe
 await fixture({bridge:'off'});await tap('刷新');await expect("document.querySelector('.section-heading p')?.innerText==='Bridge 未启用' && document.querySelector('.inline-form button.primary')?.disabled",'disabled Bridge blocks new tool requests');
 await fixture({bridge:'unavailable'});await tap('刷新');await expect("document.querySelector('.section-heading p')?.innerText==='Bridge 暂不可用' && document.querySelector('.inline-form button.primary')?.disabled",'unavailable Bridge blocks new tool requests');
 await fixture({reset:true});await tools();await fixture({next_write:'drop_before'});await tap('查询');
-await expect("document.querySelector('.scope-note[role=status]')?.innerText.includes('结果尚未确认') && document.querySelector('.inline-form select')?.disabled",'lost tool request freezes tool and arguments');
+await expect("document.querySelector('.scope-note[role=alert]')?.innerText.includes('结果尚未确认') && document.querySelector('.inline-form select')?.disabled",'lost tool request freezes tool and arguments');
 await navigate('消息');await navigate('工具');await ready();await expect("document.querySelector('.inline-form button.primary')?.innerText==='重试同一请求'",'pending tool identity survives navigation');
 await wait(5.2);if((await fixture({})).requests.filter(r=>r.method==='POST').length!==1)throw new Error('Tool polling replayed creation');results.push('tool polling never replays unknown creation');
 await fixture({next_write:'deny'});await tap('重试同一请求');await expect("document.querySelector('.inline-form button.primary')?.innerText==='重试同一请求' && !document.querySelector('.inline-form button.primary').disabled && document.querySelector('.inline-form select')?.disabled",'a rejection after an unknown tool result cannot discard its identity');
@@ -99,7 +99,7 @@ await fixture({reset:true,read_delay:1});await navigate('自动化');
 await expect("document.querySelector('.content > section [aria-busy=true]')?.innerText==='正在读取自动化状态…' && !document.querySelector('.empty-state')",'automation initial load is distinct from empty state');await ready();
 await expect("document.querySelector('.empty-state h2')?.innerText==='暂无自动化规则'",'automation empty state appears after successful read');await fixture({read_delay:0});
 await prepareRule('响应丢失的规则','daily');await fixture({next_write:'drop_after'});await tap('保存规则');
-await expect("document.querySelector('.scope-note[role=status]')?.innerText.includes('结果尚未确认') && [...document.querySelectorAll('.inline-form input,.inline-form select,.inline-form textarea')].every(e=>e.disabled)",'unknown rule creation freezes the submitted definition');
+await expect("document.querySelector('.scope-note[role=alert]')?.innerText.includes('结果尚未确认') && [...document.querySelectorAll('.inline-form input,.inline-form select,.inline-form textarea')].every(e=>e.disabled)",'unknown rule creation freezes the submitted definition');
 await navigate('工具');await navigate('自动化');await ready();
 await expect("document.querySelector('.inline-form input')?.value==='响应丢失的规则' && document.querySelector('.inline-form button.primary')?.innerText==='重试保存同一规则'",'pending daily rule restores after navigation');
 await tap('重试保存同一规则');await expect("document.querySelectorAll('.record-card').length===1 && !document.querySelector('.inline-form')",'rule replay acknowledges one saved rule');
@@ -147,7 +147,7 @@ await fixture({reset:true});await fillInput('.token-label input','ui-regression-
 await fixture({next_write:'drop_after',write_delay:1});await tap('查询');await expect("document.querySelector('.inline-form button.primary')?.disabled",'tool creation is in flight before logout');await tap('退出登录','.sidebar');await wait(1.2);
 await expect("!!document.querySelector('.login-card') && document.querySelector('.token-label input').value==='' && !document.querySelector('.content')",'late tool completion cannot restore credentials or session');
 await fixture({write_delay:0});await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'session reconnects after discarded tool request');await tools();
-await expect("document.querySelector('.inline-form button.primary')?.innerText==='查询' && !document.querySelector('.scope-note[role=status]')",'logout removes unknown tool identity without replay');
+await expect("document.querySelector('.inline-form button.primary')?.innerText==='查询' && !document.querySelector('.scope-note')",'logout removes unknown tool identity without replay');
 await fixture({read_mode:'unauthorized'});await tap('刷新');await expect("!!document.querySelector('.login-card') && !document.querySelector('.record-card')",'tool 401 clears the session');
 cliLog({passed:results.length,results});
 EOF

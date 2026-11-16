@@ -73,7 +73,7 @@ await expect("document.querySelector('.inline-form input')?.readOnly && document
 await click('.sidebar nav button[data-tab=devices]');await expect("document.querySelector('h1')?.innerText==='设备'",'navigation remains available');await click('.sidebar nav button[data-tab=inbox]');
 await expect("document.querySelector('.inline-form input')?.value==='未保存就断线' && document.querySelector('.inline-form textarea')?.value==='导航后仍保留请求' && document.querySelector('.inline-form input')?.readOnly",'unknown payload survives tab navigation');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-await expect("document.documentElement.scrollWidth<=390 && !!document.querySelector('.inline-form [role=status]')",'unknown result fits 390 CSS px and exposes a status');
+await expect("document.documentElement.scrollWidth<=390 && document.querySelector('.inline-form .scope-note[role=alert]')?.innerText.includes('发送结果尚未确认')",'unknown result fits 390 CSS px and is announced assertively');
 await cdp('Emulation.clearDeviceMetricsOverride');
 await js("(()=>{const i=document.querySelector('.inline-form input');i.value='不能改变已冻结的请求';i.dispatchEvent(new Event('input',{bubbles:true}));})()");
 await send();await acknowledged('retry after no server save succeeds');
