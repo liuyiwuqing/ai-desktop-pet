@@ -434,3 +434,5 @@ CONSOLE-15 追加（CORE `004c2db`，已推送）：三张表格容器补 `tabin
 - **接口**：`GET /api/v1/devices/{id}/telemetry?from&to&bucket`，`bucket` 为 `raw|1m|5m|15m|1h|1d`，默认最近 6 小时、5 分钟桶；窗口最大 30 天，`raw` 最大 12 小时且最多 2000 点（`truncated`），聚合桶最多约 2000 个。空桶不补零；最后一点不代表在线。字段聚合语义（last/avg/min/max/bool_or）与 400/404 见 CORE 文档。
 - **验证**：`DeviceManagementFlowTest` 新增 2 项真实 HTTP/PostgreSQL/MQTT 用例（变化下限、心跳、原始/聚合、空窗口、401/404、四类 400；40 天样本清理）。完整构建 120 条中 115 通过、5 条条件跳过，V21 在隔离库应用成功。
 - **未做**：图表/仪表盘页面、前端「实时 vs 快照」标识、真实库迁移、目标机部署、ESP32 长期采样/时钟回退/30 天规模与掉电验收。
+
+远程 CI：CORE `377813e`/`4944710` 对应的 Docker deployment 未启动 job，GitHub 返回计费/额度限制（43874044017）；上一提交 `253e467` 同样如此。非代码失败，待额度恢复后补跑；本地完整构建与隔离 PostgreSQL/MQTT 结果不受影响。
