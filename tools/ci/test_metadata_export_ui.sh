@@ -63,7 +63,7 @@ if(csv.split('\r\n').length!==33||!csv.includes('metadata-0')||!csv.includes('me
 let exported=(await state()).exportRequests.at(-1),exportQuery=new URL(exported,base).searchParams;
 if(exportQuery.get('source')!=='manual'||exportQuery.get('readStatus')!=='unread'||exportQuery.has('page')||exportQuery.get('receivedBefore')!=='2026-11-14T09:00:00.000Z')throw new Error('Export lost active filters');results.push('export reuses filters and omits pagination');
 await navigate('投递');await expect("document.querySelector('h1')?.innerText==='投递'",'delivery list opens');await ready();
-await choose('投递状态','failed');await input('设备 ID','device-a');await input('收件开始','2026-11-14T16:00');await input('收件截止','2026-11-14T17:00');await tap('应用筛选');
+await tap('更多筛选');await choose('投递状态','failed');await input('设备 ID','device-a');await input('收件开始','2026-11-14T16:00');await input('收件截止','2026-11-14T17:00');await tap('应用筛选');
 await expect("document.querySelector('.section-heading p')?.innerText.startsWith('31 条投递') && document.querySelectorAll('tbody tr').length===30",'device and message receipt window combine with delivery state');await ready();
 await tap('导出元数据');await downloaded(2,'browser saves real delivery CSV');await ready();
 csv=fs.readFileSync(path.join(downloadDir,'deliveries-metadata.csv'),'utf8');

@@ -1,6 +1,19 @@
 // Exercise Naive controls through their rendered DOM and keyboard behavior, never component state.
 function createUiHelpers({ js, wait }) {
+  async function reveal(selector) {
+    return await js(`(() => {
+      const field = document.querySelector(${JSON.stringify(selector)});
+      if (!field) return false;
+      const sections = []; let node = field.parentElement;
+      while (node) { if (node.classList.contains('console-disclosure')) sections.unshift(node); node = node.parentElement; }
+      for (const section of sections) section.querySelector(':scope > .disclosure-heading .disclosure-toggle[aria-expanded="false"]')?.click();
+      const filters = field.closest('.compact-filters');
+      if (field.closest('.advanced-filters')) filters?.querySelector('.filter-expand[aria-expanded="false"]')?.click();
+      return true;
+    })()`);
+  }
   async function choose(selector, label) {
+    await reveal(selector);
     let opened = false;
     for (let attempt = 0; attempt < 100; attempt++) {
       opened = await js(`(() => {
@@ -26,6 +39,7 @@ function createUiHelpers({ js, wait }) {
     throw new Error('Select option unavailable: ' + label + ' in ' + selector);
   }
   async function optionLabels(selector, minimumCount = 1) {
+    await reveal(selector);
     await js(`document.querySelector(${JSON.stringify(selector)}).querySelector('.n-base-selection').click()`);
     for (let attempt = 0; attempt < 100; attempt++) {
       const labels = await js("[...document.querySelectorAll('.n-base-select-option')].filter(e=>e.getBoundingClientRect().height>0).map(e=>e.textContent.trim())");
@@ -37,7 +51,7 @@ function createUiHelpers({ js, wait }) {
     }
     throw new Error('Select menu has no visible options: ' + selector);
   }
-  return { choose, optionLabels };
+  return { choose, optionLabels, reveal };
 }
 
 const ui = createUiHelpers({ js, wait });
