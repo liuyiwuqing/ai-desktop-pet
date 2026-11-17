@@ -48,8 +48,11 @@ services:
     networks: [backend, edge]
 
   core:
-    # e76732b 发布运行 44094002890 的 amd64+arm64 多架构 digest；包已公开，可直接匿名拉取。
-    image: ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba
+    # e76732b 发布运行 44094002890 的 linux/amd64 镜像，由 docker save/load 导入。
+    # 镜像 ID 必须是 sha256:aa3a2b56291ddf7b86bf38bdc63fc431e2433d5348012bb9c5c5dacec928c238。
+    # 走 GHCR 在线拉取时，把本行换成 ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba 并删掉 pull_policy。
+    image: ghcr.io/liuyiwuqing/nexus-core:sha-e76732b3792313ea5f3744b09970a7972fc89a36
+    pull_policy: never
     env_file:
       - /etc/nexus/docker/core.env
     environment:

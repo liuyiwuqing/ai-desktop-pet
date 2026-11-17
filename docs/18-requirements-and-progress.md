@@ -707,3 +707,7 @@ DEL-08 此前把 CORE 固定为 `230c809`，并记录“本地编排仍固定 23
 边界：本地隔离运行不是 Debian 目标机部署、远程 CI 或线上升级；HTTPS/网络、真实数据库迁移与设备仍待目标环境验收；升级后会话卷首次为空，已登录用户需要重新登录一次。
 
 本项 04 提交 `7b8e7ef` 已推送并 `git ls-remote` 核对 `origin/main` 为该提交；[Software checks 44098970301](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44098970301) 八个 job 全部 success。远程 CI 只构建固件预设，不解析也不运行 1Panel 编排，不能替代上面的本地隔离运行或目标机验收。
+
+线上实例改走本地导入路线（GHCR 直连慢）。本机为 Apple Silicon，`ghcr.io/liuyiwuqing/nexus-core` 的新镜像已在本地且为 `linux/amd64`，镜像 ID `sha256:aa3a2b56291ddf7b86bf38bdc63fc431e2433d5348012bb9c5c5dacec928c238`，与发布回拉验证报告记录的 ID 一致，因此无需重新下载。按完整提交标签重新打标签后 `docker save | gzip -6` 得到 `build/import/nexus-core-sha-e76732b-amd64.tar.gz`（117 MB，sha256 `72f87af4eb2c8a07f20348483f920e2ce28a5a07162987b0e4ca527f2c8590d7`）；包内 `manifest.json` 的 `Config` 为 `blobs/sha256/aa3a2b56…`，本机 `docker load` 实测输出 `Loaded image: ghcr.io/liuyiwuqing/nexus-core:sha-e76732b3792313ea5f3744b09970a7972fc89a36`，随后 `docker image inspect` 为 `linux/amd64` 且 ID 与上述一致。
+
+`docker save` 自 25.0 起输出 OCI 布局归档（`oci-layout` + `index.json` + `blobs/sha256/`），`docker load` 在同一版本起可读；目标服务器 Docker 27.3.1 满足要求，更旧引擎需先升级，本轮未在 27.x 守护进程上实跑。编排因此改为完整提交标签 + `pull_policy: never`：按 `@sha256:` 引用保存再导入会没有 `RepoTags`，编排匹配不到；改回在线拉取时换回 digest 并删掉 `pull_policy`。`docker compose config` 通过，解析出的卷名仍为 `nexus-production_console-sessions`。归档位于 git 忽略的 `build/import/`，不纳入版本；未对目标服务器执行导入或重建。

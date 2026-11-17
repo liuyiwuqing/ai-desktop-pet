@@ -75,28 +75,53 @@ edge 网络在项目名为 `nexus-production` 时通常叫 `nexus-production_edg
 
 ## 从 `230c809` 升级到 `e76732b`
 
-[docker-compose.nexus-production.yml](docker-compose.nexus-production.yml) 是线上实例（`pet.muyin.site`）编排的升级目标，结构与初始化镜像生成的 `compose.1panel.yml` 一致，只有四处差异：`core.image` 换成 `e76732b` 发布的 digest；`core.environment` 增加 `NEXUS_AUTH_SESSION_DIRECTORY: /var/lib/nexus/sessions`；`core.volumes` 增加 `console-sessions:/var/lib/nexus/sessions`；顶层 `volumes` 增加 `console-sessions:`。其余服务、端口插值、只读根、`cap_drop`、健康检查与绝对路径不变。
+[docker-compose.nexus-production.yml](docker-compose.nexus-production.yml) 是线上实例（`pet.muyin.site`）编排的升级目标，结构与初始化镜像生成的 `compose.1panel.yml` 一致，差异只有五处：`core.image` 换成 `e76732b` 的完整提交标签并加 `pull_policy: never`（本地导入路线，不访问 GHCR）；`core.environment` 增加 `NEXUS_AUTH_SESSION_DIRECTORY: /var/lib/nexus/sessions`；`core.volumes` 增加 `console-sessions:/var/lib/nexus/sessions`；顶层 `volumes` 增加 `console-sessions:`。其余服务、端口插值、只读根、`cap_drop`、健康检查与绝对路径不变。
 
 会话卷不是可选项。新镜像把浏览器会话写在私有目录，`read_only: true` 下该目录位于只读根文件系统，缺少可写挂载时创建会话抛 IO 错误并映射为 `503 session_store_unavailable`——表现是管理台登录直接失败，而不是仅仅“重启后掉登录态”。`/var/lib/nexus/sessions` 在镜像内已为 UID 65534 且 0700，挂卷后权限与判等条件（必须恰为 0700）保持不变。
 
 `e76732b` 相对 `230c809` 另有三个 Flyway 迁移 `V21`–`V23`（设备遥测历史表，以及网络/WiFi 质量列），只有 `CREATE TABLE` 与 `ADD COLUMN`，CORE 启动时自动执行。升级前仍必须备份数据库和私有目录；升级后不能直接把镜像回滚成 `230c809`，旧镜像的迁移集合里没有 V21–V23，Flyway 校验会失败并拒绝启动，需要还原备份或显式关闭该校验。
 
-在服务器 root 终端执行（先备份，再校验编排，最后只重建 CORE）：
+## 本地导入镜像（GHCR 直连慢时）
+
+CORE 镜像只有 `linux/amd64` 一份需要（服务器是 Debian x86_64），在任意能正常访问 GHCR 的机器上取一次，导出后拷进服务器即可；不要用 `docker compose pull` 在服务器上重试。
+
+导出方（Apple Silicon 必须显式指定平台，否则拿到的是 arm64）：
+
+```sh
+docker pull --platform linux/amd64 ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba
+docker image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' \
+  ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba
+docker tag ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba \
+  ghcr.io/liuyiwuqing/nexus-core:sha-e76732b3792313ea5f3744b09970a7972fc89a36
+docker save ghcr.io/liuyiwuqing/nexus-core:sha-e76732b3792313ea5f3744b09970a7972fc89a36 \
+  | gzip -6 > nexus-core-sha-e76732b-amd64.tar.gz
+shasum -a 256 nexus-core-sha-e76732b-amd64.tar.gz
+```
+
+必须打上完整提交标签再 `docker save`：直接按 `@sha256:` 引用保存，`docker load` 之后镜像没有可用的 `RepoTags`，编排里的 `image:` 匹配不到。预期镜像 ID 为 `sha256:aa3a2b56291ddf7b86bf38bdc63fc431e2433d5348012bb9c5c5dacec928c238`，与发布回拉验证报告一致；包内 `manifest.json` 的 `Config` 指向 `blobs/sha256/aa3a2b56…`，所以导入后的 ID 可直接核对。
+
+服务器 root 终端（先备份，再导入与校验，最后只重建 CORE）：
 
 ```sh
 cd /etc/nexus/docker
 cp compose.1panel.yml compose.1panel.yml.bak-$(date +%Y%m%d)
 docker ps --format '{{.Names}}' | grep postgres        # 确认实际容器名，下面按它替换
 docker exec <postgres 容器名> pg_dump -U nexus -d nexus -Fc > /root/nexus-$(date +%F).dump
-docker pull ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba
+gzip -dc nexus-core-sha-e76732b-amd64.tar.gz | docker load
+docker image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' \
+  ghcr.io/liuyiwuqing/nexus-core:sha-e76732b3792313ea5f3744b09970a7972fc89a36
 docker compose -p nexus-production -f compose.1panel.yml config -q
 docker compose -p nexus-production -f compose.1panel.yml up -d
 docker compose -p nexus-production -f compose.1panel.yml ps
 ```
 
-已有 `230c809` 安装时，用 `docker-compose.nexus-production.yml` 替换 `compose.1panel.yml` 或在 1Panel 编排里粘贴后再执行；本目录 `docker-compose.yml` 已同步为相同 digest 与会话卷，仅适用于新安装，不再作为 `230c809` 的本地基线。保留原项目名、`postgres-data` 卷、`core.env` 与 `/etc/nexus/docker` 目录，不重新运行初始化镜像。新卷首次创建为空，升级后需要重新登录一次；之后在同一卷、有效期内重启可恢复。启动后用 `docker compose logs core` 确认 V21–V23 迁移与健康检查，再核对 `/api/v1/status` 的 database 与 mqtt 均为 ready。
+`docker load` 必须打印 `Loaded image: ghcr.io/liuyiwuqing/nexus-core:sha-e76732b…`，`inspect` 必须是 `linux/amd64` 且 ID 与上面一致；两者不符就不要继续，编排里的 `pull_policy: never` 会让缺失或 arch 不符时直接报错，而不是偷偷联网拉取。`docker save` 从 25.0 起输出的是 OCI 布局归档（`oci-layout` + `manifest.json` + `blobs/sha256/`），`docker load` 在 25.0 以上可直接读取；服务器为 27.3.1，满足要求，低于 25 的旧引擎需要先升级。
 
-包已改为 Public，`docker pull` 不需要 `docker login`；若后续改回私有，才需要在服务器与 1Panel 配置只读凭据。
+需要改回在线拉取时，把 `core.image` 换成 `ghcr.io/liuyiwuqing/nexus-core@sha256:0310e733…` 并删掉 `pull_policy: never` 即可。
+
+已有 `230c809` 安装时，用 `docker-compose.nexus-production.yml` 替换 `compose.1panel.yml` 或在 1Panel 编排里粘贴后再执行。保留原项目名、`postgres-data` 卷、`core.env` 与 `/etc/nexus/docker` 目录，不重新运行初始化镜像。新卷首次创建为空，升级后需要重新登录一次；之后在同一卷、有效期内重启可恢复。启动后用 `docker compose logs core` 确认 V21–V23 迁移与健康检查，再核对 `/api/v1/status` 的 database 与 mqtt 均为 ready。
+
+包已改为 Public，需要在线拉取时也不需要 `docker login`；若后续改回私有，才需要在服务器与 1Panel 配置只读凭据。
 
 ## 验证与边界
 
