@@ -160,6 +160,29 @@ install -m 600 -o 65534 -g 65534 tokens.json.lock /etc/nexus/auth/tokens.json.lo
 
 三个必须知道的失败方式：文件必须是**绝对路径**且能被 65534 读到，否则 CORE **启动即失败**（日志 `NEXUS_AUTH_TOKEN_FILE is unavailable or invalid`），不是降级运行；文件损坏或不安全更新在请求期固定返回 503，不回退到 env；容器健康检查也读 `admin.current.token`，文件配错会让容器一直 unhealthy 反复重启。
 
+## 设备 MQTT 凭据（DEVICE-CRED-01）
+
+管理台「设备 → 展开设备 → 设置与状态 → MQTT 凭据」可以签发、轮换和撤销每台设备的台账凭据。CORE 只保存密钥的 SHA-256 指纹并一次性显示明文，**不会写 Mosquitto 配置**：本编排把 `/etc/nexus/docker/mosquitto/config` 以只读方式绑进 Broker，CORE 容器也没有该路径。签发后按下面三步在宿主机执行：
+
+```bash
+# 1. 用一次性密钥写入密码文件（路径与编排里的 bind source 一致）
+sudo mosquitto_passwd -b /etc/nexus/docker/mosquitto/config/passwd dev-<deviceId> '<一次性密钥>'
+# 2. 在同一目录的 acl 追加该设备命名空间（按页面显示的原文粘贴）
+echo 'topic readwrite nexus/v1/devices/<deviceId>/#' | sudo tee -a /etc/nexus/docker/mosquitto/config/acl
+# 3. 让 Broker 重新读取配置
+docker compose -f /etc/nexus/docker/docker-compose.yml restart mqtt
+```
+
+注意：
+
+- ACL 用 `#` 覆盖该设备的全部子主题；`*` 只匹配一级，不要用它替代。
+- 设备端要使用同一用户名与密钥（Web 配网或串口配置）；换密钥后设备必须重连一次才会生效。
+- 轮换会给出宽限期（默认 24 小时）。在这段时间新旧密钥都应保留在 `passwd` 中，等设备切换完成后再执行 `mosquitto_passwd -D passwd dev-<deviceId>` 删除旧条目——CORE 不会代删，理由同上。
+- 撤销只更新台账状态；Broker 里的账号仍需手工删除，否则旧密钥依然能连。
+- 台账状态（`none`/`active`/`rotating`/`revoked`）不代表 Broker 实际配置，接入引导顶层的 `credentialsProvisioned` 因此仍是 `unknown`。
+
+接口与语义见 CORE 仓 `docs/device-credentials.md`。
+
 ## 验证与边界
 
 2026-11-15 本地 `docker compose -f deployment/1panel/docker-compose.yml config --no-env-resolution -q` 退出 0，Compose 版本为 `v5.5.0`。隔离运行使用本机缓存的真实发布 amd64 CORE（当时为 `230c809`）、arm64 PostgreSQL/Mosquitto 和本地 arm64 初始化镜像；临时编排只替换私有目录和随机回环端口，使用独立项目/卷，通过 `up -d --no-build --wait --wait-timeout 240` 启动。

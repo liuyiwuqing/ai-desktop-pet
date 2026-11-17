@@ -81,6 +81,7 @@
 | CONSOLE-13 | 更多筛选与元数据 CSV | CORE `ea9cb77` / 04 `841f13d` 已推送并核对远端；本地 HTTP/隔离 PostgreSQL 新增 6 项、实际 Vue 新增 44/既有 349 项通过；完整构建 80 通过/5 跳过、JAR 三资源/V14 一致、Java→固件 C→Java 源码契约通过；见 [23](23-console-completion.md#console-13--更多筛选与元数据-csv) | CORE [43553123583](https://github.com/liuyiwuqing/nexus-core/actions/runs/43553123583) Docker 全步骤、04 [43553167085](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43553167085) 七个 job success；正文导出已由 CONSOLE-13-B 提供；生产与实机仍待验收 |
 | CONSOLE-13-B | 管理员正文导出 | CORE `d07bce8` / 04 `73d9f1e` 均已推送并核对远端；管理员显式确认、已应用条件与最近七天未清正文交集、1000 行上限和 CSV 公式/引号保护；真实 HTTP 新增 1/元数据 6 项、实际 Vue 正文 15/原元数据 44 检查通过，完整 CORE 105 通过/5 跳过、路径变体/1000 条最终 verify 通过；见 [正文导出契约](../../nexus-core/docs/content-export.md) | 逐仓提交；只导出隔离测试数据，没有读取生产消息 |
 | CONSOLE-09-C | 消息条件与限定动作组合 | CORE `f39ecec` / 04 `343e23b` 均已推送并核对远端；来源/类型/关键词/优先级 AND、新消息固定提醒、公开分析原授权保护、自动提醒回环排除；HTTP/隔离库新增 3 项与原编辑/创建共 17 项 verify 通过，实际 Vue 新增 17/原编辑 99/删除 52 检查通过；见 [CORE 契约](../../nexus-core/docs/automation-conditions.md) | 同步契约/页面/专项；不开放任意动作，真实规则/消息与生产库未操作 |
+| DEVICE-CRED-01 | 设备 MQTT 凭据台账与轮换 | 软件本地已验证：V25 台账（只存 SHA-256 指纹、一次性密钥、宽限期、撤销）、管理员限定签发/轮换/撤销、接入引导按设备显示台账状态、设备详情新增凭据区块；CORE 139 项 0 失败/5 条件跳过、`DeviceCredentialFlowTest` 3 项、前端 check/build、设备页 73 项浏览器检查（新增 7 项）通过；见 [契约](../../nexus-core/docs/device-credentials.md) | CORE 不写 Broker（配置为只读绑定），应用步骤见 [1Panel 说明](../deployment/1panel/README.md#设备-mqtt-凭据device-cred-01)；真实 Broker/设备/生产库未验收；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
@@ -743,3 +744,23 @@ HW-13（2026-11-18）：配网页首屏新增“当前状态”只读概览，�
 本地证据：`tools/ci/test_host.sh` 退出 0（114 条 `passed`，`test_setup_portal::status_helpers` 覆盖安全形态、Broker 解析与账号脱敏）；`tools/ci/test_ui_host.sh` 10/10；隔离构建 `firmware/build-hw11` 应用 3,009,856 B（`0x2ded40`，剩余 28%），SHA256 `231928aaf1dd6f38b3e51b35badf12227a81bcdaa97a834e79c8706c115a29d2`；390×844 浏览器用实际页面加模拟 API 分别验证“有管理台”和“无管理台且未保存 Wi-Fi”两种状态，折叠项保持关闭、空状态文案正确、无横向溢出。未烧录。
 
 提交 `d8e102a` 已推送，`git ls-remote` 核对 `origin/main` 为该提交；远程 CI [44124446775](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44124446775) 八个 job 全部 success。未验收：实机上的客户端计数增减、信道与射频一致性、剩余时间递减，以及家庭 Wi-Fi 掉线时切换到“已保存，当前未连接”的表现。
+
+## DEVICE-CRED-01 · 设备 MQTT 凭据台账与轮换（2026-11-18）
+
+差距表此前记录「设备凭据轮换 UI 尚无；登记不创建 Broker 凭据」。核对部署后先确认了一个硬约束：本仓 1Panel 编排把 `/etc/nexus/docker/mosquitto/config` 以只读 bind 挂进 Broker，CORE 容器没有该路径且以 65534/只读根运行，因此 CORE 不可能写 `passwd`/`acl`。本项据此只做「期望状态 + 一次性密钥 + ACL 片段 + 应用步骤」，把 Broker 写入保留为管理员在主机上的显式动作，不用自动改配置来假装闭环。
+
+CORE `V25__device_credentials.sql` 新增 `device_credentials`（`device_id` 主键、`username=dev-<deviceId>`、`revision`、`secret_fingerprint`、`previous_*`、签发/轮换/撤销时间、操作者）与 `device_credential_events`（只记动作、修订号、操作者与宽限期，不含密钥或指纹）。明文密钥由 `SecureRandom` 生成 32 字节并以 URL-safe Base64 一次性返回，库里只有 SHA-256 十六进制；数据库 CHECK 约束限定指纹格式与 `previous_*` 成对出现。
+
+接口：`GET /api/v1/devices/{id}/credentials`（三角色可读、永不含密钥）、`POST`（签发，`confirm=ISSUE_DEVICE_CREDENTIAL`）、`POST /rotate`（`expectedRevision` + `graceHours` 1–168，默认 24）、`POST /revoke`（`expectedRevision`）。签发在已撤销行上沿用用户名并 revision+1；轮换把旧当前指纹移入 `previous_*` 并覆盖更早的旧值，避免无限累积可用历史密钥；撤销清空 `previous_*`，同 `expectedRevision` 重放按幂等 204 处理。写操作要求管理员，`RoleTokens.permits` 的 operator 白名单不含这些路径，控制器再显式校验一次。接入引导 `/setup` 增加按设备的 `credentialStatus`/`credentialRevision`（读台账），顶层 `credentialsProvisioned` 仍为 `unknown`，避免把本机台账当成 Broker 事实。
+
+管理台在设备详情末尾新增「MQTT 凭据」区块（`DeviceCredentialsSection.vue`，不新增导航页，保持十二页与 h1 指纹断言不变）：状态徽标、用户名/修订号/时间、ACL 原文、签发/轮换（可选宽限期）/撤销的两步确认，一次性密钥只在本次响应显示并可复制，关闭后不再出现；网络中断时不猜测结果，提示刷新核对。
+
+验证（2026-11-18，本机 macOS/Docker 29.8.2）：
+- `mvn -Dtest=DeviceCredentialFlowTest test`：真实 HTTP + 隔离 PostgreSQL/MQTT，3 项通过，覆盖一次性密钥、指纹落库且不等于明文、重复签发 409、版本冲突、宽限期 `previous_*`、幂等撤销、撤销后轮换拒绝、重新签发 revision 4、事件序列与角色限定。
+- `mvn verify`：139 项，0 失败/0 错误，5 项条件跳过；JAR 重新打包成功。此前基线为 136 项（新增 3 项）。
+- 前端 `npm run check`（74 个 token 无散落 hex）与 `npm run build` 通过。
+- 04 `tools/ci/test_management_ui.sh`：73 项全部通过，其中 7 项为本项新增（未签发台账与 ACL、一次性密钥只显示一次、43 字符格式、关闭后隐藏、轮换宽限期、撤销状态、390 px 无横向溢出）。
+
+命令与环境偏差如实记录：`python3 tools/run_local.py build` 在本机失败于沙箱批量删除守卫（vite 清空 `target/frontend/assets` 的 56 项超过阈值，报 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`），不是构建错误；改为先手动清理 `target/frontend/assets`、`target/classes/static`，再分别执行该脚本的三步（`npm run check`、`npm run build`、`mvn verify`），覆盖范围一致。本机未安装 `rg`，浏览器脚本用等价 `grep -qE` 临时 shim 运行，未提交该 shim；CI 环境自带 ripgrep，脚本本身未改。
+
+边界：未连接真实 Broker、未对真实设备写入新密钥、未迁移生产库、未轮换任何真实凭据；宽限期结束不跑后台任务清理指纹，只在读取时判定状态；台账无法证明 Broker 已应用或设备已切换。

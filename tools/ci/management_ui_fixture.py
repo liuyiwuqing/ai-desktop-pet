@@ -29,7 +29,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
     state={'mode':'empty','config':copy.deepcopy(CONFIG),'revision':1,'requests':[],'submissions':[],'dropNext':False,
         'otaMode':'disabled','otaRequests':[],'otaSubmissions':[],'otaDrop':False,'otaBoot':'1'*32,'otaLastError':'','growthMode':'disabled',
         'messageSubmissions':[],'manualMessages':[],'messageNext':'success','deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success',
-        'telemetryRequests':[],'disconnectRequests':[],'listMode':False,'listMessages':[],'listDeliveries':[],'listRequests':[],'listError':'','listDelay':0}
+        'telemetryRequests':[],'disconnectRequests':[],'listMode':False,'listMessages':[],'listDeliveries':[],'listRequests':[],'listError':'','listDelay':0,
+        'credentialMode':'active','credentialRevision':1,'credentialSecret':'','credentialSubmissions':[]}
     def log_message(self,*args):pass
     def json_response(self,status,value):
         payload=json.dumps(value,ensure_ascii=False).encode()
@@ -149,6 +150,16 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     'configBlock':'config_storage_readonly' if mode=='readonly' else 'config_readback_required' if mode in ('empty','stale') else '',
                     'telemetry':telemetry,'receivedAt':None,'configRequests':state['requests']}
             elif path.endswith('/audit'):value={'items':[{'sequence':1,'actor':'admin','event':'created','detail':'','createdAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]}
+            elif path.endswith('/credentials'):
+                mode=state['credentialMode']
+                if mode=='error':return self.json_response(503,{'error':'unavailable'})
+                stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+                value={'deviceId':'dodo-ui-fixture','username':'dev-dodo-ui-fixture',
+                    'revision':0 if mode=='none' else state['credentialRevision'],'status':mode,
+                    'acl':['topic readwrite nexus/v1/devices/dodo-ui-fixture/#'],
+                    'issuedAt':None if mode=='none' else stamp,'rotatedAt':stamp if mode=='rotating' else None,
+                    'previousExpiresAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(now+86400)) if mode=='rotating' else None,
+                    'revokedAt':stamp if mode=='revoked' else None,'previousActive':mode=='rotating'}
             else:return self.json_response(404,{'error':'not_found'})
             self.json_response(200,value)
     def do_POST(self):
@@ -168,7 +179,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if value.get('reset'):
                     state.update(mode='empty',config=copy.deepcopy(CONFIG),revision=1,requests=[],submissions=[],dropNext=False,
                         deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',telemetryRequests=[],disconnectRequests=[],growthMode='disabled',
-                        listMode=False,listMessages=[],listDeliveries=[],listRequests=[],listError='',listDelay=0)
+                        listMode=False,listMessages=[],listDeliveries=[],listRequests=[],listError='',listDelay=0,
+                        credentialMode='active',credentialRevision=1,credentialSecret='',credentialSubmissions=[])
                 if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success')
                 if value.get('listReset'):
                     stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
@@ -193,6 +205,9 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if value.get('otaStage') and state['otaRequests']:state['otaRequests'][0]['status']='pending_reboot';state['otaMode']='pending_reboot'
                 if 'mode' in value:state['mode']=value['mode']
                 if 'memoryMode' in value:state['memoryMode']=value['memoryMode']
+                if 'credentialMode' in value:
+                    state['credentialMode']=value['credentialMode']
+                    if value['credentialMode']=='none':state['credentialRevision']=0;state['credentialSecret']=''
                 if 'deviceName' in value:state['deviceName']=value['deviceName']
                 if value.get('dropRenameNext'):state['dropRenameNext']=True
                 if 'renameReadDelay' in value:state['renameReadDelay']=min(max(float(value['renameReadDelay']),0),2)
@@ -251,6 +266,28 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 return self.json_response(200,{'items':[] if mode=='empty' else [{'messageId':'fixture-comment','content':'希望桌面伙伴能在专注结束后提醒我休息，也能记住常用的工作安排。' if mode=='visual' else '公开评论 <img src=x onerror=alert(1)>','summary':'读者希望增加专注结束提醒，并保存常用工作安排。' if mode=='visual' else 'AI 推断摘要',
                     'originalUrl':'https://example.invalid/post#comment' if mode=='visual' else 'javascript:alert(1)','verifiedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}],
                     'partial':mode=='partial','dataPolicy':'verified_public_comments_only'})
+            if path.endswith('/credentials/rotate'):
+                state['credentialSubmissions'].append(value)
+                if state['credentialMode']=='revoked':return self.json_response(409,{'error':'device_credential_revoked'})
+                if value.get('expectedRevision')!=state['credentialRevision']:return self.json_response(409,{'error':'device_credential_version_conflict'})
+                state['credentialMode']='rotating';state['credentialRevision']+=1;state['credentialSecret']='B'*43
+                stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+                return self.json_response(200,{'deviceId':'dodo-ui-fixture','username':'dev-dodo-ui-fixture','revision':state['credentialRevision'],
+                    'status':'rotating','acl':['topic readwrite nexus/v1/devices/dodo-ui-fixture/#'],'secret':state['credentialSecret'],
+                    'previousExpiresAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(time.time()+86400)),'rotatedAt':stamp})
+            if path.endswith('/credentials/revoke'):
+                state['credentialSubmissions'].append(value)
+                if value.get('expectedRevision') not in (None,state['credentialRevision']):return self.json_response(409,{'error':'device_credential_version_conflict'})
+                state['credentialMode']='revoked';state['credentialRevision']+=1;state['credentialSecret']=''
+                self.send_response(204);self.end_headers();return
+            if path.endswith('/credentials'):
+                state['credentialSubmissions'].append(value)
+                if state['credentialMode'] not in ('none','revoked'):return self.json_response(409,{'error':'device_credential_exists'})
+                state['credentialRevision']=1 if state['credentialMode']=='none' else state['credentialRevision']+1
+                state['credentialMode']='active';state['credentialSecret']='A'*43
+                return self.json_response(201,{'deviceId':'dodo-ui-fixture','username':'dev-dodo-ui-fixture','revision':state['credentialRevision'],
+                    'status':'active','acl':['topic readwrite nexus/v1/devices/dodo-ui-fixture/#'],'secret':state['credentialSecret'],
+                    'issuedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())})
             if path.endswith('/config-requests'):
                 state['submissions'].append(value)
                 if state['dropNext']:
