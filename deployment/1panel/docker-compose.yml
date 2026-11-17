@@ -47,13 +47,15 @@ services:
     networks: [backend, edge]
 
   core:
-    image: ghcr.io/liuyiwuqing/nexus-core:sha-230c809670edab3800801d9135fde6465f190623
+    # e76732b 发布运行 44094002890 的 amd64+arm64 多架构 digest；包已公开，可直接匿名拉取。
+    image: ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba
     platform: linux/amd64
     # 使用提前拉取或导入的镜像；缺失时直接报错，避免再次连接 GHCR。
     pull_policy: never
     env_file:
       - /etc/nexus/docker/core.env
     environment:
+      NEXUS_AUTH_SESSION_DIRECTORY: /var/lib/nexus/sessions
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError"
     ports:
       - "127.0.0.1:18088:8088"
@@ -62,6 +64,8 @@ services:
     tmpfs: ["/tmp:size=64m,mode=1777"]
     mem_limit: 1g
     volumes:
+      # 只读根文件系统下唯一可写的数据目录；缺失时登录写会话返回 503 session_store_unavailable。
+      - console-sessions:/var/lib/nexus/sessions
       - type: bind
         source: /etc/nexus/docker/mosquitto/certs/ca.crt
         target: /etc/nexus/mqtt-ca.crt
@@ -89,4 +93,5 @@ networks:
   edge:
 
 volumes:
+  console-sessions:
   postgres-data:

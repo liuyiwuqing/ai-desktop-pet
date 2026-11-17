@@ -44,7 +44,7 @@
 | DEL-05 | Linux Memory MCP/stdio 热轮换 | 04 `f99a118` 已推送；同一 `3e38ee5` 包实际 JAR/CLI/stdio 通过过渡、到期、撤销、范围隔离、异常拒绝/恢复；同一 stdio 进程不重初始化、不转发/重放失败请求；见 [20](20-credential-rotation.md#linux-memory-mcp-与-stdio-验证) | 原 admin 模式/交付 CLI 10 项通过；[43384944971](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43384944971) 六个 job 全绿；真实 provider、生产 TLS/systemd/不同用户目录仍待验收 |
 | DEL-06 | 管理台 Docker 线上部署方案 | CORE `9026e41` / 04 `5f9c15c` 已推送并核对远端；源码镜像/Compose/私有初始化/健康检查与 [部署说明](../deployment/README.md#管理台-docker-部署del-06)；本地 CLI 11 项、完整构建 62 通过/5 跳过、实际 Linux Compose 六组检查通过 | [Docker CI 43398869944](https://github.com/liuyiwuqing/nexus-core/actions/runs/43398869944) 全步骤及 [04 CI 43398982965](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43398982965) 七个 job success；尚无目标服务器，公网证书/真实升级恢复/生产资源与设备仍待验收 |
 | DEL-07 | 1Panel 拉取镜像与无源码初始化 | CORE `043f134` 已推送并核对远端；GHCR 发布/双架构/回拉验证工作流、独立初始化镜像、普通 env 的完整三服务编排及 [部署说明](../deployment/README.md#1panel-镜像部署del-07) 已补齐；本地 CLI 11 项、原部署六组、新镜像部署七组通过，actionlint 通过；发布运行 [43584412344](https://github.com/liuyiwuqing/nexus-core/actions/runs/43584412344) 成功，两个 digest 回拉后 7 项验证通过；2026-11-17 对 `e76732b` 重发布 [44094002890](https://github.com/liuyiwuqing/nexus-core/actions/runs/44094002890) 成功，两个包改为 Public 后匿名回拉 200，见末尾 | 已有用户提供的 Debian/1Panel 信息，目标机、HTTPS/网络与设备仍待验收 |
-| DEL-08 | 1Panel 本地镜像编排 | 本地 7 组检查通过；[部署文件](../deployment/1panel/docker-compose.yml)与[使用说明](../deployment/1panel/README.md)使用 CORE 完整提交标签/amd64/禁止自动拉取，基础服务缺失时拉取，保留原私有目录/项目名/卷/安全配置；04 `1436113` 已推送并核对 origin/main | 实际已发布 amd64 CORE 在本机模拟运行，PG/MQTT/初始化为本地 arm64；解析、缺镜像拒绝、启动/鉴权/TLS、重建保留通过；[CI 43729640797](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43729640797) 运行中，目标服务器/HTTPS/设备未验收 |
+| DEL-08 | 1Panel 本地镜像编排 | 本地 7 组检查通过；[部署文件](../deployment/1panel/docker-compose.yml)与[使用说明](../deployment/1panel/README.md)使用 CORE 完整提交标签/amd64/禁止自动拉取，基础服务缺失时拉取，保留原私有目录/项目名/卷/安全配置；04 `1436113` 已推送并核对 origin/main；2026-11-17 本地编排升级至 `e76732b` digest 并补 `console-sessions` 会话卷，隔离启动 7 项通过，见末尾 | 实际已发布 amd64 CORE 在本机模拟运行，PG/MQTT/初始化按本机架构；解析、缺镜像拒绝、启动/鉴权/TLS、重建保留通过；[CI 43729640797](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43729640797) 七个 job success；目标服务器/HTTPS/设备未验收 |
 | CI-01 | 首次远程 CI 与容器 Git 所有权 | 首次运行的交付/桥接检查通过；四预设在 Git 源码清单处退出 128，尚未编译。真实 Git 所有权模拟复现并建立回归 | `5183050` 修复 Git 所有权，`43169dd` / `1ad19cf` 修复 Linux C17 的 `strnlen` / `strlcpy` 依赖；本地主机检查通过；远程 OTA `0910e5f` 的 [43366086540](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43366086540) 六个 job 全绿 |
 | SW-04 | 远程 OTA 管理 | 软件已验证；CORE 配套 `2808ed7` 已推送，协议、设备事务、管理台/审计/ACL 见 [19](19-remote-ota.md)；四固件预设、主机/实际 Java–MQTT–C、浏览器通过 | 04 `0910e5f` 已推送、远程 CI 六个 job 全绿；生产钥/HTTPS 与实机 OTA 仍待验收 |
 | SW-05 | CORE/记忆工具平滑凭据轮换 | 软件已验证；双令牌/到期/撤销、稳定任务归属、stdio 文件重载、CLI 与发布预检见 [20](20-credential-rotation.md) | CORE `9559429` / 04 `ccd3afa` 已推送；设备及上游服务凭据仍走各自维护流程，不经普通配置下发秘密 |
@@ -678,3 +678,21 @@ CORE 配套 `f75d0f388554e9db3cf4cb17ce58d914647fd60a` 仅改 `docs/1panel-deplo
 缺失会话卷的后果经源码核对：`BrowserSessionStore.replace` 在 `Files.createFile(.lock)` 处遇只读文件系统抛错，被统一包装为 `Unavailable`，再由 `ApiErrors` 映射为 `503 session_store_unavailable`，即管理台登录直接失败，而非仅丢失重启后的会话；`read_only: true` 下该目录只是镜像内的只读目录，无法替代可写挂载。另外 `e76732b` 相对 `230c809` 新增 Flyway `V21`–`V23`（`CREATE TABLE device_telemetry_samples` 与两组 `ADD COLUMN`，无 drop），升级后把镜像回滚回 `230c809` 会因迁移校验失败拒绝启动，回滚需还原备份或关闭校验。
 
 配套新增 `deployment/1panel/docker-compose.nexus-production.yml`（结构对齐用户线上模板，只含上述四处差异）与 [1Panel 升级说明](../deployment/1panel/README.md#从-230c809-升级到-e76732b)。`docker compose config` 在替换私有路径为临时占位后退出 0，解析出的卷名为 `nexus-production_console-sessions`、`NEXUS_AUTH_SESSION_DIRECTORY` 为容器内绝对路径、`read_only: true` 与 `user: 65534:65534` 保持。DEL-08 的 `docker-compose.yml` 仍固定 `230c809` 与 `pull_policy: never`，未改。目标服务器仍未连接，本轮未执行任何 `docker compose up`，线上结果以用户机器为准。
+
+### 2026-11-17 · DEL-08 本地编排对齐 e76732b
+
+DEL-08 此前把 CORE 固定为 `230c809`，并记录“本地编排仍固定 230c809，需另行验收”。在剩余软件缺口里，设备凭据轮换缺后端、SW-06-B 二期范围过大、SW-07 依赖真实声学环境，均不适合本轮纯软件验证，因此选此项。
+
+- [`deployment/1panel/docker-compose.yml`](../deployment/1panel/docker-compose.yml)：CORE 改为 `ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba`，保留 `platform: linux/amd64` 与 `pull_policy: never`；增加 `NEXUS_AUTH_SESSION_DIRECTORY=/var/lib/nexus/sessions`、服务级 `console-sessions:/var/lib/nexus/sessions` 与同名顶层卷。其余服务、端口、私有路径、只读根、UID 65534、1 GiB、健康检查和日志限制未改。
+- [`deployment/1panel/README.md`](../deployment/1panel/README.md)：固定镜像、校验命令、初始化镜像与 `--image` 参数、升级指引和验证边界同步到 `e76732b`；明确新安装使用本目录文件，已有 `230c809` 安装改用 `docker-compose.nexus-production.yml`。
+
+核对事实（2026-11-17，本机 macOS，Docker Compose v5.5.0）：
+
+- CORE [发布运行 44094002890](https://github.com/liuyiwuqing/nexus-core/actions/runs/44094002890) 为 success；`docker buildx imagetools inspect` 得到索引 digest `sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba`，回拉后的 amd64 镜像 ID 为 `sha256:aa3a2b56291ddf7b86bf38bdc63fc431e2433d5348012bb9c5c5dacec928c238`，匿名拉取成功。
+- `docker compose -f deployment/1panel/docker-compose.yml config --no-env-resolution -q` 退出 0。
+- 隔离项目（临时私有目录与回环端口，初始化镜像 `sha-e76732b3792313ea5f3744b09970a7972fc89a36`）`up -d --no-build --wait` 后 postgres/mqtt/core 全部健康；未带令牌 `/api/v1/status` 返回 401，带令牌 `database`/`mqtt` 均 `ready`，页面 200。
+- 日志确认 Flyway `V21`–`V23` 执行；`POST /api/v1/session {"remember":true}` 返回 `persisted:true`，仅凭 Cookie 可读会话；会话卷目录 `65534:0700`、会话文件 `0600`；重启 CORE 后同一 Cookie 仍返回 admin 且状态 ready。
+- 运行时约束复核：`user=65534:65534`、`readonly=true`、`Memory=1073741824`、`cap_drop=[ALL]`、非特权；MQTT TLS 1.3 证书 `CN=mqtt.muyin.site` 经私有 CA 校验通过。
+- 收尾执行 `down -v` 并删除临时私有目录；未连接目标服务器，未执行线上部署或真实数据库迁移。
+
+边界：本地隔离运行不是 Debian 目标机部署、远程 CI 或线上升级；HTTPS/网络、真实数据库迁移与设备仍待目标环境验收；升级后会话卷首次为空，已登录用户需要重新登录一次。

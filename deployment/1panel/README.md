@@ -1,6 +1,6 @@
 # 1Panel：本地镜像部署
 
-[docker-compose.yml](docker-compose.yml) 适用于当前 Debian x86_64 服务器，CORE 固定使用已发布的 `230c809670edab3800801d9135fde6465f190623` 提交标签，要求本机已有 `linux/amd64` 镜像。CORE 的 `pull_policy: never` 禁止自动访问 GHCR，镜像缺失会直接报错；PostgreSQL 17 和 Mosquitto 2.0.22 沿用已有编排的 digest，仅在本机缺失时拉取。这是 CORE 本地镜像方案，首次部署仍可能下载两个基础服务镜像。
+[docker-compose.yml](docker-compose.yml) 适用于当前 Debian x86_64 服务器，CORE 固定使用 `e76732b3792313ea5f3744b09970a7972fc89a36` 发布的多架构 digest `sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba`，要求本机已有 `linux/amd64` 镜像；`NEXUS_AUTH_SESSION_DIRECTORY` 把登录会话写入 `console-sessions` 卷。CORE 的 `pull_policy: never` 禁止自动访问 GHCR，镜像缺失会直接报错；PostgreSQL 17 和 Mosquitto 2.0.22 沿用已有编排的 digest，仅在本机缺失时拉取。这是 CORE 本地镜像方案，首次部署仍可能下载两个基础服务镜像。
 
 配置复用 `/etc/nexus/docker`，管理台仅绑定 `127.0.0.1:18088`，MQTT/TLS 发布 TCP 8883；数据库使用内部网络和持久卷。HTTPS 由已有 1Panel/OpenResty 提供，不占用额外的 80/443。文件不包含密码，不需要源码、构建步骤或另行填写面板环境变量。
 
@@ -11,10 +11,10 @@
 ```sh
 docker image inspect \
   --format '{{.Os}}/{{.Architecture}} {{.Id}}' \
-  ghcr.io/liuyiwuqing/nexus-core:sha-230c809670edab3800801d9135fde6465f190623
+  ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba
 ```
 
-该次发布的 amd64 镜像 ID 为 `sha256:3ef89fa884ed20ccf153c9f3a86b559686243c48239887c5f47ce456d6f103b3`，与[发布回拉报告](https://github.com/liuyiwuqing/nexus-core/actions/runs/43620052738)一致。若尚未下载，可用前述 `docker pull`，或在网络较好的 Mac 上拉取 `--platform linux/amd64`，使用 `docker save` 导出该完整标签后上传，在服务器 `docker load -i <镜像包路径>`。导入后再次核对上述 ID；标签本身不保证内容不可变。
+[发布运行 44094002890](https://github.com/liuyiwuqing/nexus-core/actions/runs/44094002890) 为 success，多架构索引 digest 即上述值；2026-11-17 本机回拉的 amd64 镜像 ID 为 `sha256:aa3a2b56291ddf7b86bf38bdc63fc431e2433d5348012bb9c5c5dacec928c238`，与索引 digest 不是同一值。若尚未下载，可用前述 `docker pull`，或在网络较好的 Mac 上拉取 `--platform linux/amd64`，使用 `docker save` 导出该镜像后上传，在服务器 `docker load -i <镜像包路径>`。导入后再次核对上述 amd64 镜像 ID；digest 引用本身不可变，仍建议核对。
 
 不要对这份编排执行全量 `docker compose pull`，也不要在 1Panel 勾选强制拉取；启动命令的拉取策略参数可能覆盖文件中的策略。更新 CORE 时先准备并核对新镜像，再明确修改其完整标签。
 
@@ -31,12 +31,12 @@ install -d -m 700 /etc/nexus
 docker run --rm --pull=never --read-only --cap-drop ALL \
   --security-opt no-new-privileges:true --tmpfs /tmp \
   --mount type=bind,source=/etc/nexus,target=/etc/nexus \
-  ghcr.io/liuyiwuqing/nexus-core-init:sha-230c809670edab3800801d9135fde6465f190623 \
+  ghcr.io/liuyiwuqing/nexus-core-init:sha-e76732b3792313ea5f3744b09970a7972fc89a36 \
   --data-dir /etc/nexus/docker \
   --domain pet.muyin.site \
   --mqtt-host mqtt.muyin.site \
   --device dodo-1 \
-  --image ghcr.io/liuyiwuqing/nexus-core:sha-230c809670edab3800801d9135fde6465f190623
+  --image ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba
 )
 ```
 
@@ -94,14 +94,16 @@ docker compose -p nexus-production -f compose.1panel.yml up -d
 docker compose -p nexus-production -f compose.1panel.yml ps
 ```
 
-用本文文件替换 `compose.1panel.yml` 或在 1Panel 编排里粘贴后再执行。保留原项目名、`postgres-data` 卷、`core.env` 与 `/etc/nexus/docker` 目录，不重新运行初始化镜像。新卷首次创建为空，升级后需要重新登录一次；之后在同一卷、有效期内重启可恢复。启动后用 `docker compose logs core` 确认 V21–V23 迁移与健康检查，再核对 `/api/v1/status` 的 database 与 mqtt 均为 ready。
+已有 `230c809` 安装时，用 `docker-compose.nexus-production.yml` 替换 `compose.1panel.yml` 或在 1Panel 编排里粘贴后再执行；本目录 `docker-compose.yml` 已同步为相同 digest 与会话卷，仅适用于新安装，不再作为 `230c809` 的本地基线。保留原项目名、`postgres-data` 卷、`core.env` 与 `/etc/nexus/docker` 目录，不重新运行初始化镜像。新卷首次创建为空，升级后需要重新登录一次；之后在同一卷、有效期内重启可恢复。启动后用 `docker compose logs core` 确认 V21–V23 迁移与健康检查，再核对 `/api/v1/status` 的 database 与 mqtt 均为 ready。
 
 包已改为 Public，`docker pull` 不需要 `docker login`；若后续改回私有，才需要在服务器与 1Panel 配置只读凭据。
 
 ## 验证与边界
 
-2026-11-15 本地 `docker compose -f deployment/1panel/docker-compose.yml config --no-env-resolution -q` 退出 0，Compose 版本为 `v5.5.0`。隔离运行使用本机缓存的真实发布 amd64 CORE（上述镜像 ID）、arm64 PostgreSQL/Mosquitto 和本地 arm64 初始化镜像；临时编排只替换私有目录和随机回环端口，使用独立项目/卷，通过 `up -d --no-build --wait --wait-timeout 240` 启动。
+2026-11-15 本地 `docker compose -f deployment/1panel/docker-compose.yml config --no-env-resolution -q` 退出 0，Compose 版本为 `v5.5.0`。隔离运行使用本机缓存的真实发布 amd64 CORE（当时为 `230c809`）、arm64 PostgreSQL/Mosquitto 和本地 arm64 初始化镜像；临时编排只替换私有目录和随机回环端口，使用独立项目/卷，通过 `up -d --no-build --wait --wait-timeout 240` 启动。
 
 7 组检查通过：原文件三服务/拉取策略/端口解析、断网初始化生成私有配置、缺少本地 CORE 时直接拒绝、真实发布 amd64 CORE 非 root/只读/内存约束、HTTP 401/鉴权后数据库与 MQTT ready/页面 200、严格 MQTT CA/主机名验证、全部重建后隔离消息记录及原凭据保留。实际执行了 `down` 后重建；收尾仅删除该随机测试项目/卷/私有目录，报告留在忽略目录 `build/1panel-local-image-verification.json`。3 段 shell 命令经 `bash -n` 检查，本次所涉说明中的 30 个本地链接及 `git diff --check` 通过。
 
-本项仅新增编排与使用说明，未改变 CORE 或设备代码；项目事实沉淀到本目录和[任务台账](../../docs/18-requirements-and-progress.md)，无需更新通用 Skill。服务器端 Docker 为用户提供的 27.3.1，实际 Compose/1Panel 版本、HTTPS/网络、真实数据库和设备仍须目标环境核对；本地模拟不是 Debian 目标机部署或远程 CI。Docker `pull_policy` 和启动策略以[官方定义](https://docs.docker.com/reference/compose-file/services/#pull_policy)为准。
+2026-11-17 把本地编排升级到 `e76732b` 后重新核对：`config --no-env-resolution -q` 退出 0（Compose v5.5.0）；隔离项目使用上述 amd64 镜像 ID、公开 init 镜像与临时私有目录，`up -d --no-build --wait` 后三服务健康。7 项检查通过：未带令牌 `/api/v1/status` 返回 401，带令牌 database/mqtt 均 ready，页面 200；Flyway `V21`–`V23` 执行；`POST /api/v1/session {"remember":true}` 返回 `persisted:true`，仅凭 Cookie 可读会话；会话卷目录为 `65534:0700`、会话文件 `0600`；重启 CORE 后同一 Cookie 仍返回 admin 且状态 ready；CORE 保持 UID 65534、只读根、1 GiB、`cap_drop ALL`；MQTT TLS 1.3 证书 `CN=mqtt.muyin.site` 经私有 CA 校验通过。实际执行了 `down -v` 并删除临时私有目录；未连接目标服务器，未执行线上部署或真实数据库迁移。
+
+本项只调整本地编排与使用说明，未改变 CORE 或设备代码；项目事实沉淀到本目录和[任务台账](../../docs/18-requirements-and-progress.md)，无需更新通用 Skill。服务器端 Docker 为用户提供的 27.3.1，实际 Compose/1Panel 版本、HTTPS/网络、真实数据库和设备仍须目标环境核对；本地模拟不是 Debian 目标机部署或远程 CI。Docker `pull_policy` 和启动策略以[官方定义](https://docs.docker.com/reference/compose-file/services/#pull_policy)为准。
