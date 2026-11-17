@@ -19,6 +19,7 @@ rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
 {
 cat "$repo_root/tools/ci/naive_ui_helpers.js"
 cat <<'EOF'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const base='http://127.0.0.1:18805', name='NEXUS list filter regression';
 const existing=(await listTaskSpaces()).find(space=>space.name===name);
 if(existing && existing.ownership!=='agent')throw new Error('Existing regression space needs user confirmation before control');
@@ -48,7 +49,7 @@ await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDis
 const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
 if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
 
-await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
+await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
 await expect("!!document.querySelector('.sidebar') && document.querySelectorAll('.message-row').length===30",'default message list is unchanged');
 await expect("!!document.querySelector('.n-select[aria-label=消息状态]')",'message state filter is available');
 if((await state()).listRequests.some(path=>path.includes('readStatus=')||path.includes('status=')))throw new Error('Default lists must omit the optional filters');
@@ -112,7 +113,7 @@ await expect("document.querySelector('.loading-state[role=status]')?.innerText==
 await expect("!!document.querySelector('.login-card')",'logout ends the filtered session');
 await fixture({listDelay:0});await wait(1.2);
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.sidebar') && document.querySelector('.token-label input').value===''",'late filtered response cannot restore a logged-out session');
-await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
+await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
 await expect("document.querySelector('.n-select[aria-label=消息状态]')?.textContent.trim()==='全部'",'new login resets the message filter');
 await navigate('deliveries');await expect("document.querySelector('.n-select[aria-label=投递状态]')?.textContent.trim()==='全部'",'new login resets the delivery filter');
 const requests=(await state()).listRequests;

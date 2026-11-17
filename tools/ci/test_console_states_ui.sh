@@ -16,6 +16,7 @@ for attempt in {1..50}; do
   sleep .1
 done
 ego-browser nodejs <<'EOF'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const base='http://127.0.0.1:18826',name='NEXUS console states';
 const existing=(await listTaskSpaces()).find(s=>s.name===name);
 if(existing&&existing.ownership!=='agent')throw new Error('Existing space needs user confirmation');
@@ -32,7 +33,7 @@ async function qa(value){return JSON.parse(await serverFetch(base+'/__qa/present
 async function expect(expression,label){for(let i=0;i<80;i++){if(await js(expression).catch(()=>false)){results.push(label);return;}await wait(.1);}cliLog(await snapshotText());throw new Error(label);}
 async function nav(tab){await js(`document.querySelector('.app-layout > .sidebar [data-tab="${tab}"]').click()`);await expect(`document.querySelector('.app-layout > .sidebar [data-tab="${tab}"]').getAttribute('aria-current')==='page'&&!!document.querySelector('.content h1')`,'navigate '+tab);}
 async function shot(name){await cdp('Page.bringToFront');const result=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(shots+'/'+name+'.png',Buffer.from(result.data,'base64'));}
-await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await click('.login-card button.primary');
+await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await click('.login-card button.primary');
 await expect("!!document.querySelector('.app-layout')",'authenticated actual console');
 await js("document.querySelector('.topbar button[aria-label=切换到浅色主题]')?.click()");
 await expect("document.documentElement.dataset.theme==='light'",'state screenshots start in light mode');

@@ -17,6 +17,7 @@ for attempt in {1..50}; do
 done
 rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
 ego-browser nodejs <<'EOF'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const name='NEXUS automation lifecycle',base='http://127.0.0.1:18814',id='11111111-1111-4111-8111-111111111111';
 const prior=(await listTaskSpaces()).find(s=>s.name===name);
 if(prior && prior.ownership!=='agent')throw new Error('Existing space requires confirmation');
@@ -27,7 +28,7 @@ async function qa(value={}){return JSON.parse(await serverFetch(base+'/__qa/oper
 async function expect(expression,label){for(let i=0;i<100;i++){if(await js(expression).catch(()=>false)){checks.push(label);return;}await wait(.1);}cliLog(await snapshotText());throw new Error(label);}
 async function tap(label,scope='.content > section'){await expect(`(()=>{const b=[...document.querySelectorAll(${JSON.stringify(scope)}+' button')].find(b=>b.textContent.trim()===${JSON.stringify(label)});if(!b||b.disabled)return false;b.click();return true;})()`,'click '+label);}
 async function nav(label){await js(`(()=>{[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith(${JSON.stringify(label)})).click();})()`);}
-async function reset(){await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});await qa({reset:true});await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'login');await nav('自动化');await expect(`document.getElementById('delete-rule-${id}')?.disabled===false`,'deletion becomes available');}
+async function reset(){await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});await qa({reset:true});await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'login');await nav('自动化');await expect(`document.getElementById('delete-rule-${id}')?.disabled===false`,'deletion becomes available');}
 async function openDelete(){await js(`document.getElementById('delete-rule-${id}').click()`);await expect("!!document.querySelector('.rule-delete')",'delete confirmation opens');}
 async function confirmName(){await fillInput('[aria-label="确认删除的规则名称"]','隔离每日提醒');}
 function deletions(s){return s.requests.filter(r=>r.method==='DELETE');}

@@ -17,6 +17,7 @@ for attempt in {1..50}; do
 done
 rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
 ego-browser nodejs <<'EOF'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const base='http://127.0.0.1:18804', name='NEXUS message submission regression';
 const existing=(await listTaskSpaces()).find(space=>space.name===name);
 if(existing && existing.ownership!=='agent')throw new Error('Existing regression space needs user confirmation before control');
@@ -48,7 +49,7 @@ async function send() {
 }
 async function login() {
   await expect("!!document.querySelector('.login-card')",'login is shown');
-  await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
+  await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
   await expect("!!document.querySelector('.sidebar')",'authenticated console is shown');
 }
 async function acknowledged(label) {await expect("!document.querySelector('.inline-form') && document.body.innerText.includes('测试消息已保存')",label);}

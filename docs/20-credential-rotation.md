@@ -107,3 +107,10 @@ python3 tools/ci/test_server_linux.py \
 新检查曾在首次 search 响应断言处失败；受控延迟 2 秒确认容器启动与 HTTP 就绪之间存在窗口，入口已增加有超时的就绪探测后重跑通过。原 `--auth-rotation` 独立重跑退出 0（`linux-auth-rotation-compat-3e38ee5.json`），其 Memory MCP 保持关闭；交付 CLI 10 项通过。
 
 本项 provider 是同一临时网络命名空间内的空 HTTP 契约夹具，检查固定公开目录/身份/请求及调用次数。它没有真实公开评论、Halo/OpenViking、供应商 WSS 或语音链路，不构成真实检索、权限或内容失效验收。测试使用分离挂载和相同非 root UID，不替代目标机不同系统用户/目录、systemd 或生产 TLS 验收。包 SHA256 仍为 `8f888362855fcedbad186e4e9efef76a61859b22d7703599dae15a3a1cc17237`；临时容器、网络、凭据卷清理成功，未操作真实配置。
+
+
+## 管理台维护 · CONSOLE-26
+
+CORE 的“权限 → 修改管理员令牌”支持已启用且可写的受保护文件；环境变量模式不能直接由网页改写。网页校验 current 证明与 revision，零过渡替换 admin 并移除 previous，保留完整 memory scope 和固定身份；当前 Cookie 会话换发，其他旧凭据后续请求失效。需要先保存新值并重复确认，失联不自动重放。外部浏览器通过 HTTPS 使用会话，本机回环允许 HTTP；CORE 重启需重新登录。
+
+CLI 的写锁同步改为 `fcntl.lockf`，与 Java FileChannel 使用同一 POSIX record lock；macOS 不叠加 flock，Linux 不依赖二者互斥。更新 CORE 时同步使用新 CLI，避免旧 CLI 与网页并发维护同一文件。文件/目录仍需私有；read-only 挂载继续由 CLI 管理，不为网页操作降低权限。详细 API 与会话规则见 [CORE 权限文档](../../nexus-core/docs/roles-and-audit.md)。测试只用隔离凭据；真实配置变更以 18 台账的本地预览记录为准。

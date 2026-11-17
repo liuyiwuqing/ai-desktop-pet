@@ -19,6 +19,7 @@ rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
 {
 cat "$repo_root/tools/ci/naive_ui_helpers.js"
 cat <<'EOF'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const name='NEXUS automation conditions',base='http://127.0.0.1:18813',checks=[];
 const prior=(await listTaskSpaces()).find(s=>s.name===name);if(prior&&prior.ownership!=='agent')throw new Error('Existing space requires confirmation');
 await useOrCreateTaskSpace(name);await openOrReuseTab(base,{wait:true,timeout:15});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
@@ -26,7 +27,7 @@ async function qa(value={}){return JSON.parse(await serverFetch(base+'/__qa/oper
 async function expect(expression,label){for(let i=0;i<100;i++){if(await js(expression).catch(()=>false)){checks.push(label);return;}await wait(.1);}cliLog(await snapshotText());throw new Error(label);}
 async function tap(label,scope='.content > section'){await expect(`(()=>{const b=[...document.querySelectorAll(${JSON.stringify(scope)}+' button')].find(b=>b.textContent.trim()===${JSON.stringify(label)});if(!b||b.disabled)return false;b.click();return true;})()`,'click '+label);}
 async function nav(label){await js(`(()=>{[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith(${JSON.stringify(label)})).click();})()`);}
-await qa({reset:true});await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'login');await nav('自动化');await tap('创建规则');
+await qa({reset:true});await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'login');await nav('自动化');await tap('创建规则');
 await js("(()=>{const f=document.querySelector('.content form:not(.rule-editor)');f.querySelector('input').value='条件规则';f.querySelector('input').dispatchEvent(new Event('input',{bubbles:true}));})()");
 await ui.choose('.inline-form .n-select','新消息条件 → 设备提醒');
 await expect("!!document.querySelector('[aria-label=匹配来源]') && !document.querySelector('.n-time-picker')",'incoming rule exposes conditions without daily schedule');

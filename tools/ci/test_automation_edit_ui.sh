@@ -17,6 +17,7 @@ for attempt in {1..50}; do
 done
 rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
 ego-browser nodejs <<'EOF'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const name='NEXUS automation editing',base='http://127.0.0.1:18813';
 const existing=(await listTaskSpaces()).find(s=>s.name===name);
 if(existing && existing.ownership!=='agent')throw new Error('Existing space requires user confirmation');
@@ -39,7 +40,7 @@ const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js
 if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
 await fixture({reset:true});
  await cdp('Emulation.clearDeviceMetricsOverride');
- await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
+ await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
  await expect("!!document.querySelector('.sidebar')",'session opens');await navigate('自动化');
  await expect("document.querySelectorAll('.record-card').length===4",'all fixture rules are read');await ready();
 }
@@ -85,7 +86,7 @@ await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScale
 await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.rule-editor input,.rule-editor textarea,.rule-editor button')].every(e=>e.getBoundingClientRect().right<=390)",'editor fields and actions fit 390 CSS pixels');cliLog({mobileScreenshot:await captureScreenshot()});await js("document.querySelector('.rule-editor .form-footer').scrollIntoView({block:'center'})");cliLog({mobileActionsScreenshot:await captureScreenshot()});await cdp('Emulation.clearDeviceMetricsOverride');
 await fixture({detail_delay:1});await tap('核对当前规则','.rule-editor');await expect("document.querySelector('.rule-editor button.primary').disabled",'pending readback disables competing edits');await tap('退出登录','.sidebar');await wait(1.2);await expect("!!document.querySelector('.login-card') && !document.querySelector('.rule-editor') && !document.querySelector('.sidebar')",'late readback cannot restore logged out editor');
 await reset();await edit();await rename('退出中的修改');await fixture({write_delay:1});await tap('保存修改','.rule-editor');await expect("document.querySelector('.rule-editor button.primary').disabled",'edit is in flight before logout');await tap('退出登录','.sidebar');await wait(1.2);await expect("!!document.querySelector('.login-card') && !document.querySelector('.sidebar')",'late saved result cannot restore the session');
-await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'new session opens after late edit');await navigate('自动化');await ready();await expect("!document.querySelector('.rule-editor')",'new session has no previous edit identity');
+await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'new session opens after late edit');await navigate('自动化');await ready();await expect("!document.querySelector('.rule-editor')",'new session has no previous edit identity');
 await edit();await fixture({next_write:'unauthorized',write_delay:0});await rename('鉴权失败');await tap('保存修改','.rule-editor');await expect("!!document.querySelector('.login-card') && document.querySelector('.inline-error')?.innerText.includes('管理令牌无效')",'edit 401 clears the session');
 if((await listTabs()).length!==1)throw new Error('Regression must reuse one tab');results.push('all reset cycles reuse one browser tab');
 cliLog({passed:results.length,checks:results,scope:'actual Vue, RAM HTTP; no real rules/messages/CORE/DB/device'});

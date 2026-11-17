@@ -17,6 +17,7 @@ for attempt in {1..50}; do
 done
 rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
 ego-browser nodejs <<'EOF'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const base='http://127.0.0.1:18806',name='NEXUS overview regression';
 const existing=(await listTaskSpaces()).find(s=>s.name===name);
 if(existing && existing.ownership!=='agent')throw new Error('Existing space needs user confirmation');
@@ -26,7 +27,7 @@ async function fixture(value){return JSON.parse(await serverFetch(base+'/__qa/ov
 async function expect(expression,label){for(let i=0;i<60;i++){if(await js(expression).catch(()=>false)){results.push(label);return;}await wait(0.1);}cliLog(await snapshotText());throw new Error('UI assertion failed: '+label);}
 async function tap(text){if(!await js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()===${JSON.stringify(text)});if(!b||b.disabled)return false;b.click();return true;})()`))throw new Error('Button unavailable: '+text);}
 async function navigate(label){await js(`(()=>{const b=[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith(${JSON.stringify(label)}));if(!b)throw new Error('Navigation missing');b.click();})()`);}
-async function login(){await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'login succeeds');}
+async function login(){await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'login succeeds');}
 await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
 const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
 if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
@@ -59,7 +60,7 @@ await fixture({mode:'success',delay:0});await navigate('概览');await expect("d
 await fixture({mode:'empty',delay:1});await tap('刷新概览');await tap('退出登录');await wait(1.2);
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.overview-panel') && document.querySelector('.token-label input').value===''",'logout discards delayed snapshot and token');
 const beforeAuth=(await fixture({mode:'unauthorized',delay:0})).requests;
-await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
+await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.overview-panel') && document.querySelector('.token-label input').value===''",'overview 401 ends the session');
 if((await fixture({})).requests<=beforeAuth)throw new Error('401 check never reached overview HTTP');
 cliLog({passed:results.length,checks:results,scope:'actual Vue and RAM-only HTTP; no database/Broker/device'});

@@ -19,6 +19,7 @@ rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
 {
 cat "$repo_root/tools/ci/naive_ui_helpers.js"
 cat <<'EOF'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const base='http://127.0.0.1:18807',name='NEXUS delivery history regression';
 const existing=(await listTaskSpaces()).find(s=>s.name===name);
 if(existing && existing.ownership!=='agent')throw new Error('Existing space needs user confirmation');
@@ -35,7 +36,7 @@ await fixture({reset:true});await openOrReuseTab(base,{wait:true,timeout:15});aw
 const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
 if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
 
-await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
+await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
 await expect("!!document.querySelector('.sidebar')",'login succeeds');await navigate('投递');
 await expect("document.querySelectorAll('tbody tr').length===4 && [...document.querySelectorAll('tbody button')].some(b=>b.innerText.trim()==='时间线')",'each delivery exposes a timeline action');
 await history();
@@ -81,20 +82,20 @@ await fixture({history_mode:'success',history_delay:1});await tap('刷新时间�
 await expect("document.querySelector('.delivery-history-panel [aria-busy=true]')?.innerText==='正在读取时间线…' && document.querySelector('.delivery-history-panel button').disabled",'history loading prevents duplicate reads');
 await expect("document.querySelectorAll('.delivery-timeline li').length===30",'history refresh recovers');await fixture({history_delay:0});
 // 独立手机会话测布局，避免前序筛选的过渡浮层影响视口宽度。
-await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await gotoAndWait(base+'/?mobile='+Date.now(),{timeout:15});await cdp('Page.bringToFront');await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'phone session opens independently');await navigate('投递');await expect("document.querySelectorAll('tbody tr').length===4",'phone session retains the same delivery data');await history();await expect("document.querySelectorAll('.delivery-timeline li').length===30",'phone session retains the full history page');
+await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await gotoAndWait(base+'/?mobile='+Date.now(),{timeout:15});await cdp('Page.bringToFront');await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'phone session opens independently');await navigate('投递');await expect("document.querySelectorAll('tbody tr').length===4",'phone session retains the same delivery data');await history();await expect("document.querySelectorAll('.delivery-timeline li').length===30",'phone session retains the full history page');
 await expect("document.documentElement.scrollWidth<=390 && document.querySelector('.delivery-history-panel').getBoundingClientRect().right<=390",'history fits 390 CSS pixels');await js("document.querySelector('.delivery-history-panel').scrollIntoView({block:'start'})");await wait(.2);const fs=await import('node:fs');fs.mkdirSync('/tmp/nexus-console-surfaces',{recursive:true});const mobileShot=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('/tmp/nexus-console-surfaces/delivery-history-mobile.png',Buffer.from(mobileShot.data,'base64'));await cdp('Emulation.clearDeviceMetricsOverride');
 await fixture({history_delay:1});await tap('刷新时间线');await tap('收起时间线');await wait(1.2);
 await expect("!document.querySelector('.delivery-history-panel')",'late history response cannot reopen a closed panel');
 await fixture({history_delay:0});await history();await fixture({history_delay:1});await tap('刷新时间线');await tap('退出登录');await wait(1.2);
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.delivery-history-panel')",'logout discards delayed delivery data');
-await fixture({reset:true});await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
+await fixture({reset:true});await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
 await expect("!!document.querySelector('.sidebar') && document.querySelectorAll('tbody tr').length===4",'session may return before cancellation logout');
 await history();await fixture({cancel_delay:1});await tap('取消投递');await tap('确认取消');
 await expect("[...document.querySelectorAll('.delivery-cancel-confirm button')].some(b=>b.innerText==='正在取消…')",'cancellation is in flight before logout');
 await tap('退出登录');await wait(1.2);
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.delivery-history-panel') && document.querySelector('.token-label input').value===''",'late cancellation cannot restore session data or notice');
 if((await fixture({})).requests.filter(r=>r.method==='POST').length!==1)throw new Error('Logout replayed cancellation');results.push('logout never replays an in-flight cancel');
-await fixture({history_delay:0,history_mode:'unauthorized'});await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'new session may log in');
+await fixture({history_delay:0,history_mode:'unauthorized'});await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await expect("!!document.querySelector('.sidebar')",'new session may log in');
 await expect("document.querySelectorAll('tbody tr').length===4",'new session delivery list is ready');await js("[...document.querySelectorAll('tbody tr')[0].querySelectorAll('button')].find(b=>b.innerText==='时间线').click()");
 await expect("!!document.querySelector('.login-card') && document.querySelector('.token-label input').value===''",'history 401 ends the session');
 cliLog({passed:results.length,checks:results,scope:'actual Vue and RAM-only HTTP; not database/Broker/device'});

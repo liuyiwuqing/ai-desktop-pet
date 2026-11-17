@@ -58,6 +58,7 @@
 | CONSOLE-23 | 全站紧凑布局与一致按钮 | 软件本地已验证：十二页操作按钮统一描边/尺寸，侧栏账户重排；低频条件与记录折叠，校验与异常自动展开，见 [23](23-console-completion.md#console-23--紧凑页面与一致按钮) | 21 组浏览器 900 次检查通过；完整构建、配套提交与 CI 见末尾；5173 预览持续运行 |
 | CONSOLE-24 | 紧凑表格、卡片与浮层 | 软件本地已验证：共享表面/标题/间距规范，确认区与浮层同步，见 [23](23-console-completion.md#console-24--紧凑表格卡片与浮层) | 21 组浏览器 913 次检查通过；完整构建及跨仓交付见末尾 |
 | CONSOLE-25 | 统一加载、空状态与错误反馈 | 软件本地已验证：统一展示组件、读取状态去重与紧凑提示，保留校验/核对/重试 | 22 组浏览器 1038 次检查、完整构建与最终包通过；跨仓交付见末尾 |
+| CONSOLE-26 | 刷新恢复登录与令牌维护 | 软件本地已验证：8h 会话、退出/失效/跨页保护；管理员文件令牌修改，角色编辑/重新生成 | 23 组浏览器 1098 条、完整 128 项校验（5 条件跳过）、真实 5173/8088 会话与 SSE；交付见末尾 |
 | CONSOLE-02 | 管理台完成度与验收清单 | `65eb2ef` 已推送；已按八导航、原完整规划及真实控制器核对；当前功能/验证/缺项见 [23](23-console-completion.md#console-02--当前实现与完整规划的差距) | 完整规划尚未全部实现；文档核对不算缺项完成。状态筛选已单独交付 CONSOLE-03 |
 | CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；更多筛选/元数据导出见 CONSOLE-13，取消/时间线见 CONSOLE-04 |
 | CONSOLE-04 | 投递状态时间线与受限取消 | CORE `109b83f` / 04 `0dec4b6` 已推送并核对远程；HTTP/worker/隔离 SQL 6 项，实际 Vue 新增 62/既有 191 项，Java→固件 C→Java 契约通过；完整构建 70 通过/5 跳过、JAR 一致；见 [23](23-console-completion.md#console-04--事务状态时间线与受限取消) | CORE [43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) Docker job、04 [43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job 全绿；V13 只在隔离库验证，旧行历史未知，无设备撤回或生产迁移 |
@@ -588,3 +589,33 @@ CORE 远程 CI [Docker deployment 44055865803](https://github.com/liuyiwuqing/ne
 - 最终退出/清理复核：来源的一次复跑在 38 条功能断言后出现 shell 尾段错误，保留该日志且不作为最终通过依据；固定脚本重新完整执行，38 条、退出 0、`completeTaskSpace` 返回 `done: true` 均已确认（`sources-final.log`）。最终汇总改为引用这份日志，22 组总数仍为 1038；最终浏览器构建与 JAR 再次逐字节一致。
 
 04 配套脚本/验证/台账 `cee90c817ba22a1a42185c3a471accd3439e9137` 已推送并核对 `origin/main`，`.workbuddy/` 未暂存。远程状态复核：[Docker deployment 44055865803](https://github.com/liuyiwuqing/nexus-core/actions/runs/44055865803) `in_progress`；[Software checks 44055957685](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44055957685) `in_progress`；本地浏览器/构建与远程 CI 分开记录。后续仅追加交付记录，不改变已验证实现和脚本。
+
+
+## CONSOLE-26 · 刷新恢复登录与令牌维护（2026-11-17）
+
+按用户本次要求修复刷新后丢失登录，并设计实现管理员及角色令牌维护。原实现只存页面内存，已在实际旧 Vue + 环回 RAM 复现登录成功后刷新退回登录。新增测试先在原实现失败（会话 Cookie 缺失、角色编辑/轮换与管理员修改接口不存在），随后实现并逐项回归；原脚本、失败和最终证据留在忽略目录 `firmware/build-ui-console-26/`。
+
+- 默认保持登录 8 小时，原 Bearer 留在服务端内存；浏览器仅持 HttpOnly/SameSite=Strict 会话 Cookie，外部主机始终 Secure。刷新 GET 会话后恢复身份；每次请求重验父凭据，失效/撤销/角色变化不会沿用旧权限。Cookie 写请求要求独立 CSRF，机器 Bearer、Webhook 与记忆工具边界保留；SSE、导出、退出、异步响应和同源多标签页纳入同一会话规则。CORE 重启后需要重新登录，不引入迁移。
+- “权限”页可编辑角色令牌名称、角色、到期；重新生成保持身份及其他元数据，旧值失效，新值仅显示一次；过期/撤销不复活，版本冲突拒绝。名称确认、未确认结果、切页保留和回读入口保留。
+- 管理员修改沿用保护文件，校验 current 与 revision；随机生成/重复输入/先保存确认后零过渡更新，不返回新旧秘密。CLI/Java 统一 POSIX record lock、原子替换、保留 0600/owner/group、稳定身份和完整 memory scope。环境变量/只读文件模式如实提示服务端维护；真实秘密不会由本轮测试自动轮换。
+- 组件切走后仍由 App 接管成功会话，防止 Cookie 已更新而 CSRF/Bearer 仍用旧值；迟到响应不能恢复已退出身份。浏览器存储仅有无秘密的退出意图，不持久化草稿或幂等身份。
+
+使用/契约同步 CORE `docs/roles-and-audit.md`、`docs/credential-rotation.md`、README 与本项目 20/23 文档；没有修改共享 Skill。实际构建、最终浏览器组数、预览配置、提交/推送和远程 CI 结果在验证完成后追加。
+
+初轮完整 CORE 构建退出 0：127 项中 122 通过、5 项条件跳过。非回环 Secure Cookie 补强后鉴权/轮换/SSE/CSP 专项 21 项重新通过并打包，CLI 4 项通过。新增浏览器 60 条已通过，包含字段组件离开后的会话接管、读取 body 延迟后退出、修改令牌响应在退出后到达时清除其迟到 Cookie；同一会话 CSRF 证明不会误撤销另一个新登录。既有自动化编辑回归曾定位“busy 时忽略退出”，已修复为立即清空页面并独立结束会话，原失败日志保留后重跑。最终整体回归与预览证据继续追加。
+
+本地预览：已将 CORE 8088 正常重启至忽略目录中的稳定 `core-console-26.jar` 副本，保留原进程环境和 `SPRING_FLYWAY_ENABLED=false`；仅为本地预览启用 `data/dev-preview/auth/tokens.json`，初始化时核对原管理员值与稳定身份相同，文件 0600、目录 0700，未轮换秘密；随后仅在 `data/local.env` 追加非秘密的 `NEXUS_AUTH_TOKEN_FILE` 路径并保留 0600，以确保正常重启后继续使用文件中的最新凭据。原先未配置 memory scope，本轮同样不新增。5173 Vite 持续运行；经真实 Vite 代理 POST 登录、无 Bearer GET 恢复、GET 管理员可编辑状态、POST 退出 204、随后 GET 会话 401，页面/组件/消息/状态四项只读 GET 200。该核对没有签发/编辑真实角色令牌、迁移真实库、发送消息或设备操作。
+
+新增会话恢复阶段让登录表单晚于文档加载，既有 22 组浏览器脚本统一等待真实表单可用再输入；逐字核对原脚本，除增加该等待函数和调用外，原断言与动作完全保留。组合 heredoc 的函数作用域错误已在正式复跑前定位修正，原失败日志不计最终结果。
+
+真实 5173 Cookie 会话进一步复核 SSE ready、缺失 CSRF 的 POST 被拒绝 403、正常退出 204。为避免网页修改后重启又退回旧环境凭据，本地启动配置持久化受保护 store 路径；仅追加非秘密路径，管理员初始值与原值相同，后续由用户明确修改。文件模式下应从受保护 store 的 admin.current.token 读取当前值，旧环境值不作后备。
+
+最终完整 `mvn -s .mvn/settings.xml -B -ntp verify` 退出 0：128 项、123 通过、5 条件跳过（`final-verify.log`）。之后仅收紧测试中的 actor 断言，改为真实 GET 会话且要求非空 64 位身份，再单跑管理员修改流程 1 项通过；实现未再修改。最后静态包 28 份前端与 23 迁移逐字节一致，当前预览鉴权类也与最终编译输出一致。角色 UI 一次登录读取出现连接失败，原失败日志保留，脚本未经改动完整重跑 43 条、退出 0、任务空间完成；该失败不计通过。
+
+最终浏览器汇总 `summary.json`：原 22 组 1038 条 + 新增 1 组 60 条 = 23 组 1098 条，最终运行全部退出 0 且任务空间完成。所有既有断言完整保留，首次失败/修复/复跑日志分开保存；构建与浏览器使用实际前端，RAM 夹具不替代真实服务端证据。依赖/协议检查、23 个 shell 语法、Python 编译和两仓 `git diff --check` 通过。规范沉淀为本项项目契约/使用说明/验收脚本，不更新共享 Skill。
+
+真实浏览器最后复核：独立任务空间在 5173 实际登录并刷新恢复，打开“权限 → 修改管理员令牌”确认文件模式可编辑且三个秘密输入均为空；未填写/提交修改。测试会话已退出并核对刷新仍为登录页，任务空间完成。5173/8088 持续运行。
+
+CORE 实现 `b546e1974f190ffaa2a66ebf59535138fb5aec18` 已正常推送至 `origin/codex/core-baseline`，`git ls-remote` 与本地 HEAD 一致。配套 04 的 23 组脚本、使用说明与台账随本项提交；`.workbuddy/` 和所有秘密/生成产物未暂存。
+
+[CORE Docker deployment 44063434295](https://github.com/liuyiwuqing/nexus-core/actions/runs/44063434295) 当前 `in_progress`，结论 `尚未结束`；远程 CI 与本地构建/浏览器验证分别记录。

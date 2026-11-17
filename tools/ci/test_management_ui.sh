@@ -17,6 +17,7 @@ for attempt in {1..50}; do
 done
 rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
 ego-browser nodejs <<'EOF'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const base='http://127.0.0.1:18799';
 const name='NEXUS management regression';
 const listed=await listTaskSpaces();
@@ -59,10 +60,10 @@ const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js
 if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
 
 await expect("!!document.querySelector('.login-card')",'login screen');
-await fillInput('.token-label input','incorrect-fixture-token');
+await waitForLogin();await fillInput('.token-label input','incorrect-fixture-token');
 await click('.login-card button.primary');
 await expect("document.body.innerText.includes('管理令牌无效')",'invalid token is rejected');
-await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');
+await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');
 await click('.login-card button.primary');
 await expect("!!document.querySelector('.sidebar')",'authenticated app');
 await expect("document.body.innerText.includes('内容已按保留期限清除')",'purged message list explains removal');

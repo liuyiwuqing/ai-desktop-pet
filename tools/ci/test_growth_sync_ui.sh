@@ -15,6 +15,7 @@ for attempt in {1..50}; do
 done
 rg -q '^UI boundary fixture ready$' /tmp/pet-growth-ui-fixture.log
 ego-browser nodejs <<'JS'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const name='NEXUS growth synchronization regression';
 const existing=(await listTaskSpaces()).find(space=>space.name===name);
 if(existing&&existing.ownership!=='agent')throw new Error('Existing space needs user confirmation before control');
@@ -27,7 +28,7 @@ await control({reset:true});await openOrReuseTab(base,{wait:true,timeout:15});aw
 const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
 if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
 
-await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await click('.login-card button.primary');
+await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await click('.login-card button.primary');
 await expect("!!document.querySelector('.sidebar')",'authenticated');await click('.sidebar nav button[data-tab=pet]');
 const panel="document.querySelector('[aria-labelledby=device-growth-title]')";
 await expect(`${panel}?.innerText.includes('同步未启用')`,'disabled feature has an explicit state');

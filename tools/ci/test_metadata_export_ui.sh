@@ -19,6 +19,7 @@ rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
 {
 cat "$repo_root/tools/ci/naive_ui_helpers.js"
 cat <<'EOF'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const fs=await import('node:fs'), os=await import('node:os'), path=await import('node:path');
 const name='NEXUS metadata export regression', base='http://127.0.0.1:18812';
 const existing=(await listTaskSpaces()).find(s=>s.name===name);
@@ -45,7 +46,7 @@ if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathn
 // A reused tab may poll the new fixture before navigation stops the old app.
 await fixture({reset:true});await cdp('Emulation.clearDeviceMetricsOverride');
 await cdp('Page.setDownloadBehavior',{behavior:'allow',downloadPath:downloadDir});
-await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
+await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");
 await expect("!!document.querySelector('.sidebar') && document.querySelectorAll('.message-row').length===30",'default list still paginates');await ready();
 await expect("!!document.querySelector('input[aria-label=来源标识]') && !!document.querySelector('input[aria-label=收件开始]')",'source and local receipt window are available');
 if((await state()).queryRequests.some(url=>url.includes('source=')||url.includes('receivedFrom=')))throw new Error('Default query must omit optional facets: '+JSON.stringify((await state()).queryRequests));results.push('default queries omit new optional filters');
@@ -105,7 +106,7 @@ await cdp('Emulation.clearDeviceMetricsOverride');await tap('清空筛选');awai
 await freshDownloadDir();await fixture({exportDelay:1});await tap('导出元数据');await expect("!![...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='正在导出…')",'export is pending before logout');await tap('退出登录');await wait(1.2);
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.sidebar') && document.querySelector('.token-label input').value===''",'logout discards credentials and delayed export');
 if(files().length!==3)throw new Error('Logged out export downloaded');results.push('late export cannot create a file after logout');
-await fixture({exportDelay:0,exportMode:'unauthorized'});await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await ready();
+await fixture({exportDelay:0,exportMode:'unauthorized'});await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await ready();
 await expect("document.querySelector('.list-filters .n-select').textContent.trim()==='全部' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='')",'new session starts with no message filters');
 await navigate('投递');await expect("document.querySelector('.list-filters .n-select').textContent.trim()==='全部' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='')",'new session starts with no delivery filters');
 await tap('导出元数据');await expect("!!document.querySelector('.login-card') && document.querySelector('.inline-error')?.innerText.includes('管理令牌无效')",'export 401 ends the session');

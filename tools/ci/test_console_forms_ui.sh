@@ -19,6 +19,7 @@ rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
 {
 cat "$repo_root/tools/ci/naive_ui_helpers.js"
 cat <<'EOF'
+async function waitForLogin(){for(let i=0;i<120;i++){if(await js("!!document.querySelector('.token-label input:not(:disabled)') && !document.querySelector('.login-card button.primary')?.disabled").catch(()=>false))return;await wait(.1);}throw new Error('Login form did not settle after session recovery');}
 const fs=await import('node:fs'),path=await import('node:path'),os=await import('node:os');
 const name='NEXUS compact console forms',base='http://127.0.0.1:18824';
 const prior=(await listTaskSpaces()).find(s=>s.name===name);if(prior&&prior.ownership!=='agent')throw new Error('Space requires confirmation');
@@ -37,7 +38,7 @@ const shots='/tmp/nexus-console-forms';fs.mkdirSync(shots,{recursive:true});
 async function shot(name,width,height){await cdp('Page.bringToFront');await viewport(width,height);await js('window.scrollTo(0,0)');await wait(.3);const p=path.join(shots,name+'.png'),r=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(p,Buffer.from(r.data,'base64'));return p;}
 await expect("document.title==='NEXUS · 桌面伙伴管理台' && !!document.querySelector('.login-card.n-form') && !!document.querySelector('.login-card [role=checkbox]')",'login uses Naive form and checkbox');
 await tap('进入消息中心');await expect("document.querySelector('.login-card .n-form-item-feedback')?.textContent.includes('请填写') && !formWrites.length",'empty token shows field validation before authentication');
-await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await tap('进入消息中心');await expect("!!document.querySelector('.list-filters.n-form') && !!document.querySelector('.inbox-layout.short-list')",'short inbox and Naive search form render');
+await waitForLogin();await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await tap('进入消息中心');await expect("!!document.querySelector('.list-filters.n-form') && !!document.querySelector('.inbox-layout.short-list')",'short inbox and Naive search form render');
 if(await js("document.documentElement.dataset.theme==='dark'"))await click('[aria-label=切换到浅色主题]');
 await viewport(1440,900);await expect("document.querySelector('.filter-expand').getAttribute('aria-expanded')==='false' && document.querySelector('.advanced-filters').getBoundingClientRect().height===0",'message receipt window starts collapsed');await shot('message-common-desktop',1440,900);await pointerClick('.filter-expand');await expect("document.querySelector('.filter-expand').getAttribute('aria-expanded')==='true' && document.querySelector('.advanced-filters').getBoundingClientRect().height>0",'more filters reveal receipt dates');await expect("getComputedStyle(document.querySelector('.content')).paddingLeft==='20px' && document.querySelector('.inbox-layout').offsetHeight===340",'desktop gutter and short inbox are compact');
 await ui.choose('.n-select[aria-label=消息状态]','未读');await expect("document.querySelector('.n-select[aria-label=消息状态]').textContent.trim()==='未读'",'status changes through actual select menu');
