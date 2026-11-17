@@ -91,6 +91,18 @@
     "audioFaulted": {
       "type": "boolean"
     },
+    "wifiIp": {
+      "description": "本机 Wi-Fi IPv4 点分十进制；未关联或未取得地址时省略。不含 SSID 或凭据。",
+      "type": "string",
+      "maxLength": 15,
+      "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$"
+    },
+    "wifiRssi": {
+      "description": "当前 AP 的 RSSI（dBm，<=0）；未关联或取不到时省略。",
+      "type": "integer",
+      "minimum": -130,
+      "maximum": 0
+    },
     "config": {
       "description": "设备运行期用户配置（NVS pet_cfg），不含凭据。",
       "type": "object",

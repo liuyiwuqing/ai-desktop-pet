@@ -121,14 +121,16 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                         'firmwareVersion':'0.4.0-ui-fixture','configRevision':state['revision'],'volume':10+(i*7)%40,
                         'brightness':state['config']['brightness'],'muted':False,'dnd':False,'unread':i%3,
                         'freeHeap':heap,'freeHeapMin':heap,'freeHeapMax':heap,'minFreeHeap':90000-(i%5)*100,
-                        'audioUnderruns':(i*13)%4,'inferenceMaxMs':200+i,'displayMaxMs':20,'audioFaulted':i%17==5})
+                        'audioUnderruns':(i*13)%4,'inferenceMaxMs':200+i,'displayMaxMs':20,'audioFaulted':i%17==5,
+                        'wifiIp':'192.168.1.%d'%(20+i%3),'wifiRssi':-40-(i*7)%35})
                 value={'deviceId':'dodo-ui-fixture','from':query.get('from',[''])[0] or time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(start)),
                     'to':query.get('to',[''])[0] or time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(end)),'bucket':bucket,
                     'sampleSeconds':30,'retentionDays':30,'truncated':False,'points':points}
             elif path.endswith('/management'):
                 telemetry=None if mode=='empty' else {'observedAt':now-(120 if mode=='stale' else 0),'firmwareVersion':'0.4.0-ui-fixture',
                     'configRevision':state['revision'],'configWritable':mode!='readonly','muted':False,'dnd':False,'volume':state['config']['volume'],
-                    'brightness':state['config']['brightness'],'unread':0,'freeHeap':100000,'minFreeHeap':90000,'config':state['config']}
+                    'brightness':state['config']['brightness'],'unread':0,'freeHeap':100000,'minFreeHeap':90000,
+                    'wifiIp':'192.168.1.20','wifiRssi':-52,'config':state['config']}
                 value={'deviceId':'dodo-ui-fixture','fresh':mode not in ('empty','stale'),'canConfigure':mode not in ('empty','stale','readonly'),
                     'configBlock':'config_storage_readonly' if mode=='readonly' else 'config_readback_required' if mode in ('empty','stale') else '',
                     'telemetry':telemetry,'receivedAt':None,'configRequests':state['requests']}

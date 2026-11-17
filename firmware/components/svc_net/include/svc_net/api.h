@@ -28,5 +28,12 @@ esp_err_t pet_net_publish_confirmed(pet_net_topic_t topic, const char *payload, 
 /* SNTP 是否已成功对时；未对时时暂不接受有 TTL 的新消息。 */
 bool pet_net_is_time_synced(void);
 
+/* 只读链路信息，仅供遥测上报；不写入日志，也不代表 Broker 已连接或消息已送达。
+   IPv4 为点分十进制；未关联或未取得地址时返回 ESP_ERR_INVALID_STATE。 */
+esp_err_t pet_net_local_ip(char *out, size_t capacity);
+
+/* 当前 AP 的 RSSI（dBm，<=0）；未关联或取不到时返回 ESP_ERR_INVALID_STATE。 */
+esp_err_t pet_net_rssi(int *dbm);
+
 const char *pet_net_state_name(pet_net_state_t state);
 const char *pet_net_error_name(pet_net_error_t error);

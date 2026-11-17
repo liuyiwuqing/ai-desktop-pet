@@ -298,6 +298,10 @@ export interface PetTelemetry {
   inferenceMaxMs?: number;
   displayMaxMs?: number;
   audioFaulted?: boolean;
+  /** 本机 Wi-Fi IPv4 点分十进制；未关联或未取得地址时省略。不含 SSID 或凭据。 */
+  wifiIp?: string;
+  /** 当前 AP 的 RSSI（dBm，<=0）；未关联或取不到时省略。 */
+  wifiRssi?: number;
   /** 设备运行期用户配置（NVS pet_cfg），不含凭据。 */
   config?: PetTelemetryConfig;
 }

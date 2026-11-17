@@ -20,6 +20,7 @@
 
 #include "net_policy.h"
 #include "pet/event_bus.h"
+#include "svc_net/api.h"
 
 /* Wi-Fi station + esp-mqtt over TLS：MQTT 3.1.1、QoS1、持久会话、LWT。 */
 
@@ -725,6 +726,35 @@ static esp_err_t esp_net_publish_confirmed(const char *topic, const char *payloa
 static bool esp_net_is_online(void) { return s_running && !s_stopping && s_mqtt_connected; }
 
 static bool esp_net_is_time_synced(void) { return s_time_synced; }
+
+esp_err_t pet_net_local_ip(char *out, size_t capacity)
+{
+    if (out == NULL || capacity < 8) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (s_netif == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    esp_netif_ip_info_t info;
+    if (esp_netif_get_ip_info(s_netif, &info) != ESP_OK || info.ip.addr == 0) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    esp_ip4addr_ntoa(&info.ip, out, (int)capacity);
+    return ESP_OK;
+}
+
+esp_err_t pet_net_rssi(int *dbm)
+{
+    if (dbm == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    wifi_ap_record_t ap;
+    if (esp_wifi_sta_get_ap_info(&ap) != ESP_OK || ap.rssi > 0) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    *dbm = ap.rssi;
+    return ESP_OK;
+}
 
 const pet_net_t *pet_net_esp_driver(void)
 {

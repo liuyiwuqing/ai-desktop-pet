@@ -461,3 +461,12 @@ TELEMETRY-03 之后补图表交互。图内拖拽选区放大时间窗口，只�
 
 - **验证**：`npm run check`（78 token）与 `npm run build` 通过；`test_management_ui.sh` 新增 5 项断言（CSV 下载文件名与大小、CSV 头与 70+ 行、拖拽缩放、缩放后悬停、重置），54→59 项通过，390px 无横向溢出仍覆盖。全量 `python3 tools/run_local.py build`：120 条中 115 通过、5 条条件跳过，V21 在隔离 PostgreSQL 17 应用成功并产出 jar。
 - **未做**：缩放为已取回桶的放大而非重新采样，未做多序列联动；未迁移真实库、部署、烧录与实机视觉终验。CORE `f13c4f5` 与 04 `a7de938` 已推送并核对远端；[CORE Docker CI 43908329517](https://github.com/liuyiwuqing/nexus-core/actions/runs/43908329517) 与 [04 Software checks 43908339990](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43908339990) 仍约 2–3 秒失败、`steps` 为空且无日志，属 GitHub 计费/额度阻断，非代码失败，待恢复后补跑。
+
+## TELEMETRY-05 · 设备 Wi-Fi 地址与信号（2026-11-17，CORE `8656303`、04 本提交）
+
+设备管理此前只展示内存等状态，设备表要求的 IP/RSSI 一直缺位。本轮固件 `svc_net` 新增只读 `pet_net_local_ip`/`pet_net_rssi`：从既有关联的 netif 取 IPv4、从 AP 记录取 dBm，不新增连接、不读 SSID/口令；联网时 `app_summary_json` 附带 `wifiIp`/`wifiRssi`，未关联或假传输时整项省略。`telemetry.schema.json` 增加可选字段与 IPv4/`-130..0` 约束，并重新生成 `pet-contracts.ts`。
+
+CORE 侧 V22 为样本表追加 `wifi_ip`/`wifi_rssi`：地址变化立即成条、信号波动随心跳（默认 30 秒），聚合桶取桶内最新非空地址与平均信号，非法 IPv4 或越界 RSSI 使整条遥测被拒；管理台实时快照显示「网络 · 地址 · dBm」，状态历史新增「网络」指标画 RSSI，CSV 扩至 20 列。
+
+- **验证**：`npm run check`（78 token）与 `npm run build` 通过；夹具补充 `wifiIp`/`wifiRssi` 与快照网络字段，`test_management_ui.sh` 由 59 增至 62 项（快照地址/信号、网络指标与 dBm、CSV 网络列），390px 无横向溢出仍覆盖。固件增量 `idf.py build` 通过（`nexus_pet.bin` 0x2d81c0，app 分区余量 29%），`test_host.sh`（`LC_ALL=C`）与 `check_contracts.py` 通过。CORE 全量构建 121 条中 116 通过、5 条条件跳过，V22 在隔离 PostgreSQL 17 应用并产出 jar。
+- **未做**：SSID/BSSID、信道、掉线原因与凭据轮换 UI 未纳入；未迁移真实库、部署、烧录，未验证真实 AP 切换、弱信号表现与长期采样。`test_host.sh` 的构建矩阵用例在中文 locale 下按英文 `dubious ownership` 断言失败，`LC_ALL=C` 重跑通过，属既有环境问题，未改断言。远程 CI 待额度恢复后补跑。

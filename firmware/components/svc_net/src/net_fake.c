@@ -5,6 +5,7 @@
 
 #include "pet/event_bus.h"
 #include "pet/hal/net.h"
+#include "svc_net/api.h"
 
 /* 假传输：无 Wi-Fi/MQTT 依赖，用于无硬件构建与 CI。 */
 
@@ -80,6 +81,20 @@ static esp_err_t fake_set_rx_handler(pet_net_rx_handler_t handler, void *context
 static bool fake_is_time_synced(void)
 {
     return s_online;
+}
+
+/* 假传输没有真实链路，不上报地址与信号，避免把夹具值当成设备网络事实。 */
+esp_err_t pet_net_local_ip(char *out, size_t capacity)
+{
+    (void)out;
+    (void)capacity;
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
+esp_err_t pet_net_rssi(int *dbm)
+{
+    (void)dbm;
+    return ESP_ERR_NOT_SUPPORTED;
 }
 
 const pet_net_t *pet_fake_net_driver(void)

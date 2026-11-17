@@ -30,6 +30,7 @@
 #include "svc_ai_agent/wss.h"
 #endif
 #include "svc_message_hub/api.h"
+#include "svc_net/api.h"
 #include "svc_ota/api.h"
 #if CONFIG_PET_EXT_SERVO
 #include "pet_ext/servo_service.h"
@@ -62,6 +63,12 @@ esp_err_t app_summary_json(const char *device,uint32_t epoch,char *out,size_t ca
     cJSON_AddNumberToObject(root,"volume",settings.config.volume);cJSON_AddNumberToObject(root,"brightness",settings.config.brightness);
     cJSON_AddNumberToObject(root,"unread",pet_message_hub_depth());
     cJSON_AddNumberToObject(root,"freeHeap",esp_get_free_heap_size());cJSON_AddNumberToObject(root,"minFreeHeap",esp_get_minimum_free_heap_size());
+#if CONFIG_PET_MODULE_NET_ENABLED
+    /* 只上报本机链路地址与信号，不含 SSID、口令或 Broker 凭据。 */
+    char wifi_ip[16];int wifi_rssi;
+    if(pet_net_local_ip(wifi_ip,sizeof(wifi_ip))==ESP_OK)cJSON_AddStringToObject(root,"wifiIp",wifi_ip);
+    if(pet_net_rssi(&wifi_rssi)==ESP_OK)cJSON_AddNumberToObject(root,"wifiRssi",wifi_rssi);
+#endif
 #if CONFIG_PET_MODULE_UI_ENABLED
     pet_ui_metrics_t ui;pet_ui_metrics(&ui);cJSON_AddNumberToObject(root,"displayMaxMs",ui.max_frame_ms);
 #endif
