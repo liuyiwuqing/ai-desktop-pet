@@ -477,3 +477,10 @@ CORE 侧 V22 为样本表追加 `wifi_ip`/`wifi_rssi`：地址变化立即成条
 
 - **验证**：`DeviceManagementFlowTest` 在既有网络用例中补列表断言（地址与信号取最近带地址样本）；夹具 `/devices` 补充字段，`test_management_ui.sh` 由 62 增至 63 项并断言卡片显示 `192.168.1.20` 与 `-52 dBm`，390px 仍无横向溢出；CORE 全量构建 121 条中 116 通过、5 条条件跳过，前端检查与构建通过。
 - **未做**：未在列表显示固件版本、队列深度或逐台信号趋势；未做按信号/离线排序与筛选；未迁移真实库、部署、烧录或实机验收。CORE `2345764` 与 04 `862c466` 已推送并核对远端；[CORE Docker CI 43992251814](https://github.com/liuyiwuqing/nexus-core/actions/runs/43992251814) 与 [04 Software checks 43992263834](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43992263834) 仍在约 2 秒内失败、`steps` 为空且无日志，属 GitHub 计费/额度阻断，非代码失败，待恢复后补跑。
+
+## TELEMETRY-07 · 设备网络质量（2026-11-17，CORE `05255ed`、04 `a6f2516`）
+
+此前只能看到地址与信号，无法判断设备换到了哪个网络、是否受信道干扰或为什么掉线。固件 `svc_net` 新增只读 `pet_net_ssid`/`pet_net_channel`/`pet_net_last_disconnect`：从当前 AP 记录取 SSID 与主信道，断线原因和时刻在运行期断线事件中记录；SSID 空口字节不是可打印 UTF-8 时整条省略，未对时只报原因不报时刻。`app_summary_json` 按需附带 `wifiSsid`/`wifiChannel`/`wifiDisconnectReason`/`wifiDisconnectedAt`，`telemetry.schema.json` 增加四个可选字段并重新生成 `pet-contracts.ts`。CORE 以 V23 追加 `wifi_ssid`/`wifi_channel`/`wifi_disconnect_reason`/`wifi_disconnected_at`，SSID、信道与断线原因变化立即成条，聚合桶取最新非空网络信息；非法 SSID、越界信道或原因整条拒绝。管理台快照显示网络名/地址/信道/信号与「上次断线」原因名称，设备卡片显示 SSID 与地址，CSV 扩至 24 列。
+
+- **验证**：`DeviceManagementFlowTest` 扩展既有网络用例（原始字段、最新网络聚合、非法地址/信道整条拒绝）。夹具补充 SSID/信道/断线原因，`test_management_ui.sh` 由 63 增至 64 项（卡片网络名、快照信道、断线原因映射、CSV 列），390px 仍无横向溢出。固件增量 `idf.py build` 通过（`nexus_pet.bin` 0x2d84f0，app 分区余量 29%），`test_host.sh`（`LC_ALL=C`）与 `check_contracts.py` 通过；CORE 全量构建 121 条中 116 通过、5 条条件跳过，V23 在隔离 PostgreSQL 17 应用并产出 jar，前端检查与构建通过。
+- **未做**：未纳入 BSSID、信道带宽（`second`）与断线历史列表；SSID 非法时只是省略，不转码；未迁移真实库、部署、烧录，未验证真实 AP 漫游、信道干扰与断线原因长期分布。CORE `05255ed` 与 04 `a6f2516` 已推送并核对远端；[CORE Docker CI 43995342794](https://github.com/liuyiwuqing/nexus-core/actions/runs/43995342794) 与 [04 Software checks 43995350148](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43995350148) 均在约 4 秒内失败、`steps` 为空且无日志，属 GitHub 计费/额度阻断，非代码失败，待恢复后补跑。
