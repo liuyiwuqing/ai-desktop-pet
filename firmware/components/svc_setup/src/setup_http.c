@@ -63,6 +63,20 @@ static esp_err_t status(httpd_req_t *r)
     cJSON_AddBoolToObject(root,"voiceSaved",snapshot.voice_saved);
     cJSON_AddBoolToObject(root,"nexusSaved",snapshot.nexus_saved);
     cJSON_AddStringToObject(root,"activationCode",snapshot.activation_code);
+    /* 只回显热点名称与安全形态；热点口令、家庭凭据仍只留在设备和屏幕上。 */
+    cJSON_AddStringToObject(root,"apSsid",snapshot.ap_ssid);
+    cJSON_AddBoolToObject(root,"apOpen",snapshot.ap_password[0]==0);
+    cJSON *portal=cJSON_AddObjectToObject(root,"portal");
+    if(portal) {
+        const pet_setup_portal_t *saved=&snapshot.portal;
+        cJSON_AddBoolToObject(portal,"custom",saved->custom);
+        cJSON_AddNumberToObject(portal,"passwordMode",saved->password_mode);
+        cJSON_AddBoolToObject(portal,"hidden",saved->hidden);
+        cJSON_AddNumberToObject(portal,"channel",saved->channel);
+        cJSON_AddNumberToObject(portal,"maxClients",saved->max_clients);
+        cJSON_AddNumberToObject(portal,"windowMinutes",saved->window_s/60u);
+        if(saved->custom) cJSON_AddStringToObject(portal,"ssid",saved->ssid);
+    }
     char *json=cJSON_PrintUnformatted(root);cJSON_Delete(root);
     if(!json) return ESP_ERR_NO_MEM;
     esp_err_t err=json_response(r,"200 OK",json);cJSON_free(json);return err;
@@ -103,6 +117,7 @@ static void wipe_tree(cJSON *root)
 static esp_err_t mutate(httpd_req_t *r)
 {
     if(!authorized(r)) return json_response(r,"403 Forbidden","{\"error\":\"forbidden\"}");
+    setup_runtime_t *s=r->user_ctx;
     char type[64]={0};
     if(httpd_req_get_hdr_value_str(r,"Content-Type",type,sizeof(type))!=ESP_OK||
         (strcmp(type,"application/json")&&strcmp(type,"application/json; charset=utf-8")))
@@ -144,6 +159,27 @@ static esp_err_t mutate(httpd_req_t *r)
         wipe_tree(patch);cJSON_Delete(patch);
     } else if(!strcmp(r->uri,"/api/activate")) {
         if(cJSON_GetArraySize(root)==1) err=pet_setup_activate();
+    } else if(!strcmp(r->uri,"/api/portal")) {
+        cJSON *portal=cJSON_GetObjectItemCaseSensitive(root,"portal");
+        cJSON *restart=cJSON_GetObjectItemCaseSensitive(root,"restart");
+        int size=cJSON_GetArraySize(root);
+        if(!cJSON_IsObject(portal)||!(size==2||(size==3&&cJSON_IsBool(restart)))) goto parsed;
+        char *encoded=cJSON_PrintUnformatted(portal);
+        if(!encoded) {err=ESP_ERR_NO_MEM;goto parsed;}
+        size_t bytes=strlen(encoded);
+        pet_setup_portal_t settings,saved;
+        xSemaphoreTake(s->lock,portMAX_DELAY);saved=s->portal;xSemaphoreGive(s->lock);
+        /* 页面不回显已保存的名称/口令：留空表示沿用，其它字段与 NVS 编解码共用同一套边界。 */
+        if(bytes<=512&&pet_setup_portal_parse_partial(encoded,bytes,&settings)) {
+            if(settings.custom&&!settings.ssid[0]) memcpy(settings.ssid,saved.ssid,sizeof(settings.ssid));
+            if(settings.password_mode==PET_SETUP_PASSWORD_CUSTOM&&!settings.password[0])
+                memcpy(settings.password,saved.password,sizeof(settings.password));
+            if(pet_setup_portal_valid(&settings))
+                err=pet_setup_submit_portal(&settings,cJSON_IsTrue(restart),expected);
+            setup_wipe(&settings,sizeof(settings));
+        }
+        setup_wipe(&saved,sizeof(saved));
+        setup_wipe(encoded,bytes);cJSON_free(encoded);
     } else if(!strcmp(r->uri,"/api/finish")) {
         if(cJSON_GetArraySize(root)==1) err=pet_setup_leave();
     }
@@ -173,6 +209,7 @@ esp_err_t setup_http_start(setup_runtime_t *s)
         {.uri="/api/wifi",.method=HTTP_POST,.handler=mutate,.user_ctx=s},
         {.uri="/api/services",.method=HTTP_POST,.handler=mutate,.user_ctx=s},
         {.uri="/api/activate",.method=HTTP_POST,.handler=mutate,.user_ctx=s},
+        {.uri="/api/portal",.method=HTTP_POST,.handler=mutate,.user_ctx=s},
         {.uri="/api/finish",.method=HTTP_POST,.handler=mutate,.user_ctx=s},
     };
     for(unsigned i=0;i<sizeof(routes)/sizeof(routes[0]);i++) {

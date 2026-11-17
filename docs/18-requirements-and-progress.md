@@ -35,6 +35,7 @@
 | HW-08 | 连续语音、显示与输入实时预算 | 已实现并通过本地/实机：4 KiB 片内优先阈值、`-O2`、语音页按变化刷新及 DMA 余量诊断；隐私/超时保护保留 | 用户确认最终固件 5 轮全正常；USB 记录 7 轮 IDLE/DRAINED、显示失败 0；主机、LVGL/ASan/UBSan、隔离 default/维护构建与烧录回读通过。长回答欠载 24 次单列，长稳/OTA 待验收；提交与 CI 见末尾 |
 | HW-09 | 待机崩溃进入恢复模式 | 已修复并通过本地/实机：事件任务改为通知唤醒、持续优先扫描，避免过期 Queue Set 通知导致任务返回；恢复与存档保护保留 | 用户确认主页/3 轮完整回答；同一会话连续观察约 6 分钟、8 轮 DRAINED，0 崩溃/重启/恢复锁定；主机/ASan/UBSan、default/维护构建和烧录回读通过。播放欠载单列，长期稳定性待验收；推送/CI 见末尾 |
 | HW-10 | 基础硬件“小爱同学”语音唤醒 | 已实现并完成初步实机验收；固定双模型、缓存/PSRAM 预算、延迟重建，PTT 与隐私/恢复保护保留 | 自动连续 3 轮通过；用户确认人声 2 轮+BOOT 1 轮均正常，无闪屏/卡住；本地主机/ASan/UBSan、10 项 LVGL、voice/default 构建通过。同一会话约五分钟无重启/显示失败；`3eacd00` 已推送并核对 origin/main，远程 CI [43744450764](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43744450764) 八个 job 全部成功。长稳、远距离识别率、OTA/掉电仍待验收 |
+| HW-11 | 设备热点自定义与配网页扩展 | 软件已验证；热点名称/密码策略（随机/固定/开放）、隐藏、信道、连接数、设置窗口保存到 NVS `pet_setup/portal_v1`，配网页新增“设备热点”区与保存后重开热点；见 [28](28-device-web-setup.md#设备热点设置) | 新增 `test_setup_portal` 覆盖默认值/边界/生效规则/JSON 往返/部分更新；完整主机测试、隔离固件构建与 10 项 LVGL 通过；实机改名、隐藏与重开热点待验收，提交/CI 见末尾 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |

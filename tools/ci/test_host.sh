@@ -38,12 +38,19 @@ build_and_run test_event_bus \
     "${repo_root}/firmware/components/core/src/event_bus.c" \
     "${repo_root}/firmware/tests/host/test_event_bus.c"
 
+cc "${host_flags[@]}" -Wno-deprecated-declarations \
+    -I "${repo_root}/firmware/managed_components/espressif__cjson/cJSON" \
+    -c "${repo_root}/firmware/managed_components/espressif__cjson/cJSON/cJSON.c" \
+    -o "${out_dir}/setup_cjson.o"
+
 build_and_run test_setup_policy \
     -I "${repo_root}/firmware/tests/host/support" \
     -I "${repo_root}/firmware/components/svc_setup/include" \
     -I "${repo_root}/firmware/components/svc_setup/private_include" \
+    -I "${repo_root}/firmware/managed_components/espressif__cjson/cJSON" \
     "${repo_root}/firmware/components/svc_setup/src/setup_policy.c" \
-    "${repo_root}/firmware/tests/host/test_setup_policy.c"
+    "${out_dir}/setup_cjson.o" \
+    "${repo_root}/firmware/tests/host/test_setup_policy.c" -lm
 
 for fallback in '' compiled-network; do
     build_and_run test_setup_boot \
@@ -58,10 +65,6 @@ for fallback in '' compiled-network; do
         "${repo_root}/firmware/tests/host/test_setup_boot.c"
 done
 
-cc "${host_flags[@]}" -Wno-deprecated-declarations \
-    -I "${repo_root}/firmware/managed_components/espressif__cjson/cJSON" \
-    -c "${repo_root}/firmware/managed_components/espressif__cjson/cJSON/cJSON.c" \
-    -o "${out_dir}/setup_cjson.o"
 build_and_run test_setup_activation \
     -I "${repo_root}/firmware/tests/host/support" -I "${contracts_inc}" \
     -I "${repo_root}/firmware/components/svc_setup/private_include" \
@@ -69,6 +72,15 @@ build_and_run test_setup_activation \
     "${repo_root}/firmware/components/svc_setup/src/setup_activation_policy.c" \
     "${out_dir}/setup_cjson.o" \
     "${repo_root}/firmware/tests/host/test_setup_activation.c" -lm
+
+build_and_run test_setup_portal \
+    -I "${repo_root}/firmware/tests/host/support" \
+    -I "${repo_root}/firmware/components/svc_setup/include" \
+    -I "${repo_root}/firmware/components/svc_setup/private_include" \
+    -I "${repo_root}/firmware/managed_components/espressif__cjson/cJSON" \
+    "${repo_root}/firmware/components/svc_setup/src/setup_policy.c" \
+    "${out_dir}/setup_cjson.o" \
+    "${repo_root}/firmware/tests/host/test_setup_portal.c" -lm
 
 bash "${repo_root}/tools/ci/test_config_host.sh"
 bash "${repo_root}/tools/ci/test_ota_host.sh"

@@ -107,6 +107,13 @@ esp_err_t app_diagnostics_json(char *out,size_t capacity)
         cJSON_AddNumberToObject(local,"revision",setup.revision);
         cJSON_AddBoolToObject(local,"wifiSaved",setup.wifi_saved);
         cJSON_AddBoolToObject(local,"voiceSaved",setup.voice_saved);
+        /* 热点偏好只输出策略与数量，名称和口令不进入诊断/日志。 */
+        cJSON_AddBoolToObject(local,"portalCustom",setup.portal.custom);
+        cJSON_AddNumberToObject(local,"portalPasswordMode",setup.portal.password_mode);
+        cJSON_AddBoolToObject(local,"portalHidden",setup.portal.hidden);
+        cJSON_AddNumberToObject(local,"portalChannel",setup.portal.channel);
+        cJSON_AddNumberToObject(local,"portalClients",setup.portal.max_clients);
+        cJSON_AddNumberToObject(local,"portalWindow",setup.portal.window_s);
         /* 热点口令、会话 nonce、Wi-Fi 和供应商凭据不进入诊断/日志。 */
         volatile unsigned char *secret=(volatile unsigned char *)&setup;
         for(size_t i=0;i<sizeof(setup);i++) secret[i]=0;

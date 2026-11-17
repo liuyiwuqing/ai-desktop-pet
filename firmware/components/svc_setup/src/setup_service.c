@@ -75,24 +75,38 @@ static void setup_task(void *context)
         setup_job_t job={0};
         if(xQueueReceive(s->jobs,&job,pdMS_TO_TICKS(100))!=pdTRUE) continue;
         esp_err_t err=ESP_ERR_INVALID_ARG;
+        const setup_job_kind_t kind=job.kind;
+        const bool restart=job.restart;
         if(job.kind==SETUP_JOB_WIFI) {
             setup_state(s,PET_SETUP_CONNECTING,ESP_OK);
             err=setup_network_connect(s,job.ssid,job.password);
             if(err==ESP_OK&&!setup_cancelled(s)) err=save_wifi(&job);
         } else if(job.kind==SETUP_JOB_SERVICES) {
             err=pet_provision_patch(job.json,job.bytes,job.revision);
+        } else if(job.kind==SETUP_JOB_PORTAL) {
+            err=setup_portal_save(&job.portal);
+            if(err==ESP_OK) {
+                xSemaphoreTake(s->lock,portMAX_DELAY);
+                s->portal=job.portal;s->snapshot.portal=job.portal;
+                xSemaphoreGive(s->lock);
+            }
         } else if(job.kind==SETUP_JOB_ACTIVATE) {
             setup_state(s,PET_SETUP_ACTIVATING,ESP_OK);
             err=setup_activation_run(s);
         }
-        setup_job_kind_t kind=job.kind;
         if(job.json) {setup_wipe(job.json,job.bytes);heap_caps_free(job.json);}
         setup_wipe(&job,sizeof(job));
         refresh_saved(s);
         if(!setup_cancelled(s)) setup_state(s,err==ESP_OK?
-            kind==SETUP_JOB_ACTIVATE?PET_SETUP_VOICE_SAVED:kind==SETUP_JOB_WIFI?PET_SETUP_WIFI_SAVED:PET_SETUP_SERVICES_SAVED:
+            kind==SETUP_JOB_ACTIVATE?PET_SETUP_VOICE_SAVED:kind==SETUP_JOB_WIFI?PET_SETUP_WIFI_SAVED:
+            kind==SETUP_JOB_PORTAL?PET_SETUP_PORTAL_SAVED:PET_SETUP_SERVICES_SAVED:
             PET_SETUP_FAILED,err);
         atomic_store(&s->busy,false);
+        /* 热点偏好不影响当前连接；用户要求立即生效时以设置模式重启，等响应发出再复位。 */
+        if(kind==SETUP_JOB_PORTAL&&restart&&err==ESP_OK&&setup_boot_save(1)==ESP_OK) {
+            vTaskDelay(pdMS_TO_TICKS(800));
+            esp_restart();
+        }
     }
     setup_state(s,PET_SETUP_LEAVING,ESP_OK);
     /* 关闭门户仅保存进入模式，不删除任何 Wi-Fi、服务凭据或成长存档。 */
@@ -141,6 +155,13 @@ esp_err_t pet_setup_activate(void)
     return submit(&job);
 }
 
+esp_err_t pet_setup_submit_portal(const pet_setup_portal_t *portal,bool restart,uint32_t revision)
+{
+    if(!pet_setup_portal_valid(portal)) return ESP_ERR_INVALID_ARG;
+    setup_job_t job={.kind=SETUP_JOB_PORTAL,.revision=revision,.restart=restart,.portal=*portal};
+    esp_err_t err=submit(&job);setup_wipe(&job,sizeof(job));return err;
+}
+
 esp_err_t pet_setup_leave(void)
 {
     if(!runtime) return ESP_ERR_INVALID_STATE;
@@ -161,7 +182,10 @@ esp_err_t pet_setup_start(void)
         if(s->lock) vSemaphoreDelete(s->lock);
         heap_caps_free(s);return ESP_ERR_NO_MEM;
     }
-    s->deadline_us=esp_timer_get_time()+(int64_t)PET_SETUP_WINDOW_S*1000000;
+    /* 损坏或不可读的偏好回落默认热点；不阻断配网，也不改动已保存的家庭凭据。 */
+    (void)setup_portal_load(&s->portal);
+    s->snapshot.portal=s->portal;
+    s->deadline_us=esp_timer_get_time()+(int64_t)s->portal.window_s*1000000;
     refresh_saved(s);
     err=setup_network_start(s);
     if(err==ESP_OK) err=setup_http_start(s);

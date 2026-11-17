@@ -381,6 +381,21 @@ int main(int argc, char **argv)
         assert(lv_obj_get_y(setup.password)+lv_obj_get_height(setup.password)<193);
         assert(lv_obj_get_y(setup.action)+lv_obj_get_height(setup.action)<=320);
     }
+    /* 自定义长名称/长口令与隐藏热点：屏幕只截断显示，不挤占后续信息。 */
+    setup_state.state=PET_SETUP_READY;setup_state.ap_hidden=true;
+    strcpy(setup_state.ap_ssid,"Qitomo-VeryLongName-0123456789AB");
+    strcpy(setup_state.ap_password,"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789a");
+    pet_setup_view_show(&setup,&setup_state);lv_obj_update_layout(setup_root);
+    assert(strstr(lv_label_get_text(setup.ssid),"（隐藏）"));
+    assert(strstr(lv_label_get_text(setup.ssid),"..."));
+    assert(strstr(lv_label_get_text(setup.password),"..."));
+    assert(lv_obj_get_y(setup.password)+lv_obj_get_height(setup.password)<193);
+    assert(lv_obj_get_y(setup.action)+lv_obj_get_height(setup.action)<=320);
+    screenshot(argv[2],"setup-long",display);
+    setup_state.ap_password[0]=0;
+    pet_setup_view_show(&setup,&setup_state);
+    assert(strstr(lv_label_get_text(setup.password),"开放网络"));
+    screenshot(argv[2],"setup-open",display);
     lv_display_delete(display);
     lv_binfont_destroy(small);
     lv_binfont_destroy(large);

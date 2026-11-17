@@ -1,4 +1,5 @@
 #include "setup_internal.h"
+#include "setup_policy.h"
 #include "esp_event.h"
 #include "esp_random.h"
 #include "esp_timer.h"
@@ -33,18 +34,26 @@ esp_err_t setup_network_start(setup_runtime_t *s)
     wifi_config_t empty={0};
     if((err=esp_wifi_set_config(WIFI_IF_STA,&empty))!=ESP_OK) return err;
     if((err=esp_wifi_start())!=ESP_OK) return err;
-    /* RF 已运行，硬件 RNG 有连续熵源；密码和会话 nonce 每次进入配网重新生成。 */
+    /* RF 已运行，硬件 RNG 有连续熵源；默认策略每次进入重新生成名称、口令和会话 nonce。 */
     unsigned char random[32];esp_fill_random(random,sizeof(random));
-    snprintf(s->snapshot.ap_ssid,sizeof(s->snapshot.ap_ssid),"Qitomo-%02X%02X",random[0],random[1]);
-    static const char alphabet[]="23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-    for(unsigned i=0;i<12;i++) s->snapshot.ap_password[i]=alphabet[random[i+2]&31];
+    char ssid[PET_SETUP_SSID_MAX+1]={0},password[PET_SETUP_PASSWORD_MAX+1]={0};
+    pet_setup_portal_effective(&s->portal,random,ssid,password);
     for(unsigned i=0;i<16;i++) snprintf(s->session+2*i,3,"%02x",random[i+14]);
     setup_wipe(random,sizeof(random));
+    xSemaphoreTake(s->lock,portMAX_DELAY);
+    memcpy(s->snapshot.ap_ssid,ssid,sizeof(ssid));
+    memcpy(s->snapshot.ap_password,password,sizeof(password));
+    s->snapshot.ap_hidden=s->portal.hidden;
+    xSemaphoreGive(s->lock);
     wifi_config_t ap={0};
-    memcpy(ap.ap.ssid,s->snapshot.ap_ssid,strlen(s->snapshot.ap_ssid));
-    ap.ap.ssid_len=strlen(s->snapshot.ap_ssid);
-    memcpy(ap.ap.password,s->snapshot.ap_password,12);
-    ap.ap.authmode=WIFI_AUTH_WPA2_PSK;ap.ap.max_connection=2;ap.ap.channel=1;
+    memcpy(ap.ap.ssid,ssid,strlen(ssid));
+    ap.ap.ssid_len=strlen(ssid);
+    memcpy(ap.ap.password,password,strlen(password));
+    ap.ap.authmode=password[0]?WIFI_AUTH_WPA2_PSK:WIFI_AUTH_OPEN;
+    ap.ap.ssid_hidden=s->portal.hidden?1:0;
+    ap.ap.max_connection=s->portal.max_clients;
+    ap.ap.channel=s->portal.channel;
+    setup_wipe(ssid,sizeof(ssid));setup_wipe(password,sizeof(password));
     if((err=esp_wifi_set_mode(WIFI_MODE_APSTA))!=ESP_OK) return err;
     if((err=esp_wifi_set_config(WIFI_IF_AP,&ap))!=ESP_OK) return err;
     if((err=esp_event_handler_register(WIFI_EVENT,WIFI_EVENT_STA_DISCONNECTED,network_event,s))!=ESP_OK) return err;
