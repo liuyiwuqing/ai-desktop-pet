@@ -649,3 +649,5 @@ Linux 真实 HTTPS 夹具首次在 Secure Cookie 标志处失败，诊断确认�
 匹配的初始化镜像也从当前源码构建，`python3 tools/test_image_deployment.py --image nexus-core:console-27-final --init-image nexus-core-init:console-27-final --report …/image-session-final.json` 退出 0，7 组检查通过并清理自身隔离资源：无源码/socket 初始化、私有权限/凭据不覆盖、1Panel 三服务解析、非 root/只读启动与 literal env、实际 JAR 资源、MQTT TLS、容器重建后业务记录和原凭据保留。仅验证本地源码镜像，不发布新镜像或替换 04 固定发布版。临时重启脚本和浏览器指南副本已清理。
 
 CORE `e76732b3792313ea5f3744b09970a7972fc89a36` 已正常提交并推送至 `origin/codex/core-baseline`，已用 `git ls-remote` 核对远端分支包含本次提交。04 本项仅提交 18/23 配套文档；现有 `.workbuddy/`、私有 env/会话、生成镜像/JAR 与测试证据均不纳入版本。远程 CI 另查当前 SHA，不以前项成功代替。
+
+04 配套 `7b01867c2fa5d176c8cd3058995e89259669b3df` 已推送并核对 `origin/main` 包含该提交；该提交仅 docs，不匹配 Software checks 的 push paths，按 SHA 查询无新运行。CORE 本项远程 [Docker deployment #44074830487](https://github.com/liuyiwuqing/nexus-core/actions/runs/44074830487) 当前 `in_progress`，尚未获得远程完成结论；不计作 CI 通过。最终 5173 与 8088 HTTP 首页均 200，CORE 工作区干净；04 除原有未跟踪 `.workbuddy/` 外无其他遗留改动。
