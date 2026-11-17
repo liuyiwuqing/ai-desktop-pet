@@ -65,11 +65,13 @@ esp_err_t app_summary_json(const char *device,uint32_t epoch,char *out,size_t ca
     cJSON_AddNumberToObject(root,"freeHeap",esp_get_free_heap_size());cJSON_AddNumberToObject(root,"minFreeHeap",esp_get_minimum_free_heap_size());
 #if CONFIG_PET_MODULE_NET_ENABLED
     /* 只上报链路标识与质量，不含口令或 Broker 凭据；取不到的字段一律省略。 */
-    char wifi_ip[16],wifi_ssid[33];int wifi_rssi,wifi_channel,wifi_reason;uint32_t wifi_disconnected_at;
+    char wifi_ip[16],wifi_ssid[33],wifi_bssid[18];int wifi_rssi,wifi_channel,wifi_width,wifi_reason;uint32_t wifi_disconnected_at;
     if(pet_net_local_ip(wifi_ip,sizeof(wifi_ip))==ESP_OK)cJSON_AddStringToObject(root,"wifiIp",wifi_ip);
     if(pet_net_rssi(&wifi_rssi)==ESP_OK)cJSON_AddNumberToObject(root,"wifiRssi",wifi_rssi);
     if(pet_net_ssid(wifi_ssid,sizeof(wifi_ssid))==ESP_OK)cJSON_AddStringToObject(root,"wifiSsid",wifi_ssid);
     if(pet_net_channel(&wifi_channel)==ESP_OK)cJSON_AddNumberToObject(root,"wifiChannel",wifi_channel);
+    if(pet_net_bssid(wifi_bssid,sizeof(wifi_bssid))==ESP_OK)cJSON_AddStringToObject(root,"wifiBssid",wifi_bssid);
+    if(pet_net_channel_width(&wifi_width)==ESP_OK)cJSON_AddNumberToObject(root,"wifiChannelWidth",wifi_width);
     if(pet_net_last_disconnect(&wifi_reason,&wifi_disconnected_at)==ESP_OK){
         cJSON_AddNumberToObject(root,"wifiDisconnectReason",wifi_reason);
         if(wifi_disconnected_at!=0)cJSON_AddNumberToObject(root,"wifiDisconnectedAt",wifi_disconnected_at);

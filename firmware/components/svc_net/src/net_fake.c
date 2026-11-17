@@ -110,6 +110,19 @@ esp_err_t pet_net_channel(int *channel)
     return ESP_ERR_NOT_SUPPORTED;
 }
 
+esp_err_t pet_net_bssid(char *out, size_t capacity)
+{
+    (void)out;
+    (void)capacity;
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
+esp_err_t pet_net_channel_width(int *mhz)
+{
+    (void)mhz;
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
 esp_err_t pet_net_last_disconnect(int *reason, uint32_t *epoch_seconds)
 {
     (void)reason;

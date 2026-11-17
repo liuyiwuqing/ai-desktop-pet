@@ -847,6 +847,41 @@ esp_err_t pet_net_channel(int *channel)
     return ESP_OK;
 }
 
+esp_err_t pet_net_bssid(char *out, size_t capacity)
+{
+    if (out == NULL || capacity < 18) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    wifi_ap_record_t ap;
+    if (esp_wifi_sta_get_ap_info(&ap) != ESP_OK) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    static const char hex[] = "0123456789ABCDEF";
+    char *write = out;
+    for (size_t i = 0; i < sizeof(ap.bssid); i++) {
+        if (i != 0) {
+            *write++ = ':';
+        }
+        *write++ = hex[(ap.bssid[i] >> 4) & 0x0f];
+        *write++ = hex[ap.bssid[i] & 0x0f];
+    }
+    *write = '\0';
+    return ESP_OK;
+}
+
+esp_err_t pet_net_channel_width(int *mhz)
+{
+    if (mhz == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    wifi_ap_record_t ap;
+    if (esp_wifi_sta_get_ap_info(&ap) != ESP_OK || ap.primary == 0) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    *mhz = ap.second == WIFI_SECOND_CHAN_NONE ? 20 : 40;
+    return ESP_OK;
+}
+
 esp_err_t pet_net_last_disconnect(int *reason, uint32_t *epoch_seconds)
 {
     if (reason == NULL || epoch_seconds == NULL) {

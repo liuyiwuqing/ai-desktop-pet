@@ -306,6 +306,10 @@ export interface PetTelemetry {
   wifiSsid?: string;
   /** 当前 AP 的主信道（1–196）；未关联或取不到时省略。 */
   wifiChannel?: number;
+  /** 当前 AP 的 BSSID（大写十六进制 AA:BB:CC:DD:EE:FF）；未关联或取不到时省略。仅用于识别接入点，不含口令。 */
+  wifiBssid?: string;
+  /** 当前 AP 的信道宽度（MHz），20 或 40；未关联或取不到时省略。 */
+  wifiChannelWidth?: number;
   /** 本次启动以来最近一次 Wi-Fi 断线原因（ESP-IDF wifi_err_reason_t）；从未断线时省略。 */
   wifiDisconnectReason?: number;
   /** 最近一次断线的设备时间（Unix 秒）；未对时或从未断线时省略。 */

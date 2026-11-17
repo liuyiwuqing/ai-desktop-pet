@@ -510,6 +510,15 @@ TELEMETRY-07 只在快照里显示「上次断线」，无法回看此前掉线�
 - **验证**：`DeviceManagementFlowTest` 新增断线历程序例（401/404/400、原因变化立即成条、时刻变化随心跳成条、同一对值跨心跳去重、无原因样本不计入、`limit` 截断），测试 Broker 增加 `dodo-disconnects` 凭据；CORE 全量构建 136 条中 131 通过、5 条条件跳过、0 失败，前端类型检查、74 token 守卫与生产构建通过。`test_management_ui.sh` 由 64 增至 66 项：实际 Vue + 环回夹具断言三条事件、原因名称（含未知码 777）、未对时说明与只读端点 `limit=20`，390px 仍无横向溢出。
 - **未做**：未纳入 BSSID 与信道带宽，未做断线次数统计、筛选、导出或趋势图；不覆盖保留期外或已清理的样本，未对时且原因为空的历史无法补造；未迁移真实库、未部署、未烧录或实机验收。CORE `6306809` 已推送并核对 `origin/codex-core-baseline`；[CORE Docker CI 44102984359](https://github.com/liuyiwuqing/nexus-core/actions/runs/44102984359) 的 docker-compose job 成功。04 `75047d0` 已推送并核对 `origin/main`；[04 Software checks 44103563880](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44103563880) 八个 job 全部成功。
 
+## TELEMETRY-09 · BSSID 与信道带宽（2026-11-17，CORE `75584bc`）
+
+TELEMETRY-07 只上报 SSID、主信道与断线原因，遇到同名 AP 或 20/40 MHz 重新协商时无法区分。本轮补齐两项只读遥测：固件 `pet_net_bssid` 从已关联 AP 记录取 BSSID（大写 MAC），`pet_net_channel_width` 由主/辅信道推断 20/40 MHz；未关联或取不到时字段整条省略，不新增探测、不改连接流程。`telemetry.schema.json` 增加可选 `wifiBssid`（MAC 格式）与 `wifiChannelWidth`（20/40），重生成 C/TS 契约无偏移。
+
+CORE 以 `V24__device_telemetry_wifi_access_point.sql` 为样本表追加 `wifi_bssid`/`wifi_channel_width`（允许 NULL、带格式与取值约束）；入站校验整条拒绝小写 BSSID 与 20/40 之外的宽度；BSSID 或宽度变化与地址/SSID 一样立即成条；1 分钟及以上聚合取桶内最后一个非空值，实时快照与 CSV（26 列）同时透出。管理台「网络」摘要按 SSID · 地址 · 信道 · 宽度 · dBm · BSSID 展示，缺失段省略；设备列表卡片保持原字段不变。
+
+- **验证**：固件 `LC_ALL=C build_firmware.sh` 退出 0（含 `test_host.sh`、依赖/板级/契约检查、AI/WSS/ESP-SR 主机用例、`idf.py build` 与 size），`nexus_pet.bin` 0x2d8620、app 分区余量 29%；`check_contracts.py` 校验 14 个 schema/12 个示例通过。CORE `DeviceManagementFlowTest` 扩展网络用例（原始、聚合与快照的 BSSID/宽度，非法宽度与小写 BSSID 整条拒绝），全量构建 136 条中 131 通过、5 条条件跳过、0 失败；前端类型检查、74 token 守卫与构建通过。`test_management_ui.sh` 66 项（快照含 40 MHz 与 BSSID、CSV 含宽度/BSSID 列）通过，390px 无横向溢出。
+- **未做**：未在真实 AP 上核对 BSSID/宽度上报与漫游切换，未烧录；V24 只在隔离 PostgreSQL 库应用，本机长期开发库与目标库未迁移；未改 OTA、配置下发与成长数据。CORE `75584bc` 已推送并核对 `origin/codex-core-baseline`；04 随本项提交，04 远程 CI 见推送后记录。
+
 ## CONSOLE-21 · 紧凑布局与 Naive UI 表单（2026-11-17，CORE `959e7b7`）
 
 按用户反馈进一步压缩留白：侧栏 208px、页头 56px、桌面页边距 24px、卡片内距 16px、字段间距 12px、标准控件 34px；设备摘要/动作在上方，设置面板满宽；卡内指标 18px，网络等长文本 14px。桌面四条以内消息容器 340px，手机短列表随内容收缩，筛选状态/来源并排、日期各占一行。各页表单、输入、下拉、数字、勾选、滑块、日期/时间、时区补全和 manifest 选择统一使用 Naive UI。

@@ -42,6 +42,14 @@ esp_err_t pet_net_ssid(char *out, size_t capacity);
 /* 当前 AP 的主信道（1–196）；未关联或取不到时返回 ESP_ERR_INVALID_STATE。 */
 esp_err_t pet_net_channel(int *channel);
 
+/* 当前 AP 的 BSSID（大写十六进制，AA:BB:CC:DD:EE:FF；至少 18 字节）；未关联或
+   取不到时返回 ESP_ERR_INVALID_STATE。仅用于识别接入点，不含口令。 */
+esp_err_t pet_net_bssid(char *out, size_t capacity);
+
+/* 当前 AP 的信道宽度（20 或 40 MHz），由主/辅信道推断；未关联或取不到时返回
+   ESP_ERR_INVALID_STATE。 */
+esp_err_t pet_net_channel_width(int *mhz);
+
 /* 本次启动以来最近一次运行期断线原因（ESP-IDF wifi_err_reason_t）与设备时刻；
    epoch_seconds 在未对时时为 0。从未断线时返回 ESP_ERR_INVALID_STATE。 */
 esp_err_t pet_net_last_disconnect(int *reason, uint32_t *epoch_seconds);

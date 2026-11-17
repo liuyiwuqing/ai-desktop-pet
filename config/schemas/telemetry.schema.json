@@ -115,6 +115,17 @@
       "minimum": 1,
       "maximum": 196
     },
+    "wifiBssid": {
+      "description": "当前 AP 的 BSSID（大写十六进制 AA:BB:CC:DD:EE:FF）；未关联或取不到时省略。仅用于识别接入点，不含口令。",
+      "type": "string",
+      "maxLength": 17,
+      "pattern": "^([0-9A-F]{2}:){5}[0-9A-F]{2}$"
+    },
+    "wifiChannelWidth": {
+      "description": "当前 AP 的信道宽度（MHz），20 或 40；未关联或取不到时省略。",
+      "type": "integer",
+      "enum": [20, 40]
+    },
     "wifiDisconnectReason": {
       "description": "本次启动以来最近一次 Wi-Fi 断线原因（ESP-IDF wifi_err_reason_t）；从未断线时省略。",
       "type": "integer",

@@ -132,6 +132,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                         'audioUnderruns':(i*13)%4,'inferenceMaxMs':200+i,'displayMaxMs':20,'audioFaulted':i%17==5,
                         'wifiIp':'192.168.1.%d'%(20+i%3),'wifiRssi':-40-(i*7)%35,
                         'wifiSsid':'HomeLab-2.4G','wifiChannel':6+i%3,
+                        'wifiBssid':'AA:BB:CC:DD:EE:%02X'%(i%8),'wifiChannelWidth':20 if i%3==0 else 40,
                         'wifiDisconnectReason':201 if i%5==0 else None,
                         'wifiDisconnectedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(start+i*step-1800)) if i%5==0 else None})
                 value={'deviceId':'dodo-ui-fixture','from':query.get('from',[''])[0] or time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(start)),
@@ -142,6 +143,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     'configRevision':state['revision'],'configWritable':mode!='readonly','muted':False,'dnd':False,'volume':state['config']['volume'],
                     'brightness':state['config']['brightness'],'unread':0,'freeHeap':100000,'minFreeHeap':90000,
                     'wifiIp':'192.168.1.20','wifiRssi':-52,'wifiSsid':'HomeLab-2.4G','wifiChannel':6,
+                    'wifiBssid':'AA:BB:CC:DD:EE:02','wifiChannelWidth':40,
                     'wifiDisconnectReason':201,'wifiDisconnectedAt':now-3600,'config':state['config']}
                 value={'deviceId':'dodo-ui-fixture','fresh':mode not in ('empty','stale'),'canConfigure':mode not in ('empty','stale','readonly'),
                     'configBlock':'config_storage_readonly' if mode=='readonly' else 'config_readback_required' if mode in ('empty','stale') else '',
