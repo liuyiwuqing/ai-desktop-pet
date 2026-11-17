@@ -48,7 +48,7 @@ async function rename(value){await field('编辑规则名称',value);}
 await reset();
 await expect(`document.getElementById('edit-rule-${daily}')?.disabled===false && !document.getElementById('edit-rule-${comment}').disabled && document.getElementById('edit-rule-${active}').disabled && document.getElementById('edit-rule-${running}').disabled`,'enabled and executing rules cannot be edited');
 await edit();await expect("document.activeElement?.getAttribute('aria-label')==='编辑规则名称'",'editor focuses the named input');
-await expect("document.querySelector('[aria-label=编辑提醒时间]').value==='08:00' && document.querySelector('[aria-label=编辑提醒时区]').value==='Asia/Shanghai' && !document.querySelector('.rule-editor select')",'daily values are loaded and rule kind cannot change');
+await expect("document.querySelector('[aria-label=编辑提醒时间]').value==='08:00' && document.querySelector('[aria-label=编辑提醒时区]').value==='Asia/Shanghai' && !document.querySelector('.rule-editor .n-select')",'daily values are loaded and rule kind cannot change');
 await rename('跨导航草稿');await field('编辑提醒时间','09:30');await field('编辑提醒时区','UTC');await field('编辑提醒标题','修改后标题');await field('编辑提醒内容','修改后内容');
 await wait(5.3);await ready();await expect("document.querySelector('[aria-label=编辑规则名称]').value==='跨导航草稿' && document.querySelector('[aria-label=编辑提醒内容]').value==='修改后内容'",'polling preserves the edit draft');
 await navigate('消息');await navigate('自动化');await ready();await expect("document.querySelector('[aria-label=编辑规则名称]').value==='跨导航草稿' && document.querySelector('[aria-label=编辑提醒时间]').value==='09:30'",'navigation preserves unsaved rule draft and base version');
@@ -58,7 +58,7 @@ await js("document.querySelector('.rule-editor button.primary').click()");await 
 let state=await fixture(),saved=state.rules.find(r=>r.ruleId===daily);if(writes(state).length!==1||saved.enabled||saved.version!==2)throw new Error('Edit repeated or enabled a rule');
 let body=writes(state)[0].body;if(body.expectedVersion!==1||body.title!=='修改后标题'||body.localTime!=='09:30'||'trigger'in body||'requestKey'in body)throw new Error('Wrong fixed edit identity');results.push('one fixed versioned PUT saves without type or identity changes');
 await expect(`document.activeElement?.id==='edit-rule-${daily}'`,'successful save restores the rule action focus');
-await fixture({write_delay:0});await js(`document.getElementById('edit-rule-${daily}').closest('.record-card').querySelector('input[type=checkbox]').click()`);await ready();
+await fixture({write_delay:0});await js(`document.getElementById('edit-rule-${daily}').closest('.record-card').querySelector('[role=checkbox]').click()`);await ready();
 let toggle;for(let i=0;i<80;i++){state=await fixture();toggle=state.requests.find(r=>r.method==='PUT'&&r.path.endsWith('/enabled'));if(toggle)break;await wait(.1);}if(toggle?.body.expectedVersion!==2)throw new Error('Enable omitted observed version');results.push('enable sends the currently observed version');
 await expect(`document.getElementById('edit-rule-${daily}').disabled`,'enabling removes edit permission');
 await edit(comment);await expect("!document.querySelector('[aria-label=编辑提醒标题]')",'comment editing hides notification payload fields');await rename('评论新名称');await tap('保存修改','.rule-editor');await expect("!document.querySelector('.rule-editor') && [...document.querySelectorAll('.record-card h2')].some(h=>h.innerText==='评论新名称')",'comment name can be edited');

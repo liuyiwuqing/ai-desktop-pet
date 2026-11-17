@@ -16,7 +16,9 @@ for attempt in {1..50}; do
     sleep 0.1
 done
 rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
-ego-browser nodejs <<'EOF'
+{
+cat "$repo_root/tools/ci/naive_ui_helpers.js"
+cat <<'EOF'
 const base='http://127.0.0.1:18808',name='NEXUS operations regression';
 const existing=(await listTaskSpaces()).find(s=>s.name===name);
 if(existing && existing.ownership!=='agent')throw new Error('Existing space needs user confirmation');
@@ -42,20 +44,20 @@ if(retry.jobs.length!==1 || retry.requests.filter(r=>r.method==='POST')[0].body.
 results.push('unknown creation retry retains one tool request identity');
 await expect("document.querySelectorAll('.record-card').length===1",'saved tool request appears after retry');
 async function ready(){await expect("!document.querySelector('.content > section [aria-busy=true]')",'panel read has settled');}
-async function choose(selector,value){await js(`(()=>{const s=document.querySelector(${JSON.stringify(selector)});s.value=${JSON.stringify(value)};s.dispatchEvent(new Event('change',{bubbles:true}));})()`);}
+async function choose(selector,value){const labels={'app.open':'打开应用 · 需确认','project.status':'项目状态','daily':'每日定时 → 设备提醒'};await ui.choose(selector,labels[value]||value);}
 async function tools(){await navigate('消息');await navigate('工具');await ready();}
 async function automation(){await navigate('消息');await navigate('自动化');await ready();}
 async function prepareRule(name,kind='comment'){
   if(!await js("!!document.querySelector('.inline-form')"))await tap('创建规则');
   await fillInput('.inline-form input',name);
   if(kind==='daily'){
-    await choose('.inline-form select','daily');
-    await js("(()=>{const input=document.querySelector('.inline-form input[type=time]');input.value='09:30';input.dispatchEvent(new Event('input',{bubbles:true}));})()");
-    await fillInput('.inline-form .form-columns.spaced input:not([type=time])','Asia/Shanghai');
-    await fillInput('.inline-form > label input','回归提醒');await fillInput('.inline-form textarea','隔离页面检查');
+    await choose('.inline-form .n-select','daily');
+    await js("(()=>{const input=document.querySelector('.inline-form .n-time-picker input');input.value='09:30';input.dispatchEvent(new Event('input',{bubbles:true}));})()");
+    await fillInput('.inline-form input[aria-label=时区]','Asia/Shanghai');
+    await fillInput('.inline-form input[aria-label=提醒标题]','回归提醒');await fillInput('.inline-form textarea','隔离页面检查');
   }
 }
-await choose('.inline-form select','app.open');await choose('.inline-form label:nth-child(2) select','codex');
+await choose('.inline-form .n-select','app.open');await choose('.inline-form .n-form-item:nth-child(2) .n-select','codex');
 await tap('创建打开请求');await expect("document.querySelector('.record-card .badge')?.innerText==='等待你确认'",'opening an application first creates a confirmation request');
 const opened=await fixture({});if(opened.requests.filter(r=>r.path.endsWith('/confirm')).length)throw new Error('Preparing auto-confirmed opening');results.push('prepare never confirms application opening');
 await fixture({write_delay:1});await tap('确认打开 codex');
@@ -78,16 +80,16 @@ await fixture({read_mode:'success',read_delay:0});await tap('刷新');await expe
 await fixture({bridge:'off'});await tap('刷新');await expect("document.querySelector('.section-heading p')?.innerText==='Bridge 未启用' && document.querySelector('.inline-form button.primary')?.disabled",'disabled Bridge blocks new tool requests');
 await fixture({bridge:'unavailable'});await tap('刷新');await expect("document.querySelector('.section-heading p')?.innerText==='Bridge 暂不可用' && document.querySelector('.inline-form button.primary')?.disabled",'unavailable Bridge blocks new tool requests');
 await fixture({reset:true});await tools();await fixture({next_write:'drop_before'});await tap('查询');
-await expect("document.querySelector('.scope-note[role=alert]')?.innerText.includes('结果尚未确认') && document.querySelector('.inline-form select')?.disabled",'lost tool request freezes tool and arguments');
+await expect("document.querySelector('.scope-note[role=alert]')?.innerText.includes('结果尚未确认') && document.querySelector('.inline-form .n-select')?.querySelector('.n-base-selection')?.classList.contains('n-base-selection--disabled')",'lost tool request freezes tool and arguments');
 await navigate('消息');await navigate('工具');await ready();await expect("document.querySelector('.inline-form button.primary')?.innerText==='重试同一请求'",'pending tool identity survives navigation');
 await wait(5.2);if((await fixture({})).requests.filter(r=>r.method==='POST').length!==1)throw new Error('Tool polling replayed creation');results.push('tool polling never replays unknown creation');
-await fixture({next_write:'deny'});await tap('重试同一请求');await expect("document.querySelector('.inline-form button.primary')?.innerText==='重试同一请求' && !document.querySelector('.inline-form button.primary').disabled && document.querySelector('.inline-form select')?.disabled",'a rejection after an unknown tool result cannot discard its identity');
-await tap('重试同一请求');await expect("document.querySelectorAll('.record-card').length===1 && !document.querySelector('.inline-form select')?.disabled",'explicit tool retry recovers from pre-save loss');
+await fixture({next_write:'deny'});await tap('重试同一请求');await expect("document.querySelector('.inline-form button.primary')?.innerText==='重试同一请求' && !document.querySelector('.inline-form button.primary').disabled && document.querySelector('.inline-form .n-select')?.querySelector('.n-base-selection')?.classList.contains('n-base-selection--disabled')",'a rejection after an unknown tool result cannot discard its identity');
+await tap('重试同一请求');await expect("document.querySelectorAll('.record-card').length===1 && !document.querySelector('.inline-form .n-select')?.querySelector('.n-base-selection')?.classList.contains('n-base-selection--disabled')",'explicit tool retry recovers from pre-save loss');
 const toolRetry=await fixture({});if(new Set(toolRetry.requests.filter(r=>r.method==='POST').map(r=>JSON.stringify(r.body))).size!==1)throw new Error('Tool retry changed parameters');results.push('navigation retry preserves exact tool body');
 for(const mode of ['deny','error','invalid']){
   await fixture({reset:true});await tools();await fixture({next_write:mode});await tap('查询');
   if(mode==='deny'){
-    await expect("!!document.querySelector('.content > .feedback.error') && !document.querySelector('.inline-form select')?.disabled",'explicit tool rejection releases editing');
+    await expect("!!document.querySelector('.content > .feedback.error') && !document.querySelector('.inline-form .n-select')?.querySelector('.n-base-selection')?.classList.contains('n-base-selection--disabled')",'explicit tool rejection releases editing');
     await tap('查询');await expect("document.querySelectorAll('.record-card').length===1",'new tool creation succeeds after a rejected request');
     const state=await fixture({});const posts=state.requests.filter(r=>r.method==='POST');if(posts[0].body.requestKey===posts[1].body.requestKey)throw new Error('Rejected tool key reused');results.push('rejected tool creation starts a new identity');
   }else{
@@ -99,7 +101,7 @@ await fixture({reset:true,read_delay:1});await navigate('自动化');
 await expect("document.querySelector('.content > section [aria-busy=true]')?.innerText==='正在读取自动化状态…' && !document.querySelector('.empty-state')",'automation initial load is distinct from empty state');await ready();
 await expect("document.querySelector('.empty-state h2')?.innerText==='暂无自动化规则'",'automation empty state appears after successful read');await fixture({read_delay:0});
 await prepareRule('响应丢失的规则','daily');await fixture({next_write:'drop_after'});await tap('保存规则');
-await expect("document.querySelector('.scope-note[role=alert]')?.innerText.includes('结果尚未确认') && [...document.querySelectorAll('.inline-form input,.inline-form select,.inline-form textarea')].every(e=>e.disabled)",'unknown rule creation freezes the submitted definition');
+await expect("document.querySelector('.scope-note[role=alert]')?.innerText.includes('结果尚未确认') && document.querySelectorAll('.inline-form input,.inline-form textarea').length>0 && [...document.querySelectorAll('.inline-form input,.inline-form textarea')].every(e=>e.disabled) && !!document.querySelector('.inline-form .n-base-selection--disabled')",'unknown rule creation freezes the submitted definition');
 await navigate('工具');await navigate('自动化');await ready();
 await expect("document.querySelector('.inline-form input')?.value==='响应丢失的规则' && document.querySelector('.inline-form button.primary')?.innerText==='重试保存同一规则'",'pending daily rule restores after navigation');
 await tap('重试保存同一规则');await expect("document.querySelectorAll('.record-card').length===1 && !document.querySelector('.inline-form')",'rule replay acknowledges one saved rule');
@@ -136,9 +138,9 @@ const disabled={...rule,ruleId:'00000000-0000-0000-0000-000000000001',name:'停�
 const run=(id,ruleId,version,state)=>({runId:id,ruleId,ruleVersion:version,name:'隔离规则任务',state,attempts:3,lastError:'execution_interrupted',createdAt:'2026-11-13T10:00:00Z',result:null});
 await fixture({rules:[rule,disabled,comment],ai:false,runs:[run('00000000-0000-0000-0000-000000000011',rule.ruleId,2,'failed'),run('00000000-0000-0000-0000-000000000012',disabled.ruleId,2,'failed'),run('00000000-0000-0000-0000-000000000013',rule.ruleId,1,'failed'),run('00000000-0000-0000-0000-000000000014',rule.ruleId,2,'executing')]});await tap('刷新');await ready();
 await expect("document.querySelectorAll('.automation-history tbody button').length===1",'retry only appears for enabled matching-version failed runs');
-await expect("document.querySelectorAll('.record-card input[type=checkbox]')[2]?.disabled && !document.querySelectorAll('.record-card input[type=checkbox]')[0]?.disabled",'missing AI blocks comment enablement but permits disabling active rules');
+await expect("document.querySelectorAll('.record-card [role=checkbox]')[2]?.classList.contains('n-checkbox--disabled') && !document.querySelectorAll('.record-card [role=checkbox]')[0]?.classList.contains('n-checkbox--disabled')",'missing AI blocks comment enablement but permits disabling active rules');
 await tap('重试');await expect("!document.querySelector('.automation-history tbody button') && document.querySelector('.automation-history tbody .badge')?.innerText==='等待处理'",'run retry returns to the automation queue');
-await js("document.querySelector('.record-card input[type=checkbox]').click()");await ready();await expect("!document.querySelector('.record-card input[type=checkbox]')?.checked",'enabled rule can be explicitly disabled');
+await js("document.querySelector('.record-card [role=checkbox]').click()");await ready();await expect("document.querySelector('.record-card [role=checkbox]')?.getAttribute('aria-checked')==='false'",'enabled rule can be explicitly disabled');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
 await expect("document.documentElement.scrollWidth<=390",'automation fits a 390 CSS pixel viewport');await js("document.querySelector('.content > section').scrollIntoView({block:'start'})");cliLog({mobileScreenshot:await captureScreenshot()});await cdp('Emulation.clearDeviceMetricsOverride');
 await fixture({read_delay:1});await tap('刷新');await tap('退出登录','.sidebar');await wait(1.2);
@@ -151,6 +153,7 @@ await expect("document.querySelector('.inline-form button.primary')?.innerText==
 await fixture({read_mode:'unauthorized'});await tap('刷新');await expect("!!document.querySelector('.login-card') && !document.querySelector('.record-card')",'tool 401 clears the session');
 cliLog({passed:results.length,results});
 EOF
+} | ego-browser nodejs
 ego-browser nodejs <<'EOF'
 cliLog(await completeTaskSpace('NEXUS operations regression',{keep:false}));
 EOF

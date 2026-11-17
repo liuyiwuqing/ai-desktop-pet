@@ -16,7 +16,9 @@ for attempt in {1..50}; do
     sleep 0.1
 done
 rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
-ego-browser nodejs <<'EOF'
+{
+cat "$repo_root/tools/ci/naive_ui_helpers.js"
+cat <<'EOF'
 const fs=await import('node:fs'), os=await import('node:os'), path=await import('node:path');
 const name='NEXUS metadata export regression', base='http://127.0.0.1:18812';
 const existing=(await listTaskSpaces()).find(s=>s.name===name);
@@ -29,11 +31,11 @@ await cdp('Emulation.setTimezoneOverride',{timezoneId:'Asia/Shanghai'});
 async function fixture(value){return JSON.parse(await serverFetch(base+'/__qa/query',{method:'POST',headers:{'Content-Type':'application/json','X-QA-Key':'isolated-ui-fixture-control'},body:JSON.stringify(value)}));}
 async function state(){return JSON.parse(await serverFetch(base+'/__qa/state',{headers:{'X-QA-Key':'isolated-ui-fixture-control'}}));}
 async function expect(expression,label){for(let i=0;i<70;i++){if(await js(expression).catch(()=>false)){results.push(label);return;}await wait(0.1);}cliLog(await snapshotText());throw new Error('UI assertion failed: '+label);}
-async function ready(){for(let i=0;i<70;i++){if(await js("!!document.querySelector('.list-filters select') && !document.querySelector('.list-filters select').disabled"))return;await wait(0.1);}throw new Error('List did not settle');}
+async function ready(){for(let i=0;i<70;i++){if(await js("!!document.querySelector('.list-filters .n-select') && !document.querySelector('.list-filters .n-select').querySelector('.n-base-selection')?.classList.contains('n-base-selection--disabled')"))return;await wait(0.1);}throw new Error('List did not settle');}
 async function tap(text){if(text==='导出元数据')await js("document.querySelector('.export-actions').open=true");for(let i=0;i<70;i++){if(await js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)});if(!b||b.disabled)return false;b.click();return true;})()`))return;await wait(0.1);}throw new Error('Button unavailable: '+text);}
 async function navigate(label){await js(`(()=>{[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith(${JSON.stringify(label)})).click();})()`);}
-async function input(label,value){await ready();await js(`(()=>{const e=document.querySelector('input[aria-label="'+${JSON.stringify(label)}+'"]');e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('input',{bubbles:true}));})()`);}
-async function choose(label,value){await ready();await js(`(()=>{const e=document.querySelector('select[aria-label="'+${JSON.stringify(label)}+'"]');e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('change',{bubbles:true}));})()`);await ready();}
+async function input(label,value){await ready();await js(`(()=>{const e=document.querySelector('input[aria-label="'+${JSON.stringify(label)}+'"]');e.value=${JSON.stringify(value)}.replace('T',' ');e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));e.blur();})()`);}
+async function choose(label,value) { await ui.choose('.n-select[aria-label="'+label+'"]', ({ '':'全部', unread:'未读', read:'已读', deliveryRead:'用户已读', pending:'等待投递', sent:'等待设备确认', received:'设备已保存', displayed:'设备已展示', expired:'已结束', failed:'投递失败' })[value==='read'&&label==='投递状态'?'deliveryRead':value]); }
 function files(){return downloadDirs.flatMap(dir=>fs.readdirSync(dir).filter(file=>file.endsWith('.csv')).map(file=>path.join(dir,file)));}
 async function downloaded(count,label){for(let i=0;i<70;i++){if(files().length===count){results.push(label);return;}await wait(0.1);}throw new Error('Download missing: '+label);}
 await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
@@ -64,7 +66,7 @@ await expect("document.querySelector('.section-heading p')?.innerText.startsWith
 await tap('导出元数据');await downloaded(2,'browser saves real delivery CSV');await ready();
 csv=fs.readFileSync(path.join(downloadDir,'deliveries-metadata.csv'),'utf8');
 if(csv.split('\r\n').length!==33||!csv.includes('event-30')||csv.includes('event-31')||csv.includes('title'))throw new Error('Wrong delivery CSV content');results.push('delivery metadata includes all filtered rows and no title');
-await navigate('消息');await expect("document.querySelector('input[aria-label=来源标识]')?.value==='manual' && document.querySelector('input[aria-label=收件截止]')?.value==='2026-11-14T17:00' && document.querySelector('.pagination > span')?.innerText==='2 / 2'",'navigation preserves message search and page');
+await navigate('消息');await expect("document.querySelector('input[aria-label=来源标识]')?.value==='manual' && document.querySelector('input[aria-label=收件截止]')?.value==='2026-11-14 17:00' && document.querySelector('.pagination > span')?.innerText==='2 / 2'",'navigation preserves message search and page');
 await tap('刷新');await ready();await expect("document.querySelector('input[aria-label=来源标识]')?.value==='manual' && document.querySelector('.pagination > span')?.innerText==='2 / 2'",'manual refresh preserves applied facets');
 await input('收件开始','2026-11-14T18:00');let reads=(await state()).queryRequests.length;await tap('应用筛选');
 await expect("document.querySelector('.filter-feedback[role=alert]')?.innerText==='收件开始必须早于截止时间。'",'inverted range has local feedback');
@@ -83,23 +85,24 @@ await js("[...document.querySelectorAll('button')].find(b=>b.textContent.trim()=
 if((await state()).exportRequests.length!==before+1)throw new Error('Repeated click sent another export');results.push('repeated export click sends once');
 await freshDownloadDir();await fixture({exportDelay:1});await tap('导出元数据');await expect("!![...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='正在导出…')",'export is pending before navigation');await navigate('投递');await wait(1.2);
 if(files().length!==3)throw new Error('Abandoned export downloaded after navigation');results.push('navigation discards a delayed export');
-await expect("document.querySelector('input[aria-label=\"设备 ID\"]')?.value==='device-a' && document.querySelector('.list-filters select')?.value==='failed'",'delivery facets survive a return visit');await ready();
+await expect("document.querySelector('input[aria-label=\"设备 ID\"]')?.value==='device-a' && document.querySelector('.list-filters .n-select')?.textContent.trim()==='投递失败'",'delivery facets survive a return visit');await ready();
 await fixture({exportDelay:0,queryDelay:1});await input('设备 ID','device-b');await tap('应用筛选');
 await expect("document.querySelector('.empty-state[role=status]')?.innerText==='正在加载投递…' && document.querySelector('.list-filters input').disabled",'filter loading clears old delivery rows');
 await expect("document.querySelector('.section-heading p')?.innerText.startsWith('1 条投递')",'delayed delivery filter finishes');await ready();await fixture({queryDelay:0});
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.list-filters input,.list-filters select,.filter-actions button')].every(e=>e.getBoundingClientRect().right<=390)",'all delivery facets and actions fit 390 CSS pixels');
+await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.list-filters input,.list-filters .n-select,.filter-actions button')].every(e=>e.getBoundingClientRect().right<=390)",'all delivery facets and actions fit 390 CSS pixels');
 cliLog({mobileScreenshot:await captureScreenshot()});await navigate('消息');await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.list-filters input,.filter-actions button')].every(e=>e.getBoundingClientRect().right<=390)",'all message facets and actions fit 390 CSS pixels');
-await cdp('Emulation.clearDeviceMetricsOverride');await tap('清空筛选');await ready();await expect("document.querySelector('.list-filters select').value==='' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='') && document.querySelector('.section-heading p')?.innerText==='34 条消息'",'clear resets state, facets and page together');
+await cdp('Emulation.clearDeviceMetricsOverride');await tap('清空筛选');await ready();await expect("document.querySelector('.list-filters .n-select').textContent.trim()==='全部' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='') && document.querySelector('.section-heading p')?.innerText==='34 条消息'",'clear resets state, facets and page together');
 await freshDownloadDir();await fixture({exportDelay:1});await tap('导出元数据');await expect("!![...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='正在导出…')",'export is pending before logout');await tap('退出登录');await wait(1.2);
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.sidebar') && document.querySelector('.token-label input').value===''",'logout discards credentials and delayed export');
 if(files().length!==3)throw new Error('Logged out export downloaded');results.push('late export cannot create a file after logout');
 await fixture({exportDelay:0,exportMode:'unauthorized'});await fillInput('.token-label input','ui-regression-fixture-token-at-least-32-characters');await js("document.querySelector('.login-card button.primary').click()");await ready();
-await expect("document.querySelector('.list-filters select').value==='' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='')",'new session starts with no message filters');
-await navigate('投递');await expect("document.querySelector('.list-filters select').value==='' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='')",'new session starts with no delivery filters');
+await expect("document.querySelector('.list-filters .n-select').textContent.trim()==='全部' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='')",'new session starts with no message filters');
+await navigate('投递');await expect("document.querySelector('.list-filters .n-select').textContent.trim()==='全部' && [...document.querySelectorAll('.list-filters input')].every(e=>e.value==='')",'new session starts with no delivery filters');
 await tap('导出元数据');await expect("!!document.querySelector('.login-card') && document.querySelector('.inline-error')?.innerText.includes('管理令牌无效')",'export 401 ends the session');
 cliLog({passed:results.length,checks:results,downloadDirs,downloadedFiles:files(),scope:'actual Vue and real browser CSV download; RAM HTTP boundary only'});
 EOF
+} | ego-browser nodejs
 ego-browser nodejs <<'EOF'
 cliLog(await completeTaskSpace('NEXUS metadata export regression',{keep:false}));
 EOF

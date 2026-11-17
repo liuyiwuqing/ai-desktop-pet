@@ -47,7 +47,7 @@ await expect("document.querySelector('.export-actions')?.open===false",'secondar
 await click('.export-actions summary');await expect("document.querySelector('.export-menu button').getBoundingClientRect().width>0",'export actions open through their visible disclosure');
 await pressKey('Escape');await expect("!document.querySelector('.export-actions').open && document.activeElement.tagName==='SUMMARY'",'Escape closes exports and returns focus');
 await shot('messages-desktop',1440);
-await click('.sidebar [data-tab=devices]');await expect("document.querySelector('h1')?.textContent==='设备' && !!document.querySelector('.device-card .n-tag')",'device card keeps identity and online state');
+await click('.sidebar [data-tab=devices]');await expect("document.querySelector('h1')?.textContent.trim()==='设备' && !!document.querySelector('.device-card .n-tag')",'device card keeps identity and online state');
 await shot('devices-desktop',1440);
 await shot('devices-mobile',390,844,true);
 await expect("document.documentElement.scrollWidth<=390 && getComputedStyle(document.querySelector('.app-layout > .sidebar')).display==='none'",'mobile removes the scrolling navigation strip');

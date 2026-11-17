@@ -16,7 +16,9 @@ for attempt in {1..50}; do
     sleep 0.1
 done
 rg -q '^UI boundary fixture ready$' "$output_dir/fixture.log"
-ego-browser nodejs <<'EOF'
+{
+cat "$repo_root/tools/ci/naive_ui_helpers.js"
+cat <<'EOF'
 const base='http://127.0.0.1:18807',name='NEXUS delivery history regression';
 const existing=(await listTaskSpaces()).find(s=>s.name===name);
 if(existing && existing.ownership!=='agent')throw new Error('Existing space needs user confirmation');
@@ -27,8 +29,8 @@ async function expect(expression,label){for(let i=0;i<60;i++){if(await js(expres
 async function tap(text){if(!await js(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()===${JSON.stringify(text)});if(!b||b.disabled)return false;b.click();return true;})()`))throw new Error('Button unavailable: '+text);}
 async function navigate(label){await js(`(()=>{const b=[...document.querySelectorAll('.sidebar nav button')].find(b=>b.textContent.trim().endsWith(${JSON.stringify(label)}));if(!b)throw new Error('Navigation missing');b.click();})()`);}
 async function history(index=0){await js(`(()=>{const row=document.querySelectorAll('tbody tr')[${index}];const b=[...row.querySelectorAll('button')].find(b=>b.innerText.trim()==='时间线');if(!b)throw new Error('History action missing');b.click();})()`);await expect("!!document.querySelector('.delivery-history-panel .management-status .badge')",'history snapshot loaded');}
-async function filter(value){await js(`(()=>{const s=document.querySelector('select[aria-label=投递状态]');s.value=${JSON.stringify(value)};s.dispatchEvent(new Event('change',{bubbles:true}));})()`);await expect("!document.querySelector('select[aria-label=投递状态]').disabled",'delivery filter is ready');}
-async function reset(){await fixture({reset:true});if(await js("!!document.querySelector('.delivery-history-panel')"))await tap('收起时间线');await filter('');await tap('刷新');await expect("document.querySelectorAll('tbody tr').length===4 && !document.querySelector('.list-filters select').disabled",'fixture starts with four deliveries');}
+async function filter(value){await ui.choose('.n-select[aria-label=投递状态]',({ '':'全部', unread:'未读', read:'已读', pending:'等待投递', cancelled:'已取消', sent:'等待设备确认', received:'设备已保存', displayed:'设备已展示', expired:'已结束', failed:'投递失败' })[value]);await expect("!document.querySelector('.n-select[aria-label=投递状态] .n-base-selection--disabled')",'delivery filter is ready');}
+async function reset(){await fixture({reset:true});if(await js("!!document.querySelector('.delivery-history-panel')"))await tap('收起时间线');await filter('');await tap('刷新');await expect("document.querySelectorAll('tbody tr').length===4 && !document.querySelector('.list-filters .n-select').querySelector('.n-base-selection')?.classList.contains('n-base-selection--disabled')",'fixture starts with four deliveries');}
 await fixture({reset:true});await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
 const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
 if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
@@ -47,7 +49,7 @@ await tap('收起时间线');await filter('pending');await history();await tap('
 await expect("document.querySelector('.delivery-cancel-confirm')?.innerText.includes('不删除消息，也不影响其他设备')",'cancellation explains its per-delivery consequence');
 if((await fixture({})).requests.some(r=>r.method==='POST'))throw new Error('Opening confirmation sent a cancel');results.push('opening confirmation does not mutate');
 await tap('暂不取消');await expect("!document.querySelector('.delivery-cancel-confirm')",'confirmation can be dismissed');await tap('取消投递');await tap('确认取消');
-await expect("document.querySelector('.delivery-history-panel .management-status .badge')?.innerText==='已取消' && document.querySelectorAll('.delivery-timeline li').length===2 && document.querySelectorAll('tbody tr').length===1 && document.querySelector('.list-filters select').value==='pending'",'cancellation is acknowledged, history appended and filtered list refreshed');
+await expect("document.querySelector('.delivery-history-panel .management-status .badge')?.innerText==='已取消' && document.querySelectorAll('.delivery-timeline li').length===2 && document.querySelectorAll('tbody tr').length===1 && document.querySelector('.list-filters .n-select').textContent.trim()==='等待投递'",'cancellation is acknowledged, history appended and filtered list refreshed');
 const first=await fixture({});if(first.requests.filter(r=>r.method==='POST').length!==1 || first.rows.slice(1).some(r=>r.status==='cancelled'))throw new Error('Cancel affected another delivery or repeated');results.push('only one selected delivery is cancelled');
 await tap('收起时间线');await expect("document.activeElement?.getAttribute('aria-label')==='投递状态'",'closing a filtered-out delivery returns focus to filter');
 await filter('cancelled');await expect("document.querySelectorAll('tbody tr').length===1 && document.querySelector('tbody .badge')?.innerText==='已取消'",'cancelled status has its own filtered result');
@@ -96,6 +98,7 @@ await expect("document.querySelectorAll('tbody tr').length===4",'new session del
 await expect("!!document.querySelector('.login-card') && document.querySelector('.token-label input').value===''",'history 401 ends the session');
 cliLog({passed:results.length,checks:results,scope:'actual Vue and RAM-only HTTP; not database/Broker/device'});
 EOF
+} | ego-browser nodejs
 ego-browser nodejs <<'EOF'
 cliLog(await completeTaskSpace('NEXUS delivery history regression',{keep:false}));
 EOF

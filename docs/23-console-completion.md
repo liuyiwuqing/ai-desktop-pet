@@ -259,3 +259,20 @@ python3 tools/ci/test_server_linux.py --bundle build/server-release-20261115/nex
 
 
 CONSOLE-12-C 远程收口：04 软件回归提交 `1fe497c` 的 [CI 43620611463](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43620611463) 七个 job 全部 success，包含五固件预设与 full 主机/协议/DSP/LVGL。交付说明 `a9e7604` 只含 docs，与该提交的源码、配置、工具和部署模板相同。前一 `e15692a` 运行被后续 push 取消，不计作成功。CORE `230c809` 的发布四 job success 与本地完整 Maven/750 次浏览器检查分别有证据，不互相替代；没有生产部署或实机验收结论。
+
+## CONSOLE-21 · 紧凑布局与 Naive UI 表单
+
+按用户反馈继续压缩留白：侧栏 208px、页头 56px、桌面页边距 24px、卡片 16px、表单间距 12px、标准控件 34px；桌面四条以内消息容器收至 340px，手机短列表随内容收缩，长列表独立滚动。设备摘要和动作放在上方，长设置面板占满下一行；卡内指标改为 18px，网络等长文本 14px。390px 筛选的状态/来源并排，日期各占一行，导航仍保留 44px 点击高度。
+
+各页统一使用 `NForm`/`NFormItem`、`NInput`、`NSelect`、`NInputNumber`、`NCheckbox`、`NSlider`、日期/时间选择、时区补全与 manifest 文件选择。CORE 的 `ConsoleForm`/`ConsoleField`/`formRules` 仅承接标签、原有输入约束、提交前校验与焦点；业务处理、权限、版本与原身份重试仍在原面板/App。日期继续提交 UTC 查询窗口，免打扰/显示时长继续提交分钟数/毫秒数，暂时清空的输入计入脏草稿以防轮询覆盖。`NUpload` 不自动上传，保留 JSON/7000 字节校验和显式登记。
+
+Naive 自身与 `vueuc` 的下拉/日历/虚拟列表样式分别经过既有 nonce 目标和局部样式工厂适配，保留正式 CSP。浏览器脚本通过 `naive_ui_helpers.js` 操作实际菜单、焦点和键盘，不使用组件内部状态或隐藏原生控件；原业务断言保留。专项入口：
+
+```sh
+bash tools/ci/test_console_forms_ui.sh
+bash tools/ci/test_console_theme_ui.sh
+```
+
+两项及其余页面脚本各自构建真实 Vue，在环回 RAM HTTP/SSE 夹具和正式 CSP 下运行。新增专项覆盖空令牌/非法设备 ID 的提交前反馈、下拉/日历及 Escape、音量和免打扰提交参数、manifest 解析、深色主题、390px 控件/弹层边界及 CSP/运行时错误。验证与跨仓提交结果同步记录于 18 台账；夹具结果不替代真实数据库、供应商、设备或部署验收。
+
+本项 CORE `959e7b7` 已推送并核对远端。21 组浏览器合计 848 次（新增表单/紧凑布局 35 次）通过，类型/75 token/生产构建与完整 CORE 构建通过（121 条中 116 通过、5 条条件跳过）；最终手机样式复核后静态资源重新打包，JAR 的 23 份前端和 23 份迁移逐字节一致。已查看 1440×900/390×844 明暗截图，见忽略目录 `firmware/build-ui-console-forms/`。首轮两组脚本登录连接失败，单独重跑通过，初因未确认；完整过程与配套边界见 18 台账。本次不重启真实 CORE、不迁移真实库、不做真实消息或设备验收。
