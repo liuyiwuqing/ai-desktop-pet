@@ -123,6 +123,43 @@ docker compose -p nexus-production -f compose.1panel.yml ps
 
 包已改为 Public，需要在线拉取时也不需要 `docker login`；若后续改回私有，才需要在服务器与 1Panel 配置只读凭据。
 
+## 可选：管理员令牌改为受保护文件（`NEXUS_AUTH_TOKEN_FILE`）
+
+先说清适用范围。管理台“权限”页签发的**独立角色令牌**（operator/viewer，给脚本或他人用）存在数据库里，与这个变量无关，登录后直接签发即可，不需要改环境或重启。`NEXUS_AUTH_TOKEN_FILE` 只解决两件事：管理员令牌的 current/previous 平滑轮换，以及让“权限 → 修改管理员令牌”在网页可改。默认 env 模式下这两项都不可以用。
+
+启用步骤：
+
+1. 在源码机（本机）生成 store——服务器上没有 Python，初始化镜像只打包了 `init_docker.py`/`init_local.py`/`broker_policy.py`，不能就地生成。`init` 会**保留现有管理员令牌原值**，只把它挪进文件，`adminActor` 取其 SHA-256，所以既有审计归属和登录令牌都不变。命令只从环境读秘密，不接受 `--token` 参数，也不打印秘密：
+
+```sh
+NEXUS_ADMIN_TOKEN='<服务器 core.env 里那个值>' \
+  python3 tools/credential_store.py init --file ./auth/tokens.json
+python3 tools/credential_store.py status --file ./auth/tokens.json   # 只显示 revision 与 id，不显示令牌
+```
+
+2. 拷到服务器并交给容器用户（CORE 以 `65534:65534` 运行）。`init` 会在同目录留下 `tokens.json` 和 `tokens.json.lock`，**两个都要拷**：Java 侧用 `FileChannel.open(..., WRITE)` 打开锁文件、不带 `CREATE`，缺锁文件时网页修改会直接失败。
+
+```sh
+install -d -m 700 -o 65534 -g 65534 /etc/nexus/auth
+install -m 600 -o 65534 -g 65534 tokens.json      /etc/nexus/auth/tokens.json
+install -m 600 -o 65534 -g 65534 tokens.json.lock /etc/nexus/auth/tokens.json.lock
+```
+
+3. 编排里加挂载与环境（目录挂载，不能只挂单个文件，否则网页改完后宿主的原子替换不会反映进容器）：
+
+```yaml
+    environment:
+      NEXUS_AUTH_TOKEN_FILE: /var/lib/nexus/auth/tokens.json
+    volumes:
+      - /etc/nexus/auth:/var/lib/nexus/auth
+```
+
+父目录必须是 0700 且属主为 65534，文件 0600；容器只读根不影响 bind 挂载。若不想开放网页改写，把挂载改为 `/etc/nexus/auth:/var/lib/nexus/auth:ro`，此时页面会提示“凭据文件不可写”，轮换继续走 CLI。
+
+4. 重建 CORE（`up -d`，不是 `restart`）。首次切换需要这一次重启，之后轮换和网页修改都不再重启。
+
+三个必须知道的失败方式：文件必须是**绝对路径**且能被 65534 读到，否则 CORE **启动即失败**（日志 `NEXUS_AUTH_TOKEN_FILE is unavailable or invalid`），不是降级运行；文件损坏或不安全更新在请求期固定返回 503，不回退到 env；容器健康检查也读 `admin.current.token`，文件配错会让容器一直 unhealthy 反复重启。
+
 ## 验证与边界
 
 2026-11-15 本地 `docker compose -f deployment/1panel/docker-compose.yml config --no-env-resolution -q` 退出 0，Compose 版本为 `v5.5.0`。隔离运行使用本机缓存的真实发布 amd64 CORE（当时为 `230c809`）、arm64 PostgreSQL/Mosquitto 和本地 arm64 初始化镜像；临时编排只替换私有目录和随机回环端口，使用独立项目/卷，通过 `up -d --no-build --wait --wait-timeout 240` 启动。
