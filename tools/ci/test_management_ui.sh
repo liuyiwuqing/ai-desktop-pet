@@ -106,6 +106,9 @@ await expect("document.querySelector('.chart-tooltip')?.textContent.includes('KB
 await expect("document.querySelector('.history-metrics')?.innerText.includes('内存') && document.querySelector('.history-metrics')?.innerText.includes('音量') && document.querySelector('.history-metrics')?.innerText.includes('未读') && document.querySelector('.history-metrics')?.innerText.includes('音频') && document.querySelector('.history-metrics')?.innerText.includes('网络')",'metric switcher exposes all history metrics');
 await expect("document.querySelector('.management-metrics')?.innerText.includes('HomeLab-2.4G') && document.querySelector('.management-metrics')?.innerText.includes('192.168.1.20') && document.querySelector('.management-metrics')?.innerText.includes('信道 6') && document.querySelector('.management-metrics')?.innerText.includes('-52 dBm')",'snapshot shows the device Wi-Fi network, address, channel and signal');
 await expect("document.querySelector('.management-metrics')?.innerText.includes('上次断线') && document.querySelector('.management-metrics')?.innerText.includes('201 找不到目标 AP')",'snapshot names the last disconnect reason');
+await tap('最近断线');
+await expect("document.querySelectorAll('.disconnect-history .management-record').length===3 && document.querySelector('.disconnect-history').innerText.includes('202 认证失败') && document.querySelector('.disconnect-history').innerText.includes('201 找不到目标 AP') && document.querySelector('.disconnect-history').innerText.includes('原因 777') && document.querySelector('.disconnect-history')?.innerText.includes('尚未对时')",'disconnect history lists every recorded event with reason names');
+await expectState(snapshot=>snapshot.disconnectRequests.some(path=>path.includes('/devices/dodo-ui-fixture/telemetry/disconnects') && path.includes('limit=20')),'disconnect history reads the read-only endpoint');
 await tap('音量');
 await expect("document.querySelector('.chart-legend')?.innerText.includes('音量') && document.querySelector('.chart-legend')?.innerText.includes('%') && !document.querySelector('.telemetry-chart .series-secondary')",'volume metric draws a single percent series');
 await hover(0.55);
@@ -157,7 +160,7 @@ await expect("document.querySelector('.audit-list')?.innerText.includes('管理�
 await range(0,61);await fixture({dropNext:true});await tap('保存到设备');
 await expect("document.body.innerText.includes('提交结果尚未确认') && [...document.querySelectorAll('button')].some(b=>b.innerText.trim()==='重试同一请求')",'unknown HTTP outcome retains retry');
 await tap('重试同一请求');
-await expect("document.querySelectorAll('.management-record').length===2 && !document.body.innerText.includes('提交结果尚未确认')",'retry resolves after acknowledgment');
+await expect("document.querySelectorAll('.management-history .management-record').length===2 && !document.body.innerText.includes('提交结果尚未确认')",'retry resolves after acknowledgment');
 observed=await state();
 if(observed.submissions.length!==3 || observed.submissions[1].requestId!==observed.submissions[2].requestId)throw new Error('Retry changed the request ID');
 results.push('unknown outcome retries identical request ID');

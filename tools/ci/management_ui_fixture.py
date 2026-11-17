@@ -29,7 +29,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
     state={'mode':'empty','config':copy.deepcopy(CONFIG),'revision':1,'requests':[],'submissions':[],'dropNext':False,
         'otaMode':'disabled','otaRequests':[],'otaSubmissions':[],'otaDrop':False,'otaBoot':'1'*32,'otaLastError':'','growthMode':'disabled',
         'messageSubmissions':[],'manualMessages':[],'messageNext':'success','deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success',
-        'telemetryRequests':[],'listMode':False,'listMessages':[],'listDeliveries':[],'listRequests':[],'listError':'','listDelay':0}
+        'telemetryRequests':[],'disconnectRequests':[],'listMode':False,'listMessages':[],'listDeliveries':[],'listRequests':[],'listError':'','listDelay':0}
     def log_message(self,*args):pass
     def json_response(self,status,value):
         payload=json.dumps(value,ensure_ascii=False).encode()
@@ -103,6 +103,14 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 value={'enabled':mode!='disabled','deviceId':'dodo-ui-fixture','fresh':mode not in ('empty','stale'), 'canInstall':mode in ('fresh','no_releases') and not requests,
                     'installBlock':'ota_device_unavailable' if mode=='unavailable' else 'ota_readback_required' if mode in ('empty','stale') else 'ota_deployment_in_progress' if requests else '',
                     'canReboot':mode=='pending_reboot','observation':observation,'deployments':requests}
+            elif path.endswith('/telemetry/disconnects'):
+                state['disconnectRequests'].append(self.path)
+                items=[] if mode=='empty' else [
+                    {'observedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(now-3300)),'reason':202,'disconnectedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(now-3600))},
+                    {'observedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(now-7200)),'reason':201,'disconnectedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(now-7500))},
+                    {'observedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(now-10800)),'reason':777,'disconnectedAt':None}]
+                value={'deviceId':'dodo-ui-fixture','limit':int(parse_qs(urlparse(self.path).query).get('limit',['20'])[0]),
+                    'retentionDays':30,'items':items}
             elif path.endswith('/telemetry'):
                 query=parse_qs(urlparse(self.path).query);bucket=query.get('bucket',['5m'])[0]
                 state['telemetryRequests'].append(self.path)
@@ -157,7 +165,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if self.headers.get('X-QA-Key')!=CONTROL:return self.json_response(401,{'error':'unauthorized'})
                 if value.get('reset'):
                     state.update(mode='empty',config=copy.deepcopy(CONFIG),revision=1,requests=[],submissions=[],dropNext=False,
-                        deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',telemetryRequests=[],growthMode='disabled',
+                        deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',telemetryRequests=[],disconnectRequests=[],growthMode='disabled',
                         listMode=False,listMessages=[],listDeliveries=[],listRequests=[],listError='',listDelay=0)
                 if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success')
                 if value.get('listReset'):
