@@ -504,3 +504,6 @@ CORE 侧 V22 为样本表追加 `wifi_ip`/`wifi_rssi`：地址变化立即成条
 - **验证**：21 组实际 Vue + 环回 RAM HTTP/SSE 浏览器检查共 848 次通过：消息 33、管理 64、筛选 44、元数据导出 44、正文导出 15、角色 39、OTA 23、成长 18、工具/操作 96、规则编辑 99、规则删除/预演 52、路由 34、来源 38、RSS/天气 32、主题/导航 33、实时/引导 21、概览 17、条件规则 17、投递历史 62、模板 32、新增表单/紧凑布局 35。脚本通过 `naive_ui_helpers.js` 操作实际菜单/键盘/焦点，未用组件内部状态或隐藏原生控件。类型/75 token 守卫/生产构建、Shell 与 JS 语法、`git diff --check` 通过；1440×900 与 390×844 明暗截图保留忽略目录 `firmware/build-ui-console-forms/`，已实际查看。
 - **完整构建**：`python3 tools/run_local.py build` 退出 0，121 条中 116 通过、5 条条件跳过；最终手机短列表样式经新增专项复核后，`mvn -s .mvn/settings.xml -B -ntp -DskipTests package` 更新静态资源，Java 未改动。JAR 的 23 份前端文件和 V1–V23 迁移均逐字节匹配，无旧哈希资源。首轮实时/模板检查各出现一次登录连接失败，单独重跑通过，初因尚未确认；等待真实菜单可用与抽屉焦点恢复后再操作，日期/手机浮层检查通过。
 - **交付边界**：CORE `959e7b77ff0a61e6890e3985b9450c7e03200b06` 已推送并核对远端分支；04 配套随本项提交。本次未改后端/固件，未重启真实 8088 服务、迁移真实库、发送真实消息或验收设备；5173 开发预览继续运行，远程 CI 与本地验证分别记录。
+
+
+CONSOLE-21 推送核对：CORE `959e7b7` / 04 `20ece8e` 均已推送且远端分支包含对应提交。[CORE Docker CI 44008225925](https://github.com/liuyiwuqing/nexus-core/actions/runs/44008225925) 与 [04 Software checks 44008403882](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44008403882) 均未开始执行步骤；已读取 check-run 注释，GitHub 明确报告账户付款失败或 spending limit 需要提高。远程 CI 未通过，本地检查结果不替代它；本条后续提交仅补记录，不改变已验证代码。
