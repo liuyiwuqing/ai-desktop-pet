@@ -32,6 +32,21 @@
 
 家庭网络仅支持 2.4 GHz 开放网络或 WPA2/兼容网络，不支持企业认证；密码为空表示开放网络，非空需 8–63 字节或 64 位十六进制 PSK。设备热点同样只提供开放或 WPA2。不存在自动弹出网页的保证，始终可以手动输入上述 IP。
 
+## 家庭网络高级设置（可选）
+
+第 1 节下方默认折叠的“家庭网络高级设置”用于固定地址与主机名，日常保持自动获取即可：
+
+| 设置 | 取值 | 说明 |
+| --- | --- | --- |
+| 地址获取 | 自动获取（DHCP，默认）/ 固定 IP | 切回自动获取时不保留旧静态字段 |
+| IP 地址、子网掩码、网关 | 点分十进制四元组，各 1–15 字符 | 掩码须为连续 1，网关须与地址同网段 |
+| DNS | 同上，可留空 | 留空沿用网关作为解析入口 |
+| 主机名 | 字母/数字/连字符，最长 32，首尾不能是连字符 | 用于路由器 DHCP 列表识别设备 |
+
+固定地址与凭据同源校验：页面先做格式检查，`POST /api/network` 再按 `pet/netcfg.h` 的共享规则复核，`svc_config` 提交 `net` 分组时同样复核，任一层不通过都拒绝写入。保存写 `net` 分组的 `ip_mode/ip/netmask/gateway/dns/hostname` 并回读，**下次联网生效**，不立即断开当前连接；设置模式下同时把新地址应用到当前 STA 接口，再点“连接并保存”即按新地址联网，便于当场验证。填错会导致设备连上 Wi-Fi 却无法访问网络，此时重新进入网络设置改回自动获取即可，热点本身不受影响。
+
+页面顶部“当前地址”一行只读显示已连接时的 IP、网关、DNS、信号和信道，来自 `esp_netif_get_ip_info`/`esp_wifi_sta_get_ap_info`，不含密码，也不代表固定地址已生效。诊断 `setup` 只记录“是否固定地址”和主机名，不输出地址值。
+
 ## 使用语音唤醒
 
 安装 [voice 预设](13-operational-software.md)及配套模型后，先等主页显示正常时间，确认联网对时完成。回到宠物主页说完整的“小爱同学”，出现“正在听”后提问，说完停顿，由设备自动结束录音并播放回答；回答结束后可再次唤醒。BOOT 的“按住说话”仍保留。静音、免打扰和播放回答时暂停麦克风采集，当前不支持播放中的语音打断。
@@ -53,15 +68,16 @@ HTTP 仅绑定 SoftAP 接口，固定 Host `192.168.4.1`（可带 `:80`），不
 | 接口 | 行为 |
 | --- | --- |
 | `GET /` | 内置离线页面，无 CDN/外部脚本 |
-| `GET /api/state` | 状态、revision、窗口时间、保存标记、短期绑定码、当前热点名称/是否开放、已保存热点偏好（不含口令）与当前页面会话 nonce；不返回已保存密码/token |
+| `GET /api/state` | 状态、revision、窗口时间、保存标记、短期绑定码、当前热点名称/是否开放、已保存热点偏好（不含口令）、已保存 Wi-Fi 名称、`net` 地址设置与当前 STA 地址/信号（只读）及页面会话 nonce；不返回已保存密码/token |
 | `GET /api/scan` | 最多 20 个网络；SSID 按文字显示 |
 | `POST /api/wifi` | `expectedRevision/ssid/password`；取得 IP 后保存 |
 | `POST /api/services` | `expectedRevision/nexus`；仅更新 NEXUS 分组 |
+| `POST /api/network` | `expectedRevision` 加 `ipMode`（`dhcp`/`static`），`static` 时 `ip/netmask/gateway` 必填、`dns` 可选，`hostname` 可选；仅更新 `net` 分组的地址字段 |
 | `POST /api/portal` | `expectedRevision/portal{version,custom,ssid?,passwordMode,password?,hidden,channel,maxClients,windowMinutes}`，可选 `restart:true`；保存热点偏好，必要时重启进入设置 |
 | `POST /api/activate` | `expectedRevision`；连接官方平台并保存完整 WSS 分组 |
 | `POST /api/finish` | `expectedRevision`；保留凭据并重启返回主页 |
 
-错误会显示失败状态，允许重试；处理中禁用重复提交，退出仍可用。revision 冲突先重新读取状态，不能直接覆盖。热点偏好请求另限 512 字节，字段与 NVS 编解码共用同一套校验。`PET_DIAGNOSTICS` 中的 `setup` 只包含状态编号、错误码、revision、剩余时间、保存标记，以及热点偏好的自定义/密码策略/隐藏/信道/连接数/窗口，不包含热点名称、热点密码、nonce 或家庭凭据。
+错误会显示失败状态，允许重试；处理中禁用重复提交，退出仍可用。revision 冲突先重新读取状态，不能直接覆盖。热点偏好请求另限 512 字节，网络地址请求按固定字段白名单解析，字段与 NVS/凭据编解码共用同一套校验。`PET_DIAGNOSTICS` 中的 `setup` 只包含状态编号、错误码、revision、剩余时间、保存标记，热点偏好的自定义/密码策略/隐藏/信道/连接数/窗口，以及是否使用固定地址和主机名，不包含热点名称、热点密码、IP 地址、nonce 或家庭凭据。
 
 ## 验证记录（2026-11-15）
 
@@ -84,3 +100,15 @@ HW-07 修正后，用户明确确认能够听到真实回答，结束后不再�
 - 页面与固件共用字段 `version/custom/ssid/passwordMode/password/hidden/channel/maxClients/windowMinutes`；`password` 留空表示沿用已保存口令，开放模式不携带口令。
 
 尚未验收：改自定义名称后手机重连、隐藏热点在真实射频下的可发现性、开放热点、信道/连接数实际表现、保存后重开热点的重启时序，以及实机 LCD 显示。这些都不能用主机、浏览器或构建结果替代。
+
+## 家庭网络地址验证记录（2026-11-17）
+
+本轮把地址设置并入 `net` 分组（`pet/netcfg.h` 共享规则、`pet_netif_apply_ip`、`POST /api/network`），页面第 1 节可展开固定 IP/掩码/网关/DNS/主机名，并新增只读当前地址行。验证只覆盖下列边界：
+
+- 主机：`bash tools/ci/test_host.sh` 退出 0（114 条 `passed`）。`test_setup_portal::netcfg` 覆盖默认 DHCP、固定地址合法/缺字段/非连续掩码/网关跨网段/DNS 非四元组/主机名非法，`test_config_service` 新增固定地址写入可读回、非法 ip/掩码/网关/主机名被拒、DHCP 携带残留 `ip` 被拒、改回 DHCP 后 `ip` 键消失。
+- 真实 LVGL：`bash tools/ci/test_ui_host.sh` 10/10，未新增帧（本轮不改布局，仅状态文案）。
+- 固件：隔离目录 `firmware/build-hw11`，ESP-IDF v6.1，配置沿用当前维护 `sdkconfig`。应用 3,005,728 B（`0x2ddd20`，分区剩余 28%），SHA256 `d77d353a7939ed08f7c5a33b882efc654e72a5df53ef3889debd0e0a31968873`。仅构建，未烧录、未在设备上运行。
+- 浏览器：实际 `setup.html` + 本机模拟 API（`127.0.0.1:18899`），390×844。已验证已连接状态显示“家庭 Wi-Fi 已连接（Home-2.4G）”、当前地址行含 IP/网关/DNS/信号/信道、非连续掩码在前端与服务端均被拒、固定地址保存后状态为 `network_saved` 且表单回显、无横向溢出。模拟服务不校验真实身份，也不能替代 netif 行为。
+- 地址字段与 USB/凭据共用一份校验；页面、HTTP、`svc_config` 三层拒绝同一批非法输入，不出现“页面放过、固件才失败”。
+
+尚未验收：真实路由器下的固定地址连通、错误掩码导致断网后的恢复流程、DHCP 主机名在路由器列表中的显示、切换固定/自动获取后的实际租约变化，以及实机 LCD 上的状态文案。这些都不能用主机、浏览器或构建结果替代。

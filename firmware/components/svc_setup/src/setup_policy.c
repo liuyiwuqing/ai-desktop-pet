@@ -41,7 +41,7 @@ bool pet_setup_request_authorized(const char *host,const char *origin,
 const char *pet_setup_state_name(pet_setup_state_t state)
 {
     static const char *const names[]={"starting","ready","connecting","wifi_saved","activating",
-        "waiting_bind","voice_saved","services_saved","portal_saved","failed","leaving"};
+        "waiting_bind","voice_saved","services_saved","portal_saved","network_saved","failed","leaving"};
     return (unsigned)state<sizeof(names)/sizeof(names[0])?names[state]:"failed";
 }
 
@@ -172,4 +172,26 @@ bool pet_setup_portal_parse(const char *json,size_t bytes,pet_setup_portal_t *ou
 bool pet_setup_portal_parse_partial(const char *json,size_t bytes,pet_setup_portal_t *out)
 {
     return parse_portal(json,bytes,out,true);
+}
+
+void pet_setup_netcfg_default(pet_setup_netcfg_t *netcfg)
+{
+    memset(netcfg,0,sizeof(*netcfg));
+    strcpy(netcfg->ip_mode,"dhcp");
+}
+
+bool pet_setup_netcfg_valid(const pet_setup_netcfg_t *netcfg)
+{
+    if(!netcfg) return false;
+    if(!pet_netcfg_mode(netcfg->ip_mode)||!netcfg->ip_mode[0]) return false;
+    uint8_t quad[4];
+    if(pet_netcfg_static(netcfg->ip_mode)) {
+        if(!pet_netcfg_ipv4(netcfg->ip,quad)||!pet_netcfg_netmask(netcfg->netmask)||
+            !pet_netcfg_ipv4(netcfg->gateway,quad)) return false;
+        if(!pet_netcfg_same_subnet(netcfg->ip,netcfg->netmask,netcfg->gateway)) return false;
+        if(netcfg->dns[0]&&!pet_netcfg_ipv4(netcfg->dns,quad)) return false;
+    } else if(netcfg->ip[0]||netcfg->netmask[0]||netcfg->gateway[0]||netcfg->dns[0]) {
+        return false;
+    }
+    return !netcfg->hostname[0]||pet_netcfg_hostname(netcfg->hostname);
 }

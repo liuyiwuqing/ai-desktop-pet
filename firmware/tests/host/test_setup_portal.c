@@ -140,11 +140,69 @@ static void codec(void)
         "\"hidden\":false,\"channel\":1,\"maxClients\":2,\"windowMinutes\":15}";
     assert(pet_setup_portal_parse(open,strlen(open),&parsed)&&!parsed.password[0]);
     assert(!strcmp(pet_setup_state_name(PET_SETUP_PORTAL_SAVED),"portal_saved"));
-    puts("Setup portal: defaults, bounds, effective hotspot, NVS JSON and partial update passed");
+    assert(!strcmp(pet_setup_state_name(PET_SETUP_NETWORK_SAVED),"network_saved"));
+    puts("Setup portal: defaults, bounds, effective hotspot, NVS JSON, partial update and address rules passed");
+}
+
+static void netcfg(void)
+{
+    pet_setup_netcfg_t cfg;
+    pet_setup_netcfg_default(&cfg);
+    assert(!strcmp(cfg.ip_mode,"dhcp")&&!cfg.ip[0]&&!cfg.hostname[0]);
+    assert(pet_setup_netcfg_valid(&cfg));
+
+    /* 自动获取时不能残留静态字段，否则“改回 DHCP”看起来没生效。 */
+    strcpy(cfg.ip,"192.168.1.50");
+    assert(!pet_setup_netcfg_valid(&cfg));
+    pet_setup_netcfg_default(&cfg);
+
+    strcpy(cfg.ip_mode,"auto");
+    assert(!pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.ip_mode,"");
+    assert(!pet_setup_netcfg_valid(&cfg));
+
+    strcpy(cfg.ip_mode,"static");
+    strcpy(cfg.ip,"192.168.1.50");
+    strcpy(cfg.netmask,"255.255.255.0");
+    strcpy(cfg.gateway,"192.168.1.1");
+    assert(pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.dns,"192.168.1.1");
+    strcpy(cfg.hostname,"qitomo-pet");
+    assert(pet_setup_netcfg_valid(&cfg));
+
+    strcpy(cfg.ip,"192.168.1");
+    assert(!pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.ip,"192.168.01.50");
+    assert(!pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.ip,"192.168.1.256");
+    assert(!pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.ip,"192.168.1.50");
+    strcpy(cfg.netmask,"255.0.255.0");
+    assert(!pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.netmask,"0.0.0.0");
+    assert(!pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.netmask,"255.255.255.0");
+    strcpy(cfg.gateway,"10.0.0.1");
+    assert(!pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.gateway,"192.168.1.1");
+    strcpy(cfg.dns,"not-an-ip");
+    assert(!pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.dns,"");
+    cfg.netmask[0]=0;
+    assert(!pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.netmask,"255.255.255.0");
+
+    strcpy(cfg.hostname,"-bad");assert(!pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.hostname,"bad-");assert(!pet_setup_netcfg_valid(&cfg));
+    strcpy(cfg.hostname,"bad host");assert(!pet_setup_netcfg_valid(&cfg));
+    /* 结构体长度已由数组上限保证；超长主机名在凭据/JSON 边界拒绝。 */
+    memset(cfg.hostname,'h',PET_NETCFG_HOSTNAME_MAX);cfg.hostname[PET_NETCFG_HOSTNAME_MAX]=0;
+    assert(pet_setup_netcfg_valid(&cfg));
+    assert(!pet_setup_netcfg_valid(NULL));
 }
 
 int main(void)
 {
-    defaults();bounds();effective();codec();
+    defaults();bounds();effective();codec();netcfg();
     return 0;
 }

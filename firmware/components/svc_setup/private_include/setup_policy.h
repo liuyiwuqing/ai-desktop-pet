@@ -21,3 +21,7 @@ bool pet_setup_portal_format(const pet_setup_portal_t *portal, char *out, size_t
 bool pet_setup_portal_parse(const char *json, size_t bytes, pet_setup_portal_t *out);
 /* 允许名称/口令留空，由调用方用已保存值补齐后再校验；用于“不回显密码”的页面。 */
 bool pet_setup_portal_parse_partial(const char *json, size_t bytes, pet_setup_portal_t *out);
+
+/* 家庭网络地址：与凭据校验、netif 应用共用 pet/netcfg.h 的规则。 */
+void pet_setup_netcfg_default(pet_setup_netcfg_t *netcfg);
+bool pet_setup_netcfg_valid(const pet_setup_netcfg_t *netcfg);

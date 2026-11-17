@@ -44,7 +44,7 @@ cc "${host_flags[@]}" -Wno-deprecated-declarations \
     -o "${out_dir}/setup_cjson.o"
 
 build_and_run test_setup_policy \
-    -I "${repo_root}/firmware/tests/host/support" \
+    -I "${repo_root}/firmware/tests/host/support" -I "${contracts_inc}" \
     -I "${repo_root}/firmware/components/svc_setup/include" \
     -I "${repo_root}/firmware/components/svc_setup/private_include" \
     -I "${repo_root}/firmware/managed_components/espressif__cjson/cJSON" \
@@ -74,7 +74,7 @@ build_and_run test_setup_activation \
     "${repo_root}/firmware/tests/host/test_setup_activation.c" -lm
 
 build_and_run test_setup_portal \
-    -I "${repo_root}/firmware/tests/host/support" \
+    -I "${repo_root}/firmware/tests/host/support" -I "${contracts_inc}" \
     -I "${repo_root}/firmware/components/svc_setup/include" \
     -I "${repo_root}/firmware/components/svc_setup/private_include" \
     -I "${repo_root}/firmware/managed_components/espressif__cjson/cJSON" \

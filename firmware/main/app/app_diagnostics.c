@@ -114,6 +114,9 @@ esp_err_t app_diagnostics_json(char *out,size_t capacity)
         cJSON_AddNumberToObject(local,"portalChannel",setup.portal.channel);
         cJSON_AddNumberToObject(local,"portalClients",setup.portal.max_clients);
         cJSON_AddNumberToObject(local,"portalWindow",setup.portal.window_s);
+        /* 地址模式与主机名可公开；固定 IP 值不进入诊断，避免被当作网络拓扑信息收集。 */
+        cJSON_AddBoolToObject(local,"staticAddress",!strcmp(setup.netcfg.ip_mode,"static"));
+        cJSON_AddStringToObject(local,"hostname",setup.netcfg.hostname);
         /* 热点口令、会话 nonce、Wi-Fi 和供应商凭据不进入诊断/日志。 */
         volatile unsigned char *secret=(volatile unsigned char *)&setup;
         for(size_t i=0;i<sizeof(setup);i++) secret[i]=0;

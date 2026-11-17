@@ -15,6 +15,8 @@
 #define PET_NET_USERNAME_MAX 64
 #define PET_NET_TOKEN_MAX 128
 #define PET_NET_CA_PEM_MAX 3000
+#define PET_NET_IP_MAX 15
+#define PET_NET_HOSTNAME_MAX 32
 #define PET_NET_TOPIC_MAX 96
 
 typedef enum {
@@ -58,6 +60,14 @@ typedef struct {
     const char *mqtt_username;
     const char *mqtt_password;
     const char *ca_cert_pem; /* NULL 时使用 ESP-IDF 证书包 */
+    /* 家庭网络地址：ip_mode 为空或 "dhcp" 时自动获取；"static" 使用下列字段。
+     * dns/hostname 为空表示不覆盖默认值。 */
+    const char *ip_mode;
+    const char *ip;
+    const char *netmask;
+    const char *gateway;
+    const char *dns;
+    const char *hostname;
     uint16_t keepalive_s;
     uint32_t reconnect_timeout_ms;
 } pet_net_config_t;

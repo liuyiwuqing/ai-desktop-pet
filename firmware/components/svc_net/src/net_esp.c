@@ -21,6 +21,7 @@
 #include "net_policy.h"
 #include "pet/event_bus.h"
 #include "svc_net/api.h"
+#include "svc_net/netif_ip.h"
 
 /* Wi-Fi station + esp-mqtt over TLS：MQTT 3.1.1、QoS1、持久会话、LWT。 */
 
@@ -465,6 +466,12 @@ static esp_err_t wifi_init_and_configure(const pet_net_config_t *config)
             return ESP_FAIL;
         }
     }
+    /* 固定地址/主机名在连接前生效；坏值不阻断启动，交由上层记录并继续 DHCP 默认。 */
+    esp_err_t address_error = pet_netif_apply_ip(s_netif, config->ip_mode, config->ip,
+                                                config->netmask, config->gateway, config->dns,
+                                                config->hostname);
+    if (address_error != ESP_OK)
+        ESP_LOGW(TAG, "home network address ignored: %s", esp_err_to_name(address_error));
 
     if (!s_handlers_registered) {
         err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,

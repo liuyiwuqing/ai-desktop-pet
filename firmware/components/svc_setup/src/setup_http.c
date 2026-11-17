@@ -60,6 +60,7 @@ static esp_err_t status(httpd_req_t *r)
     cJSON_AddBoolToObject(root,"busy",atomic_load(&s->busy));
     cJSON_AddBoolToObject(root,"wifiSaved",snapshot.wifi_saved);
     cJSON_AddBoolToObject(root,"wifiConnected",(xEventGroupGetBits(s->network_events)&SETUP_CONNECTED)!=0);
+    cJSON_AddStringToObject(root,"wifiSsid",snapshot.wifi_ssid);
     cJSON_AddBoolToObject(root,"voiceSaved",snapshot.voice_saved);
     cJSON_AddBoolToObject(root,"nexusSaved",snapshot.nexus_saved);
     cJSON_AddStringToObject(root,"activationCode",snapshot.activation_code);
@@ -76,6 +77,39 @@ static esp_err_t status(httpd_req_t *r)
         cJSON_AddNumberToObject(portal,"maxClients",saved->max_clients);
         cJSON_AddNumberToObject(portal,"windowMinutes",saved->window_s/60u);
         if(saved->custom) cJSON_AddStringToObject(portal,"ssid",saved->ssid);
+    }
+    cJSON *network=cJSON_AddObjectToObject(root,"network");
+    if(network) {
+        cJSON_AddStringToObject(network,"ipMode",snapshot.netcfg.ip_mode);
+        cJSON_AddStringToObject(network,"ip",snapshot.netcfg.ip);
+        cJSON_AddStringToObject(network,"netmask",snapshot.netcfg.netmask);
+        cJSON_AddStringToObject(network,"gateway",snapshot.netcfg.gateway);
+        cJSON_AddStringToObject(network,"dns",snapshot.netcfg.dns);
+        cJSON_AddStringToObject(network,"hostname",snapshot.netcfg.hostname);
+    }
+    /* 当前地址只读回显，便于确认固定地址/DHCP 结果和信号质量。 */
+    cJSON *sta=cJSON_AddObjectToObject(root,"sta");
+    if(sta) {
+        char text[16]={0};
+        esp_netif_ip_info_t info={0};
+        if(s->sta&&esp_netif_get_ip_info(s->sta,&info)==ESP_OK&&info.ip.addr) {
+            esp_ip4addr_ntoa(&info.ip,text,sizeof(text));
+            cJSON_AddStringToObject(sta,"ip",text);
+            esp_ip4addr_ntoa(&info.gw,text,sizeof(text));
+            cJSON_AddStringToObject(sta,"gateway",text);
+            esp_ip4addr_ntoa(&info.netmask,text,sizeof(text));
+            cJSON_AddStringToObject(sta,"netmask",text);
+        }
+        esp_netif_dns_info_t dns={0};
+        if(s->sta&&esp_netif_get_dns_info(s->sta,ESP_NETIF_DNS_MAIN,&dns)==ESP_OK&&dns.ip.u_addr.ip4.addr) {
+            esp_ip4addr_ntoa(&dns.ip.u_addr.ip4,text,sizeof(text));
+            cJSON_AddStringToObject(sta,"dns",text);
+        }
+        wifi_ap_record_t ap={0};
+        if(esp_wifi_sta_get_ap_info(&ap)==ESP_OK) {
+            cJSON_AddNumberToObject(sta,"rssi",ap.rssi);
+            cJSON_AddNumberToObject(sta,"channel",ap.primary);
+        }
     }
     char *json=cJSON_PrintUnformatted(root);cJSON_Delete(root);
     if(!json) return ESP_ERR_NO_MEM;
@@ -107,6 +141,14 @@ static esp_err_t scan(httpd_req_t *r)
     cJSON_Delete(root);heap_caps_free(aps);
     if(!json) return json_response(r,"503 Service Unavailable","{\"error\":\"scan_failed\"}");
     err=json_response(r,"200 OK",json);cJSON_free(json);return err;
+}
+
+static bool text_field(const cJSON *object,const char *name,char *out,size_t capacity)
+{
+    const cJSON *item=cJSON_GetObjectItemCaseSensitive(object,name);
+    if(!item) {out[0]=0;return true;}
+    if(!cJSON_IsString(item)||strlen(item->valuestring)>=capacity) return false;
+    strcpy(out,item->valuestring);return true;
 }
 
 static void wipe_tree(cJSON *root)
@@ -180,6 +222,27 @@ static esp_err_t mutate(httpd_req_t *r)
         }
         setup_wipe(&saved,sizeof(saved));
         setup_wipe(encoded,bytes);cJSON_free(encoded);
+    } else if(!strcmp(r->uri,"/api/network")) {
+        cJSON *network=cJSON_GetObjectItemCaseSensitive(root,"network");
+        if(cJSON_GetArraySize(root)!=2||!cJSON_IsObject(network)) goto parsed;
+        static const char *const keys[]={"ipMode","ip","netmask","gateway","dns","hostname"};
+        pet_setup_netcfg_t cfg;
+        pet_setup_netcfg_default(&cfg);
+        bool known=true;
+        for(const cJSON *item=network->child;item&&known;item=item->next) {
+            unsigned i=0;
+            while(i<sizeof(keys)/sizeof(keys[0])&&(!item->string||strcmp(keys[i],item->string))) i++;
+            known=i<sizeof(keys)/sizeof(keys[0]);
+        }
+        if(!known) goto parsed;
+        if(!text_field(network,"ipMode",cfg.ip_mode,sizeof(cfg.ip_mode))||
+            !text_field(network,"ip",cfg.ip,sizeof(cfg.ip))||
+            !text_field(network,"netmask",cfg.netmask,sizeof(cfg.netmask))||
+            !text_field(network,"gateway",cfg.gateway,sizeof(cfg.gateway))||
+            !text_field(network,"dns",cfg.dns,sizeof(cfg.dns))||
+            !text_field(network,"hostname",cfg.hostname,sizeof(cfg.hostname))) goto parsed;
+        if(!pet_setup_netcfg_valid(&cfg)) goto parsed;
+        err=pet_setup_submit_network(&cfg,expected);
     } else if(!strcmp(r->uri,"/api/finish")) {
         if(cJSON_GetArraySize(root)==1) err=pet_setup_leave();
     }
@@ -198,7 +261,7 @@ esp_err_t setup_http_start(setup_runtime_t *s)
     esp_err_t err=esp_netif_get_netif_impl_name(s->ap,interface.ifr_name);
     if(err!=ESP_OK) return err;
     httpd_config_t config=HTTPD_DEFAULT_CONFIG();
-    config.if_name=&interface;config.max_uri_handlers=8;config.stack_size=8192;
+    config.if_name=&interface;config.max_uri_handlers=10;config.stack_size=8192;
     config.max_open_sockets=3;config.recv_wait_timeout=5;config.send_wait_timeout=5;config.lru_purge_enable=true;
     err=httpd_start(&s->http,&config);
     if(err!=ESP_OK) return err;
@@ -210,6 +273,7 @@ esp_err_t setup_http_start(setup_runtime_t *s)
         {.uri="/api/services",.method=HTTP_POST,.handler=mutate,.user_ctx=s},
         {.uri="/api/activate",.method=HTTP_POST,.handler=mutate,.user_ctx=s},
         {.uri="/api/portal",.method=HTTP_POST,.handler=mutate,.user_ctx=s},
+        {.uri="/api/network",.method=HTTP_POST,.handler=mutate,.user_ctx=s},
         {.uri="/api/finish",.method=HTTP_POST,.handler=mutate,.user_ctx=s},
     };
     for(unsigned i=0;i<sizeof(routes)/sizeof(routes[0]);i++) {

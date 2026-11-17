@@ -8,7 +8,7 @@
 #include "esp_http_server.h"
 #include "esp_netif.h"
 
-typedef enum { SETUP_JOB_WIFI, SETUP_JOB_SERVICES, SETUP_JOB_ACTIVATE, SETUP_JOB_PORTAL } setup_job_kind_t;
+typedef enum { SETUP_JOB_WIFI, SETUP_JOB_SERVICES, SETUP_JOB_ACTIVATE, SETUP_JOB_PORTAL, SETUP_JOB_NETWORK } setup_job_kind_t;
 typedef struct {
     setup_job_kind_t kind;
     uint32_t revision;
@@ -16,6 +16,7 @@ typedef struct {
     char *json;
     size_t bytes;
     pet_setup_portal_t portal;
+    pet_setup_netcfg_t netcfg;
     bool restart;
 } setup_job_t;
 
@@ -27,6 +28,7 @@ typedef struct {
     esp_netif_t *ap, *sta;
     pet_setup_snapshot_t snapshot;
     pet_setup_portal_t portal;
+    pet_setup_netcfg_t netcfg;
     char session[33];
     int64_t deadline_us;
     bool sntp_started;

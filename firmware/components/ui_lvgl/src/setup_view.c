@@ -38,9 +38,10 @@ void pet_setup_view_show(pet_setup_view_t *v,const pet_setup_snapshot_t *s)
 {
     static const char *const states[]={"手机连接下方 Wi-Fi","手机连接下方 Wi-Fi","正在连接家庭 Wi-Fi…",
         "Wi-Fi 已保存，可继续绑定语音","正在对时并连接小智…","请在 xiaozhi.me 添加设备",
-        "语音配置已保存","管理台配置已保存","热点设置已保存","上一步未完成，请在网页重试","正在返回宠物主页…"};
+        "语音配置已保存","管理台配置已保存","热点设置已保存","网络地址已保存",
+        "上一步未完成，请在网页重试","正在返回宠物主页…"};
     unsigned i=(unsigned)s->state;
-    lv_label_set_text(v->state,states[i<sizeof(states)/sizeof(states[0])?i:9]);
+    lv_label_set_text(v->state,states[i<sizeof(states)/sizeof(states[0])?i:10]);
     char ssid[28],password[48];
     clip(ssid,sizeof(ssid),s->ap_ssid,20);
     lv_label_set_text_fmt(v->ssid,"设备 Wi-Fi%s\n%s",s->ap_hidden?"（隐藏）":"",ssid);

@@ -30,12 +30,14 @@ python3 tools/ci/check_contracts.py
 
 | 分组 | 必填 | 可选 |
 | --- | --- | --- |
-| `net` | `wifi_ssid` | `wifi_pass` |
+| `net` | `wifi_ssid` | `wifi_pass`、`ip_mode`、`ip`、`netmask`、`gateway`、`dns`、`hostname` |
 | `nexus` | `device_id`、`mqtt_uri`、`mqtt_user`、`mqtt_pass` | `mqtt_ca` |
 | `xiaozhi`（整组可省） | `ws_uri`、`ws_token`、`device_id`、`client_id` | `ws_ca` |
 | `control`（整组可省） | `api_uri`、`token`（至少 32 字符） | `ca`、`allowed_apps`、`allowed_projects` |
 
 MQTT/WSS/控制分别要求 `mqtts://`、`wss://`、`https://`；CA 省略时使用 SDK 信任包。allowed_apps/projects 为逗号分隔白名单 ID，最多 16 项，每项 `[a-zA-Z0-9_-]{1,40}`，并须与控制网关一致。配置入口拒绝未知/重复字段、深层 JSON 和超长输入，不导出凭据，日志不输出秘密。
+
+`net` 的地址字段可整组省略，省略即自动获取（DHCP）。`ip_mode` 只接受 `dhcp`/`static`（空串等同 `dhcp`）：`static` 必须同时给出 `ip`、`netmask`、`gateway`，掩码须为连续 1 且非零、网关须与地址同网段，`dns` 可留空；`dhcp` 携带任何静态地址或 DNS 值会被拒绝，避免“改回自动获取却看起来没生效”。`hostname` 用于 DHCP option 12，字母/数字/连字符、最长 32、首尾不能是连字符。规则实现在 `firmware/components/contracts/include/pet/netcfg.h`，凭据校验、配网页面与 netif 配置共用同一份判断。
 
 新包不存在才兼容旧 namespace/key；包存在但损坏/缺必填键，不拼接旧凭据。设备身份已存在时禁止更换，避免历史回执错发。凭据成功后需显式重启；首次配置串口默认关闭。发布签名私钥与供应商密钥始终留在维护者/服务端，不下发设备。
 

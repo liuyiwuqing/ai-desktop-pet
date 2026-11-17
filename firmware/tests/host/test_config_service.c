@@ -136,6 +136,33 @@ int main(void)
     assert(pet_provision_patch(unknown_group,strlen(unknown_group),3)==ESP_ERR_INVALID_ARG);
     const char duplicate[]="{\"net\":{\"wifi_ssid\":\"one\"},\"net\":{\"wifi_ssid\":\"two\"}}";
     assert(pet_provision_patch(duplicate,strlen(duplicate),3)==ESP_ERR_INVALID_ARG);
+    /* 家庭网络地址与 Wi-Fi 同组：固定地址必须自洽，切回 DHCP 要清掉静态字段。 */
+    const char static_net[]="{\"net\":{\"wifi_ssid\":\"changed-home\",\"wifi_pass\":\"dummy-pass\","
+        "\"ip_mode\":\"static\",\"ip\":\"192.168.1.50\",\"netmask\":\"255.255.255.0\","
+        "\"gateway\":\"192.168.1.1\",\"dns\":\"192.168.1.1\",\"hostname\":\"qitomo-pet\"}}";
+    assert(pet_provision_patch(static_net,strlen(static_net),3)==ESP_OK);
+    assert(pet_provision_load_str("net","ip_mode",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"static"));
+    assert(pet_provision_load_str("net","ip",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"192.168.1.50"));
+    assert(pet_provision_load_str("net","hostname",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"qitomo-pet"));
+    const char bad_ip[]="{\"net\":{\"wifi_ssid\":\"changed-home\",\"wifi_pass\":\"dummy-pass\","
+        "\"ip_mode\":\"static\",\"ip\":\"192.168.1.256\",\"netmask\":\"255.255.255.0\",\"gateway\":\"192.168.1.1\"}}";
+    assert(pet_provision_patch(bad_ip,strlen(bad_ip),4)==ESP_ERR_INVALID_ARG);
+    const char bad_mask[]="{\"net\":{\"wifi_ssid\":\"changed-home\",\"wifi_pass\":\"dummy-pass\","
+        "\"ip_mode\":\"static\",\"ip\":\"192.168.1.50\",\"netmask\":\"255.0.255.0\",\"gateway\":\"192.168.1.1\"}}";
+    assert(pet_provision_patch(bad_mask,strlen(bad_mask),4)==ESP_ERR_INVALID_ARG);
+    const char bad_gateway[]="{\"net\":{\"wifi_ssid\":\"changed-home\",\"wifi_pass\":\"dummy-pass\","
+        "\"ip_mode\":\"static\",\"ip\":\"192.168.1.50\",\"netmask\":\"255.255.255.0\",\"gateway\":\"10.0.0.1\"}}";
+    assert(pet_provision_patch(bad_gateway,strlen(bad_gateway),4)==ESP_ERR_INVALID_ARG);
+    const char bad_host[]="{\"net\":{\"wifi_ssid\":\"changed-home\",\"wifi_pass\":\"dummy-pass\","
+        "\"ip_mode\":\"dhcp\",\"hostname\":\"bad host\"}}";
+    assert(pet_provision_patch(bad_host,strlen(bad_host),4)==ESP_ERR_INVALID_ARG);
+    const char stale[]="{\"net\":{\"wifi_ssid\":\"changed-home\",\"wifi_pass\":\"dummy-pass\","
+        "\"ip_mode\":\"dhcp\",\"ip\":\"192.168.1.50\"}}";
+    assert(pet_provision_patch(stale,strlen(stale),4)==ESP_ERR_INVALID_ARG);
+    const char back_to_dhcp[]="{\"net\":{\"wifi_ssid\":\"changed-home\",\"wifi_pass\":\"dummy-pass\",\"ip_mode\":\"dhcp\"}}";
+    assert(pet_provision_patch(back_to_dhcp,strlen(back_to_dhcp),4)==ESP_OK);
+    assert(pet_provision_load_str("net","ip",wifi_value,sizeof(wifi_value))==ESP_ERR_NVS_NOT_FOUND);
+    assert(pet_provision_load_str("net","ip_mode",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"dhcp"));
     credentials_size=0;legacy_mode=1;
     assert(pet_provision_patch(wifi_only,strlen(wifi_only),0)==ESP_OK);
     assert(pet_provision_load_str("nexus","device_id",wifi_value,sizeof(wifi_value))==ESP_OK&&!strcmp(wifi_value,"legacy-device"));

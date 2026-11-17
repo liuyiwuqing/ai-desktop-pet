@@ -99,6 +99,12 @@ static char s_device_id[PET_NET_DEVICE_ID_MAX + 1] = CONFIG_PET_NET_DEVICE_ID;
 static char s_mqtt_username[PET_NET_USERNAME_MAX + 1];
 static char s_mqtt_password[PET_NET_TOKEN_MAX + 1];
 static char s_ca_cert_pem[PET_NET_CA_PEM_MAX + 1];
+static char s_ip_mode[8];
+static char s_static_ip[PET_NET_IP_MAX + 1];
+static char s_netmask[PET_NET_IP_MAX + 1];
+static char s_gateway[PET_NET_IP_MAX + 1];
+static char s_dns[PET_NET_IP_MAX + 1];
+static char s_hostname[PET_NET_HOSTNAME_MAX + 1];
 
 static void load_text(const char *namespace_name, const char *key, char *out,
                       size_t capacity, const char *fallback)
@@ -135,6 +141,13 @@ static bool load_net_config(pet_net_config_t *config)
     load_text("nexus", "mqtt_pass", s_mqtt_password, sizeof(s_mqtt_password),
               NET_FALLBACK_MQTT_PASSWORD);
     load_text("nexus", "mqtt_ca", s_ca_cert_pem, sizeof(s_ca_cert_pem), NULL);
+    /* 地址设置缺省即 DHCP；固定地址已由凭据校验保证自洽。 */
+    load_text("net", "ip_mode", s_ip_mode, sizeof(s_ip_mode), "dhcp");
+    load_text("net", "ip", s_static_ip, sizeof(s_static_ip), NULL);
+    load_text("net", "netmask", s_netmask, sizeof(s_netmask), NULL);
+    load_text("net", "gateway", s_gateway, sizeof(s_gateway), NULL);
+    load_text("net", "dns", s_dns, sizeof(s_dns), NULL);
+    load_text("net", "hostname", s_hostname, sizeof(s_hostname), NULL);
 
     memset(config, 0, sizeof(*config));
     config->wifi_ssid = s_wifi_ssid;
@@ -144,6 +157,12 @@ static bool load_net_config(pet_net_config_t *config)
     config->mqtt_username = s_mqtt_username;
     config->mqtt_password = s_mqtt_password;
     config->ca_cert_pem = s_ca_cert_pem[0] != '\0' ? s_ca_cert_pem : NULL;
+    config->ip_mode = s_ip_mode;
+    config->ip = s_static_ip[0] != '\0' ? s_static_ip : NULL;
+    config->netmask = s_netmask[0] != '\0' ? s_netmask : NULL;
+    config->gateway = s_gateway[0] != '\0' ? s_gateway : NULL;
+    config->dns = s_dns[0] != '\0' ? s_dns : NULL;
+    config->hostname = s_hostname[0] != '\0' ? s_hostname : NULL;
     config->keepalive_s = CONFIG_PET_NET_KEEPALIVE_S;
     config->reconnect_timeout_ms = CONFIG_PET_NET_RECONNECT_MS;
 

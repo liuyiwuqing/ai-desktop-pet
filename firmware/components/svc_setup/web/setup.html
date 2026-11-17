@@ -20,6 +20,23 @@
 <button id="saveWifi" type="submit" disabled>连接并保存</button>
 </form>
 <p id="wifiResult" class="help" aria-live="polite"></p>
+<p class="now" id="staNow" hidden>当前地址：读取中…</p>
+<details><summary>家庭网络高级设置（可选）</summary>
+<p class="help">固定 IP 需与路由器同网段。填错会导致设备无法联网，需要重新进入网络设置改回自动获取；保存后下次联网生效。</p>
+<form id="network">
+<label for="ipMode">地址获取</label>
+<select id="ipMode"><option value="dhcp">自动获取（DHCP，推荐）</option><option value="static">固定 IP</option></select>
+<div id="staticRows" hidden>
+<label for="ipAddress">IP 地址</label><input id="ipAddress" maxlength="15" inputmode="decimal" placeholder="192.168.1.50" autocomplete="off">
+<label for="netmask">子网掩码</label><input id="netmask" maxlength="15" inputmode="decimal" placeholder="255.255.255.0" autocomplete="off">
+<label for="gateway">网关</label><input id="gateway" maxlength="15" inputmode="decimal" placeholder="192.168.1.1" autocomplete="off">
+<label for="dns">DNS（可留空）</label><input id="dns" maxlength="15" inputmode="decimal" placeholder="192.168.1.1" autocomplete="off">
+</div>
+<label for="hostname">主机名（可选）</label><input id="hostname" maxlength="32" placeholder="qitomo-pet" autocomplete="off">
+<button id="saveNetwork" type="submit" disabled>保存网络设置</button>
+</form>
+<p id="networkResult" class="help" aria-live="polite"></p>
+</details>
 </section>
 <section>
 <h2>2. 设备热点</h2>
@@ -68,17 +85,20 @@
 </main>
 <script>
 const $=id=>document.getElementById(id);
-let state=null,posting=false,scanRunning=false,failures=0,lastError='',errorRevision=-1,portalLoaded=false,rebooting=false;
-const names={starting:'正在准备设备…',ready:'选择 Wi-Fi 开始配置。',connecting:'正在连接 Wi-Fi，请稍候…',wifi_saved:'Wi-Fi 已连接并保存。可以继续开通语音，或返回宠物主页。',activating:'正在对时并连接小智服务…',waiting_bind:'请到小智平台输入下方绑定码，设备会自动核对结果。',voice_saved:'小智连接配置已保存，完成后即可进入语音菜单。',services_saved:'管理台连接已保存，重启后生效。',portal_saved:'热点设置已保存。下次进入设置时使用新热点；需要立即生效请点“保存并重开热点”。',failed:'上一步未完成，请检查后重试。',leaving:'正在返回宠物主页，设备热点即将关闭。'};
+let state=null,posting=false,scanRunning=false,failures=0,lastError='',errorRevision=-1,portalLoaded=false,networkLoaded=false,rebooting=false;
+const names={starting:'正在准备设备…',ready:'选择 Wi-Fi 开始配置。',connecting:'正在连接 Wi-Fi，请稍候…',wifi_saved:'Wi-Fi 已连接并保存。可以继续开通语音，或返回宠物主页。',activating:'正在对时并连接小智服务…',waiting_bind:'请到小智平台输入下方绑定码，设备会自动核对结果。',voice_saved:'小智连接配置已保存，完成后即可进入语音菜单。',services_saved:'管理台连接已保存，重启后生效。',portal_saved:'热点设置已保存。下次进入设置时使用新热点；需要立即生效请点“保存并重开热点”。',network_saved:'网络地址已保存，下次联网生效。',failed:'上一步未完成，请检查后重试。',leaving:'正在返回宠物主页，设备热点即将关闭。'};
 function fill(select,values,format){if(select.options.length)return;for(const value of values)select.append(new Option(format(value),String(value)));}
 fill($('apChannel'),Array.from({length:13},(_,i)=>i+1),value=>`信道 ${value}`);
 fill($('apClients'),[1,2,3,4],value=>`${value} 台`);
 fill($('apWindow'),[5,10,15,30,60],value=>`${value} 分钟`);
-function buttons(){const locked=!state||posting||state.busy||state.state==='leaving'||rebooting;const voiceDone=state&&state.state==='voice_saved';$('saveWifi').disabled=locked;$('activate').disabled=locked||!state.wifiSaved||!state.wifiConnected||voiceDone;$('activate').textContent=voiceDone?'语音配置已保存':'获取小智绑定码';$('saveServices').disabled=locked||!state.wifiSaved;$('finish').disabled=!state||posting||state.state==='leaving'||rebooting;$('scan').disabled=locked||scanRunning;$('savePortal').disabled=locked;$('applyPortal').disabled=locked;}
+function buttons(){const locked=!state||posting||state.busy||state.state==='leaving'||rebooting;const voiceDone=state&&state.state==='voice_saved';$('saveWifi').disabled=locked;$('activate').disabled=locked||!state.wifiSaved||!state.wifiConnected||voiceDone;$('activate').textContent=voiceDone?'语音配置已保存':'获取小智绑定码';$('saveServices').disabled=locked||!state.wifiSaved;$('saveNetwork').disabled=locked||!state.wifiSaved;$('finish').disabled=!state||posting||state.state==='leaving'||rebooting;$('scan').disabled=locked||scanRunning;$('savePortal').disabled=locked;$('applyPortal').disabled=locked;}
 async function api(path,body){const response=await fetch(path,{method:body?'POST':'GET',cache:'no-store',headers:body?{'Content-Type':'application/json','X-Setup-Token':state.session}:{},body:body?JSON.stringify({expectedRevision:state.revision,...body}):undefined});let data;try{data=await response.json()}catch{throw Error('响应未确认，请等待状态刷新后再操作。')}if(!response.ok)throw Error(data.error==='busy'?'设备正在处理，请稍候。':data.error==='revision_changed'?'配置已更新，请等待刷新后重试。':'请求未完成，请核对填写内容。');return data;}
 function portalMode(){const mode=$('apMode').value;$('apPassRow').hidden=mode!=='1';$('apOpenRow').hidden=mode!=='2';}
 function portalSync(saved){if(portalLoaded)return;portalLoaded=true;$('apCustom').checked=!!saved.custom;$('apSsid').disabled=!saved.custom;$('apSsid').value=saved.custom?saved.ssid:'';$('apMode').value=String(saved.passwordMode||0);$('apPass').value='';$('apOpenConfirm').checked=false;$('apHidden').checked=!!saved.hidden;$('apChannel').value=String(saved.channel||1);$('apClients').value=String(saved.maxClients||2);$('apWindow').value=String(saved.windowMinutes||15);portalMode();}
-function render(s){if(s.revision>errorRevision&&errorRevision>=0){lastError='';errorRevision=-1;}state=s;let message=names[s.state]||'请稍候…';if(s.state==='failed'){message=s.errorCode===263?'连接或对时超时，请检查网络后重试。':s.errorCode===259?'请先连接并保存 Wi-Fi，或刷新后重试。':s.errorCode===258?'配置无效，请核对内容。':message;}if(!rebooting){$('status').textContent=lastError||message;$('status').classList.toggle('error',!!lastError||s.state==='failed');}$('wifiResult').textContent=s.wifiSaved?(s.wifiConnected?'已保存，并已取得 IP 地址。':'Wi-Fi 已保存，当前尚未连接；可重新输入后重试。'):'';$('voiceResult').textContent=s.voiceSaved?'语音连接配置已保存。完成后可长按 BOOT 进入菜单，选择按住说话。':'也可以稍后配置，先使用宠物主页。';$('serviceResult').textContent=s.nexusSaved?'已有管理台连接配置。留空不会覆盖它；更换 Wi-Fi 会保留原配置。':'';$('binding').hidden=!s.activationCode;$('code').textContent=s.activationCode||'';$('apNow').textContent=`当前热点：${s.apSsid||'未知'}${s.apOpen?'（开放网络）':''}`;if(s.portal)portalSync(s.portal);buttons();}
+function networkMode(){const staticMode=$('ipMode').value==='static';$('staticRows').hidden=!staticMode;}
+function networkSync(saved){if(networkLoaded)return;networkLoaded=true;$('ipMode').value=saved.ipMode==='static'?'static':'dhcp';$('ipAddress').value=saved.ip||'';$('netmask').value=saved.netmask||'';$('gateway').value=saved.gateway||'';$('dns').value=saved.dns||'';$('hostname').value=saved.hostname||'';networkMode();}
+function staText(sta){if(!sta||!sta.ip)return '';const parts=[`当前地址：${sta.ip}`];if(sta.gateway)parts.push(`网关 ${sta.gateway}`);if(sta.dns)parts.push(`DNS ${sta.dns}`);if(typeof sta.rssi==='number')parts.push(`信号 ${sta.rssi} dBm · 信道 ${sta.channel}`);return parts.join(' · ');}
+function render(s){if(s.revision>errorRevision&&errorRevision>=0){lastError='';errorRevision=-1;}state=s;let message=names[s.state]||'请稍候…';if(s.state==='ready'&&s.wifiSaved&&s.wifiConnected)message=`家庭 Wi-Fi 已连接（${s.wifiSsid||'已保存'}），可修改设置或返回主页。`;if(s.state==='failed'){message=s.errorCode===263?'连接或对时超时，请检查网络后重试。':s.errorCode===259?'请先连接并保存 Wi-Fi，或刷新后重试。':s.errorCode===258?'配置无效，请核对内容。':message;}if(!rebooting){$('status').textContent=lastError||message;$('status').classList.toggle('error',!!lastError||s.state==='failed');}$('wifiResult').textContent=s.wifiSaved?(s.wifiConnected?'已保存，并已取得 IP 地址。':'Wi-Fi 已保存，当前尚未连接；可重新输入后重试。'):'';$('voiceResult').textContent=s.voiceSaved?'语音连接配置已保存。完成后可长按 BOOT 进入菜单，选择按住说话。':'也可以稍后配置，先使用宠物主页。';$('serviceResult').textContent=s.nexusSaved?'已有管理台连接配置。留空不会覆盖它；更换 Wi-Fi 会保留原配置。':'';$('binding').hidden=!s.activationCode;$('code').textContent=s.activationCode||'';$('apNow').textContent=`当前热点：${s.apSsid||'未知'}${s.apOpen?'（开放网络）':''}`;const sta=staText(s.sta);$('staNow').hidden=!sta;$('staNow').textContent=sta||'当前地址：读取中…';if(s.portal)portalSync(s.portal);if(s.network)networkSync(s.network);buttons();}
 async function refresh(){try{const s=await api('/api/state');failures=0;render(s);}catch(error){failures++;if(rebooting){$('status').textContent='设备正在重开热点。等待约 20 秒后，用新的热点名称重新连接本页（名称见设备屏幕）。';}else{$('status').textContent=failures<3?'设备正在切换网络，等待重新连接…':'无法连接设备。请确认仍连接屏幕显示的热点，再刷新页面。';}$('status').classList.add('error');}}
 async function act(path,body,clear){if(!state||posting)return false;posting=true;lastError='';buttons();let ok=false;try{await api(path,body);ok=true;}catch(error){errorRevision=state.revision;lastError=error.message;$('status').textContent=lastError;$('status').classList.add('error');}finally{posting=false;buttons();}if(ok){if(clear)clear();await refresh();}return ok;}
 $('wifi').addEventListener('submit',event=>{event.preventDefault();act('/api/wifi',{ssid:$('ssid').value,password:$('password').value},()=>{$('password').value='';});});
@@ -93,6 +113,11 @@ function portalBody(){const custom=$('apCustom').checked,mode=Number($('apMode')
 async function savePortal(restart){const portal=portalBody();if(!portal)return;$('portalResult').textContent='';if(restart&&!confirm('设备会重开热点，手机将断开连接。确认继续吗？'))return;if(restart)rebooting=true;$('status').classList.remove('error');const ok=await act('/api/portal',restart?{portal,restart:true}:{portal},()=>{$('apPass').value='';$('apOpenConfirm').checked=false;});portalLoaded=false;if(!ok){rebooting=false;buttons();return;}if(restart){$('status').textContent='设备正在重开热点。等待约 20 秒后，用新的热点名称重新连接本页（名称见设备屏幕）。';$('status').classList.add('error');}else $('portalResult').textContent='已保存。下次进入设置时使用新热点。';}
 $('portal').addEventListener('submit',event=>{event.preventDefault();savePortal(false);});
 $('applyPortal').addEventListener('click',()=>savePortal(true));
+$('ipMode').addEventListener('change',networkMode);
+$('network').addEventListener('input',()=>{$('networkResult').textContent='';});
+function octets(text){const parts=text.split('.');if(parts.length!==4)return false;return parts.every(part=>/^\d{1,3}$/.test(part)&&Number(part)<=255&&(part==='0'||part[0]!=='0'));}
+function networkBody(){const mode=$('ipMode').value,body={ipMode:mode};const host=$('hostname').value.trim();if(host){if(!/^[A-Za-z0-9]([A-Za-z0-9-]{0,30}[A-Za-z0-9])?$/.test(host)){$('networkResult').textContent='主机名只能是字母、数字和连字符，且首尾不能是连字符。';return null;}body.hostname=host;}if(mode==='static'){const fields=[['ipAddress','ip','IP 地址'],['netmask','netmask','子网掩码'],['gateway','gateway','网关']];for(const [id,key,label] of fields){const value=$(id).value.trim();if(!octets(value)){$('networkResult').textContent=`${label}格式不正确。`;return null;}body[key]=value;}const dns=$('dns').value.trim();if(dns){if(!octets(dns)){$('networkResult').textContent='DNS 格式不正确。';return null;}body.dns=dns;}}return body;}
+$('network').addEventListener('submit',event=>{event.preventDefault();const network=networkBody();if(!network)return;act('/api/network',{network}).then(ok=>{networkLoaded=false;if(ok)$('networkResult').textContent='已保存。下次联网生效；重新连接 Wi-Fi 可立即验证。';});});
 async function scan(){if(scanRunning)return;scanRunning=true;buttons();try{const data=await api('/api/scan');$('networks').replaceChildren(new Option('选择网络或在下方手动填写',''));const seen=new Set();for(const item of data.networks){if(seen.has(item.ssid))continue;seen.add(item.ssid);$('networks').append(new Option(`${item.ssid}${item.secured?' · 加密':''}`,item.ssid));}if(!data.networks.length)$('wifiResult').textContent='未发现网络，可手动填写名称。';}catch(error){$('wifiResult').textContent='扫描暂不可用，可手动填写 Wi-Fi 名称。';}finally{scanRunning=false;buttons();}}
 $('scan').addEventListener('click',scan);refresh().then(scan);setInterval(refresh,1800);
 </script>

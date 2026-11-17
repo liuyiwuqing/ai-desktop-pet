@@ -1,4 +1,4 @@
-set(net_srcs "src/net_policy.c")
+set(net_srcs "src/net_policy.c" "src/netif_ip.c")
 if(CONFIG_PET_MODULE_NET_ENABLED)
     list(APPEND net_srcs "src/net_service.c")
 

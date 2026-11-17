@@ -1,5 +1,6 @@
 #include "svc_config/provision.h"
 #include "pet/json_guard.h"
+#include "pet/netcfg.h"
 #include "svc_config/api.h"
 
 #include <stdlib.h>
@@ -47,8 +48,9 @@ static bool group(const cJSON *root, const char *name, const char *const *keys, 
 }
 static bool valid(const cJSON *root)
 {
-    static const char *const net[] = {"wifi_ssid", "wifi_pass"};
-    static const size_t nl[] = {32,64};
+    static const char *const net[] = {"wifi_ssid", "wifi_pass", "ip_mode", "ip", "netmask",
+                                      "gateway", "dns", "hostname"};
+    static const size_t nl[] = {32,64,7,15,15,15,15,32};
     static const char *const nexus[] = {"device_id", "mqtt_uri", "mqtt_user", "mqtt_pass", "mqtt_ca"};
     static const size_t ml[] = {40,127,64,128,3000};
     static const char *const ai[] = {"ws_uri", "ws_token", "device_id", "client_id", "ws_ca"};
@@ -62,8 +64,35 @@ static bool valid(const cJSON *root)
         if (!bit || (mask&bit)) return false;
         mask |= bit;
     }
-    if (!(mask&1) || !group(root,"net",net,nl,2,1) || !group(root,"nexus",nexus,ml,5,(mask&2) ? 15 : 0) ||
+    if (!(mask&1) || !group(root,"net",net,nl,8,1) || !group(root,"nexus",nexus,ml,5,(mask&2) ? 15 : 0) ||
         !group(root,"xiaozhi",ai,al,5,(mask&4) ? 15 : 0)||!group(root,"control",control,cl,5,(mask&8)?3:0)) return false;
+    const cJSON *wifi = cJSON_GetObjectItemCaseSensitive(root,"net");
+    const char *mode = cJSON_GetObjectItemCaseSensitive(wifi,"ip_mode") ?
+        cJSON_GetObjectItemCaseSensitive(wifi,"ip_mode")->valuestring : "";
+    if (!pet_netcfg_mode(mode)) return false;
+    const char *ip = cJSON_GetObjectItemCaseSensitive(wifi,"ip") ?
+        cJSON_GetObjectItemCaseSensitive(wifi,"ip")->valuestring : NULL;
+    const char *netmask = cJSON_GetObjectItemCaseSensitive(wifi,"netmask") ?
+        cJSON_GetObjectItemCaseSensitive(wifi,"netmask")->valuestring : NULL;
+    const char *gateway = cJSON_GetObjectItemCaseSensitive(wifi,"gateway") ?
+        cJSON_GetObjectItemCaseSensitive(wifi,"gateway")->valuestring : NULL;
+    const char *dns = cJSON_GetObjectItemCaseSensitive(wifi,"dns") ?
+        cJSON_GetObjectItemCaseSensitive(wifi,"dns")->valuestring : NULL;
+    const char *hostname = cJSON_GetObjectItemCaseSensitive(wifi,"hostname") ?
+        cJSON_GetObjectItemCaseSensitive(wifi,"hostname")->valuestring : NULL;
+    if (pet_netcfg_static(mode)) {
+        /* 固定地址必须自洽：合法四元组、连续掩码、网关同网段；DNS 可留空。 */
+        if (!ip || !netmask || !gateway) return false;
+        uint8_t quad[4];
+        if (!pet_netcfg_ipv4(ip,quad) || !pet_netcfg_netmask(netmask) || !pet_netcfg_ipv4(gateway,quad) ||
+            !pet_netcfg_same_subnet(ip,netmask,gateway)) return false;
+        if (dns && dns[0] && !pet_netcfg_ipv4(dns,quad)) return false;
+    } else if ((ip && ip[0]) || (netmask && netmask[0]) || (gateway && gateway[0]) ||
+               (dns && dns[0])) {
+        /* 自动获取时保留静态字段会让“切换回 DHCP”看起来没生效，直接拒绝。 */
+        return false;
+    }
+    if (hostname && hostname[0] && !pet_netcfg_hostname(hostname)) return false;
     const cJSON *n = cJSON_GetObjectItemCaseSensitive(root,"nexus");
     const char *uri;
     if (n) {
@@ -131,6 +160,8 @@ esp_err_t pet_provision_load_str(const char *ns, const char *key, char *out, siz
         const cJSON *object=cJSON_GetObjectItemCaseSensitive(root,ns);
         const cJSON *value=cJSON_GetObjectItemCaseSensitive(object,key);
         bool optional=!strcmp(key,"ws_ca")||!strcmp(key,"mqtt_ca")||!strcmp(key,"wifi_pass")||
+            !strcmp(key,"ip_mode")||!strcmp(key,"ip")||!strcmp(key,"netmask")||!strcmp(key,"gateway")||
+            !strcmp(key,"dns")||!strcmp(key,"hostname")||
             (!strcmp(ns,"control")&&(!strcmp(key,"ca")||!strcmp(key,"allowed_apps")||!strcmp(key,"allowed_projects")));
         e=!cJSON_IsString(value) ? optional || (!object && !strcmp(ns,"nexus")) ? ESP_ERR_NVS_NOT_FOUND : ESP_ERR_INVALID_STATE :
             strlen(value->valuestring)>=cap ? ESP_ERR_INVALID_SIZE : ESP_OK;
@@ -173,8 +204,8 @@ done:
 static esp_err_t preserve_legacy(cJSON *root)
 {
     /* 首次网页配置也不能丢掉旧 namespace 中已安装的服务。部分损坏则拒绝覆盖。 */
-    const struct { const char *name; const char *keys[7]; } groups[] = {
-        {"net", {"wifi_ssid","wifi_pass",NULL}},
+    const struct { const char *name; const char *keys[10]; } groups[] = {
+        {"net", {"wifi_ssid","wifi_pass","ip_mode","ip","netmask","gateway","dns","hostname",NULL}},
         {"nexus", {"device_id","mqtt_uri","mqtt_user","mqtt_pass","mqtt_ca",NULL}},
         {"xiaozhi", {"ws_uri","ws_token","device_id","client_id","ws_ca",NULL}},
         {"control", {"api_uri","token","ca","allowed_apps","allowed_projects",NULL}},

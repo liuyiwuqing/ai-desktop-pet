@@ -1,6 +1,8 @@
 #include "setup_internal.h"
 #include "setup_policy.h"
+#include "svc_net/netif_ip.h"
 #include "esp_event.h"
+#include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
@@ -27,6 +29,10 @@ esp_err_t setup_network_start(setup_runtime_t *s)
     if(err!=ESP_OK&&err!=ESP_ERR_INVALID_STATE) return err;
     s->sta=esp_netif_create_default_wifi_sta();s->ap=esp_netif_create_default_wifi_ap();
     if(!s->sta||!s->ap) return ESP_ERR_NO_MEM;
+    /* 家庭网络地址在首次连接前生效；坏值由校验拒绝，这里只记录并不阻断热点。 */
+    esp_err_t address=pet_netif_apply_ip(s->sta,s->netcfg.ip_mode,s->netcfg.ip,s->netcfg.netmask,
+        s->netcfg.gateway,s->netcfg.dns,s->netcfg.hostname);
+    if(address!=ESP_OK) ESP_LOGW("pet_setup","home network address ignored: %s",esp_err_to_name(address));
     wifi_init_config_t init=WIFI_INIT_CONFIG_DEFAULT();
     if((err=esp_wifi_init(&init))!=ESP_OK) return err;
     if((err=esp_wifi_set_storage(WIFI_STORAGE_RAM))!=ESP_OK) return err;
