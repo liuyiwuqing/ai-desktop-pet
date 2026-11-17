@@ -517,7 +517,7 @@ TELEMETRY-07 只上报 SSID、主信道与断线原因，遇到同名 AP 或 20/
 CORE 以 `V24__device_telemetry_wifi_access_point.sql` 为样本表追加 `wifi_bssid`/`wifi_channel_width`（允许 NULL、带格式与取值约束）；入站校验整条拒绝小写 BSSID 与 20/40 之外的宽度；BSSID 或宽度变化与地址/SSID 一样立即成条；1 分钟及以上聚合取桶内最后一个非空值，实时快照与 CSV（26 列）同时透出。管理台「网络」摘要按 SSID · 地址 · 信道 · 宽度 · dBm · BSSID 展示，缺失段省略；设备列表卡片保持原字段不变。
 
 - **验证**：固件 `LC_ALL=C build_firmware.sh` 退出 0（含 `test_host.sh`、依赖/板级/契约检查、AI/WSS/ESP-SR 主机用例、`idf.py build` 与 size），`nexus_pet.bin` 0x2d8620、app 分区余量 29%；`check_contracts.py` 校验 14 个 schema/12 个示例通过。CORE `DeviceManagementFlowTest` 扩展网络用例（原始、聚合与快照的 BSSID/宽度，非法宽度与小写 BSSID 整条拒绝），全量构建 136 条中 131 通过、5 条条件跳过、0 失败；前端类型检查、74 token 守卫与构建通过。`test_management_ui.sh` 66 项（快照含 40 MHz 与 BSSID、CSV 含宽度/BSSID 列）通过，390px 无横向溢出。
-- **未做**：未在真实 AP 上核对 BSSID/宽度上报与漫游切换，未烧录；V24 只在隔离 PostgreSQL 库应用，本机长期开发库与目标库未迁移；未改 OTA、配置下发与成长数据。CORE `75584bc` 已推送并核对 `origin/codex-core-baseline`；04 随本项提交，04 远程 CI 见推送后记录。
+- **未做**：未在真实 AP 上核对 BSSID/宽度上报与漫游切换，未烧录；V24 只在隔离 PostgreSQL 库应用，本机长期开发库与目标库未迁移；未改 OTA、配置下发与成长数据。CORE `75584bc` 已推送并核对 `origin/codex-core-baseline`；[CORE Docker CI 44108108283](https://github.com/liuyiwuqing/nexus-core/actions/runs/44108108283) 成功。04 `b25290d` 已推送并核对 `origin/main`；[04 Software checks 44108249470](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44108249470) 八个 job 全部成功。
 
 ## CONSOLE-21 · 紧凑布局与 Naive UI 表单（2026-11-17，CORE `959e7b7`）
 
