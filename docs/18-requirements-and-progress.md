@@ -59,6 +59,7 @@
 | CONSOLE-24 | 紧凑表格、卡片与浮层 | 软件本地已验证：共享表面/标题/间距规范，确认区与浮层同步，见 [23](23-console-completion.md#console-24--紧凑表格卡片与浮层) | 21 组浏览器 913 次检查通过；完整构建及跨仓交付见末尾 |
 | CONSOLE-25 | 统一加载、空状态与错误反馈 | 软件本地已验证：统一展示组件、读取状态去重与紧凑提示，保留校验/核对/重试 | 22 组浏览器 1038 次检查、完整构建与最终包通过；跨仓交付见末尾 |
 | CONSOLE-26 | 刷新恢复登录与令牌维护 | 软件本地已验证：8h 会话、退出/失效/跨页保护；管理员文件令牌修改，角色编辑/重新生成 | 23 组浏览器 1098 条、完整 128 项校验（5 条件跳过）、真实 5173/8088 会话与 SSE；交付见末尾 |
+| CONSOLE-27 | 登录会话跨 CORE 重启持久化 | 软件本地已验证：私有摘要会话、重启恢复、退出持久删除、逐请求核验父凭据 | 真实独立 JVM、HTTPS 容器重建、本地 5173/8088 重启与退出复核；交付见末尾 |
 | CONSOLE-02 | 管理台完成度与验收清单 | `65eb2ef` 已推送；已按八导航、原完整规划及真实控制器核对；当前功能/验证/缺项见 [23](23-console-completion.md#console-02--当前实现与完整规划的差距) | 完整规划尚未全部实现；文档核对不算缺项完成。状态筛选已单独交付 CONSOLE-03 |
 | CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；更多筛选/元数据导出见 CONSOLE-13，取消/时间线见 CONSOLE-04 |
 | CONSOLE-04 | 投递状态时间线与受限取消 | CORE `109b83f` / 04 `0dec4b6` 已推送并核对远程；HTTP/worker/隔离 SQL 6 项，实际 Vue 新增 62/既有 191 项，Java→固件 C→Java 契约通过；完整构建 70 通过/5 跳过、JAR 一致；见 [23](23-console-completion.md#console-04--事务状态时间线与受限取消) | CORE [43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) Docker job、04 [43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job 全绿；V13 只在隔离库验证，旧行历史未知，无设备撤回或生产迁移 |
@@ -621,3 +622,30 @@ CORE 实现 `b546e1974f190ffaa2a66ebf59535138fb5aec18` 已正常推送至 `origi
 [CORE Docker deployment 44063434295](https://github.com/liuyiwuqing/nexus-core/actions/runs/44063434295) 当前 `in_progress`，结论 `尚未结束`；远程 CI 与本地构建/浏览器验证分别记录。
 
 04 配套实现/检查/说明 `580e2eb4bcdbbe7601a9a4ce580796f558159a55` 已正常推送并核对 `origin/main`；两仓源码工作项已交付，后端和前端预览继续运行。 [04 Software checks 44063551850](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44063551850) 为 `in_progress`，结论 `尚未结束`。
+
+
+## CONSOLE-27 · 登录会话跨 CORE 重启持久化（2026-11-17）
+
+按用户要求在 CONSOLE-26 上补充服务端持久化，维持 8 小时绝对有效期及退出/令牌过期、撤销和轮换失效。本项替代 CONSOLE-26 的“CORE 重启需重新登录”限制。
+
+采用私有会话目录，不更改数据库 Schema。文件名哈希 Cookie ID，内容仅含父凭据摘要、CSRF、绝对到期与格式版本；原始长期令牌和 Cookie 不写会话文件或浏览器存储。目录 0700/文件 0600，POSIX 锁与同步原子写，退出删除后同步目录。缺失 401，损坏或权限/IO 故障 503；不能靠重启、旧缓存或摘要 HTTP Bearer 绕过授权。原角色权限、CSRF、SSE/导出、同源标签页退出与原身份重试保持。
+
+源码 Docker/1Panel 模板新增私有命名卷，新镜像设置 UID/GID 65534 与 0700，保留只读根和非 root；04 已固定旧镜像的部署编排不擅自替换。首次从内存版升级需要重新登录一次，之后在同一目录/卷、有效期内可恢复。会话文件的有界到期回收不启用业务清理。
+
+验证先补服务实例重建测试并在旧 Map 实现失败，再实现持久化；首轮 IO 边界失败（缺失误报 503）和测试清理问题已定位修正，保留初轮与最终日志，不把失败计通过。新增独立 CORE JVM/真实 HTTP/隔离 PG/MQTT 覆盖重启、退出、权限变更、过期/撤销/轮换和不同角色独立性；私有文件、坏数据/符号链接、容量与绝对期限另有针对性检查。实际命令/结果、预览、提交及 CI 随验证追加。
+
+针对性校验最终退出 0：26 项全部通过，包含真实独立 JVM 三次启动的重启/权限/退出/过期/撤销/轮换流程，以及文件权限/坏数据/符号链接、1024 上限、绝对期限、现有鉴权/凭据轮换/SSE/CSP。旧内存版的新增重启断言先失败，修正后的实例重建和跨 JVM 检查已实际通过。初始化 CLI 3 项与两份 Compose 解析通过；后续构建/浏览器和真实 Linux 容器结果另记。
+
+本地配置仅追加忽略的 `NEXUS_AUTH_SESSION_DIRECTORY` 绝对路径，指向当前 `data/auth/sessions`，保持 env 0600 和目录 0700；避免下次从不同工作目录启动丢失会话，不移动或更换现有管理员凭据。预览先运行新源码镜像的独立 JAR 副本，保留原服务环境和禁用真实迁移；浏览器已新登录，等待后续最终包重启复核。
+
+Linux 真实 HTTPS 夹具首次在 Secure Cookie 标志处失败，诊断确认登录 200、HttpOnly=true、Secure=false；原因是 TLS 在代理终止而后端 Host 为 localhost。修正只允许 HTTPS 转发提示收紧 Secure，外部主机无法用 http 提示降级，不把转发头用于身份。保留该轮失败和私有诊断，不计作通过；最终镜像重建后再跑完整容器检查。
+
+最终 Linux 源码镜像 `nexus-core:console-27-final` 的部署脚本退出 0，8 组检查全部通过且清理自身随机项目与卷：真实 HTTPS Secure/HttpOnly Cookie、CSRF、UID/GID 65534 与目录 0700、非 root/只读根、MQTT 私有 CA、整套容器 down/up 后同一 Cookie/CSRF/期限恢复，退出 204 后重启 CORE，旧 Cookie 重放 401。初轮失败仅是上面已修正的 Secure 边界。实际命令 `docker build -t nexus-core:console-27-final .`、`python3 tools/test_docker_deployment.py --image nexus-core:console-27-final --report …/docker-session-final.json`；没有发布镜像。
+
+本机真实预览用最终源码镜像提取的独立 JAR 更新并正常停止/启动两次 CORE：5173 浏览器在第一次重启后不输入令牌直接恢复 admin，绝对 expiresAt 与重启前逐字相同，Cookie 对 JS 不可见；退出后核对对应私有文件已删除、GET 会话 401，第二次 CORE 重启再刷新仍为登录页、GET 401。首次退出探针先于异步退出完成，等待后核对持久删除，未据此改业务。保留原管理员文件内容与 0600、原环境和禁用迁移；最终 8088 PID 8274、5173 Vite 继续运行。没有修改真实管理员/角色秘密，没有真实库迁移、消息或设备操作。浏览器任务已 finish；其旧封装标签被新版 SDK 识别为 unknown，按保护规则保留并交还用户，不关闭未知来源标签。
+
+`python3 tools/run_local.py build` 退出 0：133 项，0 失败/错误，5 项需可选环境而跳过（在最后 HTTPS/503 边界补充前）；随后最终源码 `BrowserSessionsTest,BrowserSessionStoreTest,RoleAccessFlowTest` 定向 15 项全通过，涵盖 HTTPS 仅收紧与损坏会话 503 后修复恢复同一 Cookie，再 `mvn … -DskipTests package` 退出 0。最终 JAR 的 28 个静态文件与前端输出逐字节一致，当前镜像提取运行包的三项鉴权 class 与最终包相同。浏览器登录 60、角色 43、SSE 21，共 124 项通过；角色首轮网络读取未完成保留日志，未改实现重跑通过。Python 公开部署工具单测 11 项、初始化专项 3 项、两份 Compose 解析、py_compile 与两仓 diff 检查通过。证据均在忽略的 `firmware/build-ui-console-27/`；不把本地检查替代远程 CI、目标机部署或实机验收。
+
+匹配的初始化镜像也从当前源码构建，`python3 tools/test_image_deployment.py --image nexus-core:console-27-final --init-image nexus-core-init:console-27-final --report …/image-session-final.json` 退出 0，7 组检查通过并清理自身隔离资源：无源码/socket 初始化、私有权限/凭据不覆盖、1Panel 三服务解析、非 root/只读启动与 literal env、实际 JAR 资源、MQTT TLS、容器重建后业务记录和原凭据保留。仅验证本地源码镜像，不发布新镜像或替换 04 固定发布版。临时重启脚本和浏览器指南副本已清理。
+
+CORE `e76732b3792313ea5f3744b09970a7972fc89a36` 已正常提交并推送至 `origin/codex/core-baseline`，已用 `git ls-remote` 核对远端分支包含本次提交。04 本项仅提交 18/23 配套文档；现有 `.workbuddy/`、私有 env/会话、生成镜像/JAR 与测试证据均不纳入版本。远程 CI 另查当前 SHA，不以前项成功代替。
