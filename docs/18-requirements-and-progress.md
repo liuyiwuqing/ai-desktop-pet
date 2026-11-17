@@ -696,3 +696,5 @@ DEL-08 此前把 CORE 固定为 `230c809`，并记录“本地编排仍固定 23
 - 收尾执行 `down -v` 并删除临时私有目录；未连接目标服务器，未执行线上部署或真实数据库迁移。
 
 边界：本地隔离运行不是 Debian 目标机部署、远程 CI 或线上升级；HTTPS/网络、真实数据库迁移与设备仍待目标环境验收；升级后会话卷首次为空，已登录用户需要重新登录一次。
+
+本项 04 提交 `7b8e7ef` 已推送并 `git ls-remote` 核对 `origin/main` 为该提交；[Software checks 44098970301](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44098970301) 八个 job 全部 success。远程 CI 只构建固件预设，不解析也不运行 1Panel 编排，不能替代上面的本地隔离运行或目标机验收。
