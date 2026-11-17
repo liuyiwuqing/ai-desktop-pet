@@ -584,3 +584,7 @@ CORE `450c54f6dffad1fc7b2802738fa350b5d723c85b` 已正常推送至 `codex/core-b
 CORE `b5e58d87ffaeafafe66714ef7bf5563127cb6259` 已推送至 `codex/core-baseline` 并核对远端分支；04 配套脚本和台账同项交付。
 
 CORE 远程 CI [Docker deployment 44055865803](https://github.com/liuyiwuqing/nexus-core/actions/runs/44055865803) 已触发，本次检查为 `in_progress`；远程结果与本地验证分别记录。
+
+- 最终退出/清理复核：来源的一次复跑在 38 条功能断言后出现 shell 尾段错误，保留该日志且不作为最终通过依据；固定脚本重新完整执行，38 条、退出 0、`completeTaskSpace` 返回 `done: true` 均已确认（`sources-final.log`）。最终汇总改为引用这份日志，22 组总数仍为 1038；最终浏览器构建与 JAR 再次逐字节一致。
+
+04 配套脚本/验证/台账 `cee90c817ba22a1a42185c3a471accd3439e9137` 已推送并核对 `origin/main`，`.workbuddy/` 未暂存。远程状态复核：[Docker deployment 44055865803](https://github.com/liuyiwuqing/nexus-core/actions/runs/44055865803) `in_progress`；[Software checks 44055957685](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44055957685) `in_progress`；本地浏览器/构建与远程 CI 分开记录。后续仅追加交付记录，不改变已验证实现和脚本。
