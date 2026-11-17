@@ -490,3 +490,5 @@ CORE 侧 V22 为样本表追加 `wifi_ip`/`wifi_rssi`：地址变化立即成条
 管理台与 CORE 在本机真实环境完成 V23 迁移和进程重启。迁移前确认真实库位于 `nexus-core` Compose 项目（`nexus-core-postgres-1`，127.0.0.1:54329），Flyway 停在 V20；依赖容器已不存在但 `nexus-core_postgres-data` 卷仍在，按原卷重建后通过健康检查。按升级口径备份 `data/backups/nexus-before-v23-20261117-094358.dump`（86 KB、183 个 TOC 条目、600），在临时库 `nexus_restore_check` 完整恢复并核对（最高 V20、37 张表、无样本表）后删除。停止旧 JAR（PID 35397），用新构建的 JAR 启动，Flyway 自动应用 V21–V23，`flyway_schema_history` 三条 success；`/api/v1/status` 的 database/mqtt 均 ready，管理台 200，设备列表出现 `wifiSsid` 键，`GET /devices/dodo-1/telemetry?bucket=1h` 返回空点集。服务由独立会话后台运行（PID 48119，日志 `data/logs/core-20261117-094505.log`）。
 
 - **边界**：这是本机真实库与本地进程部署，不是目标服务器、1Panel 镜像或公网域名验收；设备尚未烧录新固件，网络质量字段仍需实机上报后才能看到真实值。备份和日志位于忽略的 `data/`，未输出任何凭据。
+
+- **管理台验收（ego-browser，2026-11-17）**：管理员令牌登录成功；设备页显示 1 台设备/0 在线/从未连接，无遥测时不渲染 Wi-Fi 行；「设置与状态」显示“尚未收到设备状态”，状态历史空态为“所选范围内没有采样点。”且导出 CSV 禁用，切到网络指标无错误；390px 视口无横向溢出；概览显示 0 在线/1 离线、今日收件 0、失败率 `—`。投递页仅有 1 条 2026-11-10 的 `ack_timeout` 历史失败，与本次迁移无关。未做真机上报、漫游与断线原因分布验收。
