@@ -733,3 +733,13 @@ HW-11/HW-12（2026-11-17）：配网页扩展到设备热点与家庭网络地�
 提交 `2a75eeb`（热点）与 `50fd47c`（地址）已推送，`git ls-remote` 核对 `origin/main` 为 `50fd47c8d47f088f8b16c3d6e2b040edf98a520f`；远程 CI [44115358427](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44115358427) 与 [44117701555](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44117701555) 八个 job 全部 success。远程 CI 只构建固件预设，不覆盖真实射频或路由器行为。本段随文档提交（`5b562fd` 起）推送；工作流只筛 `firmware/**`、`config/**`、`tools/**` 等路径，纯 `docs/**` 提交不触发，故不为此单独列 run。
 
 未验收：改自定义热点名/隐藏后手机重连、开放热点、信道与连接数实际表现、重开热点的重启时序、实机 LCD 两行截断；固定地址在真实路由器下的连通、填错掩码断网后的恢复、DHCP 主机名在路由器列表中的显示，以及实机状态文案。这些不能用主机测试、浏览器模拟或构建结果替代。
+
+HW-13（2026-11-18）：配网页首屏新增“当前状态”只读概览，不再需要展开任何折叠项就能看到三块信息——家庭 Wi-Fi（名称、连接状态、IP/掩码/网关/DNS、信号与信道、地址获取方式、主机名）、设备热点（当前名称与来源、安全形态、信道、连接数与上限、剩余设置时间）和管理台摘要（设备 ID、Broker `host[:port]`、是否 TLS、脱敏账号、是否自定义 CA、配置状态）。数据分别取自 `net`/`nexus` 凭据组、`esp_netif_get_ip_info`/`get_dns_info`/`esp_wifi_sta_get_ap_info`、`esp_wifi_get_channel`/`esp_wifi_ap_get_sta_list`；未配置或读不到时显示明确的空状态，不伪造在线或地址。
+
+本轮同时修正一个既有缺陷：`refresh_saved()` 让 Wi-Fi 名称、小智与 NEXUS 的 `device_id` 共用一个缓冲，最后一次读取覆盖前值，已接入管理台的设备会把 `dodo-1` 当成 Wi-Fi 名称显示。现在三组各用独立缓冲并在拷贝后清零。
+
+隐私边界保持不变：Broker 丢弃 URI 中的账号、口令与路径；设备账号只保留首个 UTF-8 字符加 `***`；热点口令、Wi-Fi 密码、WSS token 与 CA 内容不下发页面；设置模式不建立 MQTT 连接，管理台一栏只报“配置已保存”。
+
+本地证据：`tools/ci/test_host.sh` 退出 0（114 条 `passed`，`test_setup_portal::status_helpers` 覆盖安全形态、Broker 解析与账号脱敏）；`tools/ci/test_ui_host.sh` 10/10；隔离构建 `firmware/build-hw11` 应用 3,009,856 B（`0x2ded40`，剩余 28%），SHA256 `231928aaf1dd6f38b3e51b35badf12227a81bcdaa97a834e79c8706c115a29d2`；390×844 浏览器用实际页面加模拟 API 分别验证“有管理台”和“无管理台且未保存 Wi-Fi”两种状态，折叠项保持关闭、空状态文案正确、无横向溢出。未烧录。
+
+提交 `d8e102a` 已推送，`git ls-remote` 核对 `origin/main` 为该提交；远程 CI [44124446775](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44124446775) 八个 job 全部 success。未验收：实机上的客户端计数增减、信道与射频一致性、剩余时间递减，以及家庭 Wi-Fi 掉线时切换到“已保存，当前未连接”的表现。
