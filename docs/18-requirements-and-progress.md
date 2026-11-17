@@ -559,3 +559,5 @@ CONSOLE-23 推送核对：CORE `2a8f4561c5301b09fa714bfc8737b5d9f6cbacbf` / 04 �
 CORE `450c54f6dffad1fc7b2802738fa350b5d723c85b` 已正常推送至 `codex/core-baseline`，已核对远端分支。04 配套测试与台账同项提交，CI 和本地结果继续分开记录。
 
 - CORE 远程 CI [Docker deployment 44038263653](https://github.com/liuyiwuqing/nexus-core/actions/runs/44038263653) 已启动，本次检查为 `in_progress`，尚未据此声明远程通过；本地结果见上。
+
+配套验证/文档 `a487854fcfd01905d8b4163582e53bd8df5ebbc9` 已推送 `main` 并核对远端；原 `.workbuddy/` 未暂存。2026-11-17 15:24 +08:00：CORE [Docker deployment 44038263653](https://github.com/liuyiwuqing/nexus-core/actions/runs/44038263653)、04 [Software checks 44038366787](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44038366787) 均为 `in_progress`，远程完成结果不由本地通过代替。此后仅追加本条交付记录，不改变已验证实现或脚本。
