@@ -537,3 +537,5 @@ CONSOLE-22 推送核对：CORE `11f600731a73f19cc7baee5de6c345ce94480a70` / 04 `
 CORE `2a8f4561c5301b09fa714bfc8737b5d9f6cbacbf` 已正常推送至 `codex/core-baseline` 并核对远端分支；本仓配套测试与台账同项提交。远程 CI 状态继续与本地 900 次浏览器检查、完整 CORE 构建及开发预览恢复分别记录。
 
 本项 [CORE Docker deployment 44023847705](https://github.com/liuyiwuqing/nexus-core/actions/runs/44023847705) 已实际启动，目前 `in_progress`，尚不记为远程 CI 通过。04 配套提交推送后核对其流水线。
+
+CONSOLE-23 推送核对：CORE `2a8f4561c5301b09fa714bfc8737b5d9f6cbacbf` / 04 配套 `8684155e3b18afff8e6d4fcdd0c86ae74a5941e1` 均已正常推送，远端分支包含对应提交。截至 2026-11-17 13:25，[CORE Docker deployment 44023847705](https://github.com/liuyiwuqing/nexus-core/actions/runs/44023847705) 与 [04 Software checks 44023970010](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44023970010) 均实际运行中，尚不记为远程 CI 通过。本条只补充交付状态；本地 900 次浏览器检查、完整 CORE 构建和 5173/8088 只读预览复核已通过。
