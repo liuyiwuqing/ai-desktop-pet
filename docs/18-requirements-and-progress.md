@@ -470,3 +470,10 @@ CORE 侧 V22 为样本表追加 `wifi_ip`/`wifi_rssi`：地址变化立即成条
 
 - **验证**：`npm run check`（78 token）与 `npm run build` 通过；夹具补充 `wifiIp`/`wifiRssi` 与快照网络字段，`test_management_ui.sh` 由 59 增至 62 项（快照地址/信号、网络指标与 dBm、CSV 网络列），390px 无横向溢出仍覆盖。固件增量 `idf.py build` 通过（`nexus_pet.bin` 0x2d81c0，app 分区余量 29%），`test_host.sh`（`LC_ALL=C`）与 `check_contracts.py` 通过。CORE 全量构建 121 条中 116 通过、5 条条件跳过，V22 在隔离 PostgreSQL 17 应用并产出 jar。
 - **未做**：SSID/BSSID、信道、掉线原因与凭据轮换 UI 未纳入；未迁移真实库、部署、烧录，未验证真实 AP 切换、弱信号表现与长期采样。`test_host.sh` 的构建矩阵用例在中文 locale 下按英文 `dubious ownership` 断言失败，`LC_ALL=C` 重跑通过，属既有环境问题，未改断言。CORE `8656303` 与 04 `f8c6610` 已推送并核对远端；[CORE Docker CI 43989886723](https://github.com/liuyiwuqing/nexus-core/actions/runs/43989886723) 与 [04 Software checks 43989890697](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43989890697) 仍在约 2 秒内失败、`steps` 为空且无日志，属 GitHub 计费/额度阻断，非代码失败，待恢复后补跑。
+
+## TELEMETRY-06 · 设备卡片显示最近网络（2026-11-17，CORE `2345764`、04 `862c466`）
+
+设备列表此前只有在线与最近连接，TELEMETRY-05 采集的地址和信号只能进详情面板才看得到。本轮 `GET /devices` 用 `LEFT JOIN LATERAL` 取每台设备最近一条带 `wifi_ip` 的样本，返回 `wifiIp`/`wifiRssi`/`telemetryAt`；卡片在「最近连接」下新增「Wi-Fi 地址 · dBm · 相对时间」，无地址时整行省略。无新表、无迁移，列表仍一次查询；不改变离线判定与登记/改名流程。
+
+- **验证**：`DeviceManagementFlowTest` 在既有网络用例中补列表断言（地址与信号取最近带地址样本）；夹具 `/devices` 补充字段，`test_management_ui.sh` 由 62 增至 63 项并断言卡片显示 `192.168.1.20` 与 `-52 dBm`，390px 仍无横向溢出；CORE 全量构建 121 条中 116 通过、5 条条件跳过，前端检查与构建通过。
+- **未做**：未在列表显示固件版本、队列深度或逐台信号趋势；未做按信号/离线排序与筛选；未迁移真实库、部署、烧录或实机验收。CORE `2345764` 与 04 `862c466` 已推送并核对远端；[CORE Docker CI 43992251814](https://github.com/liuyiwuqing/nexus-core/actions/runs/43992251814) 与 [04 Software checks 43992263834](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43992263834) 仍在约 2 秒内失败、`steps` 为空且无日志，属 GitHub 计费/额度阻断，非代码失败，待恢复后补跑。
