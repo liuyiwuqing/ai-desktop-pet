@@ -43,20 +43,41 @@ esp_err_t pet_setup_snapshot(pet_setup_snapshot_t *out)
     xSemaphoreGive(runtime->lock);return ESP_OK;
 }
 
+/* 管理台摘要只读 device_id/URI/账号/是否配置 CA；口令与令牌不进入快照。 */
+static void load_nexus(pet_setup_nexus_t *out,const char *device_id)
+{
+    snprintf(out->device_id,sizeof(out->device_id),"%s",device_id);
+    char uri[PET_SETUP_BROKER_MAX+1]={0},account[65]={0},ca[8]={0};
+    if(pet_provision_load_str("nexus","mqtt_uri",uri,sizeof(uri))==ESP_OK)
+        (void)pet_setup_broker_parse(uri,&out->tls,out->broker,sizeof(out->broker));
+    if(pet_provision_load_str("nexus","mqtt_user",account,sizeof(account))==ESP_OK)
+        (void)pet_setup_mask_account(account,out->account,sizeof(out->account));
+    /* CA 可能远大于栈缓冲：返回 INVALID_SIZE 同样说明该键存在且有内容。 */
+    esp_err_t installed=pet_provision_load_str("nexus","mqtt_ca",ca,sizeof(ca));
+    out->has_ca=installed==ESP_ERR_INVALID_SIZE||(installed==ESP_OK&&ca[0]);
+    setup_wipe(uri,sizeof(uri));setup_wipe(account,sizeof(account));setup_wipe(ca,sizeof(ca));
+}
+
 static void refresh_saved(setup_runtime_t *s)
 {
-    char value[65]={0};uint32_t revision=0;
+    char ssid[33]={0},voice_id[65]={0},nexus_id[65]={0};uint32_t revision=0;
     esp_err_t err=pet_provision_revision(&revision);
-    bool wifi=pet_provision_load_str("net","wifi_ssid",value,sizeof(value))==ESP_OK&&value[0];
-    bool voice=pet_provision_load_str("xiaozhi","device_id",value,sizeof(value))==ESP_OK&&value[0];
-    bool nexus=pet_provision_load_str("nexus","device_id",value,sizeof(value))==ESP_OK&&value[0];
+    /* 三组各用独立缓冲：共用时会互相覆盖，页面就会把设备 ID 当成 Wi-Fi 名称。 */
+    bool wifi=pet_provision_load_str("net","wifi_ssid",ssid,sizeof(ssid))==ESP_OK&&ssid[0];
+    bool voice=pet_provision_load_str("xiaozhi","device_id",voice_id,sizeof(voice_id))==ESP_OK&&voice_id[0];
+    bool nexus=pet_provision_load_str("nexus","device_id",nexus_id,sizeof(nexus_id))==ESP_OK&&nexus_id[0];
+    pet_setup_nexus_t info={0};
+    info.configured=nexus;
+    if(nexus) load_nexus(&info,nexus_id);
     xSemaphoreTake(s->lock,portMAX_DELAY);
     if(err==ESP_OK) s->snapshot.revision=revision;
     s->snapshot.wifi_saved=wifi;s->snapshot.voice_saved=voice;s->snapshot.nexus_saved=nexus;
-    if(wifi) snprintf(s->snapshot.wifi_ssid,sizeof(s->snapshot.wifi_ssid),"%s",value);
+    if(wifi) snprintf(s->snapshot.wifi_ssid,sizeof(s->snapshot.wifi_ssid),"%s",ssid);
     else s->snapshot.wifi_ssid[0]=0;
+    s->snapshot.nexus=info;
     xSemaphoreGive(s->lock);
-    setup_wipe(value,sizeof(value));
+    setup_wipe(ssid,sizeof(ssid));setup_wipe(voice_id,sizeof(voice_id));
+    setup_wipe(nexus_id,sizeof(nexus_id));setup_wipe(&info,sizeof(info));
 }
 
 /* 地址设置直接来自 net 凭据组；缺键即默认 DHCP，坏值回落默认以免卡住配网。 */

@@ -141,7 +141,7 @@ static void codec(void)
     assert(pet_setup_portal_parse(open,strlen(open),&parsed)&&!parsed.password[0]);
     assert(!strcmp(pet_setup_state_name(PET_SETUP_PORTAL_SAVED),"portal_saved"));
     assert(!strcmp(pet_setup_state_name(PET_SETUP_NETWORK_SAVED),"network_saved"));
-    puts("Setup portal: defaults, bounds, effective hotspot, NVS JSON, partial update and address rules passed");
+    puts("Setup portal: defaults, bounds, effective hotspot, NVS JSON, partial update, address rules and status formatting passed");
 }
 
 static void netcfg(void)
@@ -201,8 +201,46 @@ static void netcfg(void)
     assert(!pet_setup_netcfg_valid(NULL));
 }
 
+/* 状态页展示：只暴露可公开字段，且脱敏规则不依赖设备。 */
+static void status_helpers(void)
+{
+    assert(!strcmp(pet_setup_ap_security(true),"开放网络"));
+    assert(!strcmp(pet_setup_ap_security(false),"WPA2"));
+
+    char host[64]={0};bool tls=false;
+    assert(pet_setup_broker_parse("mqtts://mqtt.example.com:8883",&tls,host,sizeof(host)));
+    assert(tls&&!strcmp(host,"mqtt.example.com:8883"));
+    assert(pet_setup_broker_parse("mqtt://10.0.0.7:1883",&tls,host,sizeof(host)));
+    assert(!tls&&!strcmp(host,"10.0.0.7:1883"));
+    /* 账号、口令与路径一律丢掉，避免把凭据带到页面上。 */
+    assert(pet_setup_broker_parse("mqtts://user:secret@broker.local:8883/mqtt",&tls,host,sizeof(host)));
+    assert(tls&&!strcmp(host,"broker.local:8883"));
+    assert(pet_setup_broker_parse("mqtts://@broker.local",&tls,host,sizeof(host)));
+    assert(!strcmp(host,"broker.local"));
+    /* 没有协议头时按原样当主机名，仍不视为 TLS。 */
+    assert(pet_setup_broker_parse("broker.local:8883",&tls,host,sizeof(host)));
+    assert(!tls&&!strcmp(host,"broker.local:8883"));
+    assert(!pet_setup_broker_parse("",&tls,host,sizeof(host)));
+    assert(!pet_setup_broker_parse("mqtts://",&tls,host,sizeof(host)));
+    assert(!pet_setup_broker_parse(NULL,&tls,host,sizeof(host)));
+    char tiny[8]={0};
+    assert(!pet_setup_broker_parse("mqtts://broker.example.com:8883",&tls,tiny,sizeof(tiny)));
+    assert(pet_setup_broker_parse("mqtts://broker.local:8883",NULL,host,sizeof(host)));
+
+    char account[PET_SETUP_ACCOUNT_MAX]={0};
+    assert(pet_setup_mask_account("dodo-1",account,sizeof(account)));
+    assert(!strcmp(account,"d***"));
+    assert(pet_setup_mask_account("名字很长的账号",account,sizeof(account)));
+    assert(!strcmp(account,"名***")); /* 只保留首个 UTF-8 字符，不截断成乱码。 */
+    assert(pet_setup_mask_account("a",account,sizeof(account)));
+    assert(!strcmp(account,"a***"));
+    assert(!pet_setup_mask_account("",account,sizeof(account)));
+    assert(!pet_setup_mask_account(NULL,account,sizeof(account)));
+    assert(!pet_setup_mask_account("dodo",account,4));
+}
+
 int main(void)
 {
-    defaults();bounds();effective();codec();netcfg();
+    defaults();bounds();effective();codec();netcfg();status_helpers();
     return 0;
 }

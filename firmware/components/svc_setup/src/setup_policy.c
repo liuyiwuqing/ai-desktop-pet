@@ -195,3 +195,50 @@ bool pet_setup_netcfg_valid(const pet_setup_netcfg_t *netcfg)
     }
     return !netcfg->hostname[0]||pet_netcfg_hostname(netcfg->hostname);
 }
+
+const char *pet_setup_ap_security(bool open)
+{
+    return open?"开放网络":"WPA2";
+}
+
+/* 只取第一个 UTF-8 字符作为可见前缀，避免把多字节字符截成乱码。 */
+static size_t utf8_head(const char *text)
+{
+    const unsigned char lead=(unsigned char)text[0];
+    size_t bytes=lead<0x80?1:(lead&0xE0)==0xC0?2:(lead&0xF0)==0xE0?3:(lead&0xF8)==0xF0?4:1;
+    for(size_t i=1;i<bytes;i++) if(!text[i]) return 1;
+    return bytes;
+}
+
+bool pet_setup_broker_parse(const char *uri,bool *tls,char *host,size_t capacity)
+{
+    if(!uri||!host||!capacity) return false;
+    if(tls) *tls=false;
+    const char *start=uri;
+    const char *scheme_end=strstr(uri,"://");
+    if(scheme_end) {
+        size_t scheme=scheme_end-uri;
+        /* 凭据校验只放行 mqtts，其余协议按非 TLS 展示，避免把明文口径写成加密。 */
+        if(tls&&scheme==5&&!strncmp(uri,"mqtts",5)) *tls=true;
+        start=scheme_end+3;
+    }
+    const char *path=strchr(start,'/');
+    const char *end=path?path:start+strlen(start);
+    /* 去掉 user:pass@，账号口令不进入页面。 */
+    for(const char *p=start;p<end;p++) if(*p=='@') start=p+1;
+    size_t bytes=(size_t)(end-start);
+    if(!bytes||bytes>=capacity) return false;
+    memcpy(host,start,bytes);host[bytes]=0;
+    return true;
+}
+
+bool pet_setup_mask_account(const char *account,char *out,size_t capacity)
+{
+    if(!account||!account[0]||!out||capacity<5) return false;
+    const size_t head=utf8_head(account);
+    if(head+4>capacity) return false;
+    memcpy(out,account,head);
+    memcpy(out+head,"***",3);
+    out[head+3]=0;
+    return true;
+}

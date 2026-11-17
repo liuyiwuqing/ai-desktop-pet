@@ -3,11 +3,23 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>栖团 · 设备设置</title>
 <style>
-:root{color-scheme:light;font:16px/1.55 system-ui,-apple-system,sans-serif;color:#182721;background:#f4f6f2}*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0}main{max-width:620px;margin:0 auto;padding:30px 20px 48px}h1{font-size:28px;letter-spacing:-.04em;margin:0}h2{font-size:20px;margin:0 0 16px}.brand{color:#50645b;margin:4px 0 24px}.status{border-left:3px solid #578b71;padding:12px 14px;background:#e7eee7;margin-bottom:24px;min-height:50px;overflow-wrap:anywhere}section{background:#fff;padding:24px;border-radius:12px;margin:0 0 20px;border:1px solid #dce3da}label{display:block;margin:16px 0 6px;font-weight:550}input,select,textarea,button{font:inherit}input,select,textarea{width:100%;padding:11px;border:1px solid #9daaa1;border-radius:6px;background:#fff;color:inherit}input:focus,select:focus,textarea:focus{outline:2px solid #44765b;outline-offset:2px}input:disabled,select:disabled{background:#f0f2ef;color:#6a7a70}input[type=checkbox]{width:auto;margin-right:8px}button{min-height:44px;padding:10px 16px;border-radius:6px;border:1px solid #2d5740;background:#2d5740;color:#fff;cursor:pointer;margin-top:18px;font-weight:550}button:disabled{opacity:.55;cursor:wait}.secondary{background:transparent;color:#2d5740}small,.help{display:block;color:#56675c;font-size:14px;margin:8px 0}.row{display:flex;gap:10px;align-items:end}.row>div{flex:1}.row>button{flex:none;margin:0}summary{font-weight:600;cursor:pointer;padding:4px 0}details{margin-top:24px}a{color:#2d5740;text-underline-offset:3px}.code{font-size:34px;font-weight:650;letter-spacing:.12em;display:block;margin:12px 0}.error{color:#8b2921}#finish{width:100%;margin-top:4px}.check{font-weight:400}textarea{height:96px}hr{border:0;border-top:1px solid #dce3da;margin:24px 0}.now{background:#eef3ee;border-radius:6px;padding:10px 12px;margin:0 0 4px;font-size:14px;color:#33493c;overflow-wrap:anywhere}
+:root{color-scheme:light;font:16px/1.55 system-ui,-apple-system,sans-serif;color:#182721;background:#f4f6f2}*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0}main{max-width:620px;margin:0 auto;padding:30px 20px 48px}h1{font-size:28px;letter-spacing:-.04em;margin:0}h2{font-size:20px;margin:0 0 16px}.brand{color:#50645b;margin:4px 0 24px}.status{border-left:3px solid #578b71;padding:12px 14px;background:#e7eee7;margin-bottom:24px;min-height:50px;overflow-wrap:anywhere}section{background:#fff;padding:24px;border-radius:12px;margin:0 0 20px;border:1px solid #dce3da}label{display:block;margin:16px 0 6px;font-weight:550}input,select,textarea,button{font:inherit}input,select,textarea{width:100%;padding:11px;border:1px solid #9daaa1;border-radius:6px;background:#fff;color:inherit}input:focus,select:focus,textarea:focus{outline:2px solid #44765b;outline-offset:2px}input:disabled,select:disabled{background:#f0f2ef;color:#6a7a70}input[type=checkbox]{width:auto;margin-right:8px}button{min-height:44px;padding:10px 16px;border-radius:6px;border:1px solid #2d5740;background:#2d5740;color:#fff;cursor:pointer;margin-top:18px;font-weight:550}button:disabled{opacity:.55;cursor:wait}.secondary{background:transparent;color:#2d5740}small,.help{display:block;color:#56675c;font-size:14px;margin:8px 0}.row{display:flex;gap:10px;align-items:end}.row>div{flex:1}.row>button{flex:none;margin:0}summary{font-weight:600;cursor:pointer;padding:4px 0}details{margin-top:24px}a{color:#2d5740;text-underline-offset:3px}.code{font-size:34px;font-weight:650;letter-spacing:.12em;display:block;margin:12px 0}.error{color:#8b2921}#finish{width:100%;margin-top:4px}.check{font-weight:400}textarea{height:96px}hr{border:0;border-top:1px solid #dce3da;margin:24px 0}.facts{display:grid;grid-template-columns:minmax(88px,auto) 1fr;gap:7px 14px;margin:10px 0 4px;font-size:15px}.facts dt{color:#50645b}.facts dd{margin:0;overflow-wrap:anywhere}
+h3{font-size:16px;margin:18px 0 2px}h3:first-of-type{margin-top:8px}.empty{color:#56675c;background:#f6f7f4;border:1px dashed #c2cdc2;border-radius:6px;padding:10px 12px;margin:10px 0 4px;font-size:14px}
 </style>
 <main>
 <h1>栖团设备设置</h1><p class="brand">连接网络，开始陪伴。</p>
 <div id="status" class="status" role="status" aria-live="polite">正在读取设备状态…</div>
+<section id="overview">
+<h2>当前状态</h2>
+<h3>家庭 Wi-Fi</h3>
+<dl class="facts" id="wifiFacts"><dt>连接状态</dt><dd>读取中…</dd></dl>
+<p class="empty" id="wifiEmpty" hidden>尚未保存家庭 Wi-Fi。在下方第 1 节填写名称和密码，设备取得 IP 后保存。</p>
+<h3>设备热点</h3>
+<dl class="facts" id="apFacts"><dt>热点名称</dt><dd>读取中…</dd></dl>
+<h3>管理台</h3>
+<dl class="facts" id="nexusFacts"><dt>连接状态</dt><dd>读取中…</dd></dl>
+<p class="empty" id="nexusEmpty" hidden>尚未接入管理台（可选）。需要接收管理台消息时，在下方第 3 节“管理台接入”填写设备 ID、Broker 与设备账号。</p>
+</section>
 <section>
 <h2>1. 连接家里的 Wi-Fi</h2>
 <form id="wifi">
@@ -20,7 +32,6 @@
 <button id="saveWifi" type="submit" disabled>连接并保存</button>
 </form>
 <p id="wifiResult" class="help" aria-live="polite"></p>
-<p class="now" id="staNow" hidden>当前地址：读取中…</p>
 <details><summary>家庭网络高级设置（可选）</summary>
 <p class="help">固定 IP 需与路由器同网段。填错会导致设备无法联网，需要重新进入网络设置改回自动获取；保存后下次联网生效。</p>
 <form id="network">
@@ -40,8 +51,7 @@
 </section>
 <section>
 <h2>2. 设备热点</h2>
-<p class="now" id="apNow">当前热点：读取中…</p>
-<small>手机通过这个热点打开本页。保存后从下次进入设置起生效；点“保存并重开热点”可立即生效。</small>
+<small>手机通过这个热点打开本页。下方改动只影响设备热点，不会断开家庭 Wi-Fi；保存后从下次进入设置起生效，点“保存并重开热点”可立即生效。</small>
 <form id="portal">
 <label class="check"><input id="apCustom" type="checkbox">自定义热点名称</label>
 <input id="apSsid" maxlength="32" placeholder="Qitomo-XXXX（默认按设备随机生成）" autocomplete="off" disabled aria-label="热点名称">
@@ -97,8 +107,39 @@ function portalMode(){const mode=$('apMode').value;$('apPassRow').hidden=mode!==
 function portalSync(saved){if(portalLoaded)return;portalLoaded=true;$('apCustom').checked=!!saved.custom;$('apSsid').disabled=!saved.custom;$('apSsid').value=saved.custom?saved.ssid:'';$('apMode').value=String(saved.passwordMode||0);$('apPass').value='';$('apOpenConfirm').checked=false;$('apHidden').checked=!!saved.hidden;$('apChannel').value=String(saved.channel||1);$('apClients').value=String(saved.maxClients||2);$('apWindow').value=String(saved.windowMinutes||15);portalMode();}
 function networkMode(){const staticMode=$('ipMode').value==='static';$('staticRows').hidden=!staticMode;}
 function networkSync(saved){if(networkLoaded)return;networkLoaded=true;$('ipMode').value=saved.ipMode==='static'?'static':'dhcp';$('ipAddress').value=saved.ip||'';$('netmask').value=saved.netmask||'';$('gateway').value=saved.gateway||'';$('dns').value=saved.dns||'';$('hostname').value=saved.hostname||'';networkMode();}
-function staText(sta){if(!sta||!sta.ip)return '';const parts=[`当前地址：${sta.ip}`];if(sta.gateway)parts.push(`网关 ${sta.gateway}`);if(sta.dns)parts.push(`DNS ${sta.dns}`);if(typeof sta.rssi==='number')parts.push(`信号 ${sta.rssi} dBm · 信道 ${sta.channel}`);return parts.join(' · ');}
-function render(s){if(s.revision>errorRevision&&errorRevision>=0){lastError='';errorRevision=-1;}state=s;let message=names[s.state]||'请稍候…';if(s.state==='ready'&&s.wifiSaved&&s.wifiConnected)message=`家庭 Wi-Fi 已连接（${s.wifiSsid||'已保存'}），可修改设置或返回主页。`;if(s.state==='failed'){message=s.errorCode===263?'连接或对时超时，请检查网络后重试。':s.errorCode===259?'请先连接并保存 Wi-Fi，或刷新后重试。':s.errorCode===258?'配置无效，请核对内容。':message;}if(!rebooting){$('status').textContent=lastError||message;$('status').classList.toggle('error',!!lastError||s.state==='failed');}$('wifiResult').textContent=s.wifiSaved?(s.wifiConnected?'已保存，并已取得 IP 地址。':'Wi-Fi 已保存，当前尚未连接；可重新输入后重试。'):'';$('voiceResult').textContent=s.voiceSaved?'语音连接配置已保存。完成后可长按 BOOT 进入菜单，选择按住说话。':'也可以稍后配置，先使用宠物主页。';$('serviceResult').textContent=s.nexusSaved?'已有管理台连接配置。留空不会覆盖它；更换 Wi-Fi 会保留原配置。':'';$('binding').hidden=!s.activationCode;$('code').textContent=s.activationCode||'';$('apNow').textContent=`当前热点：${s.apSsid||'未知'}${s.apOpen?'（开放网络）':''}`;const sta=staText(s.sta);$('staNow').hidden=!sta;$('staNow').textContent=sta||'当前地址：读取中…';if(s.portal)portalSync(s.portal);if(s.network)networkSync(s.network);buttons();}
+function facts(target,rows){const list=$(target);list.replaceChildren();for(const [key,value] of rows){if(value===undefined||value===null||value==='')continue;const dt=document.createElement('dt');dt.textContent=key;const dd=document.createElement('dd');dd.textContent=String(value);list.append(dt,dd);}}
+function overview(s){const sta=s.sta||{},ap=s.ap||{},nx=s.nexus||{},net=s.network||{};
+facts('wifiFacts',[
+['网络名称',s.wifiSsid],
+['连接状态',!s.wifiSaved?'未配置':(s.wifiConnected?'已连接':'已保存，当前未连接')],
+['IP 地址',sta.ip],
+['子网掩码',sta.netmask],
+['网关',sta.gateway],
+['DNS',sta.dns],
+['信号 / 信道',typeof sta.rssi==='number'?`${sta.rssi} dBm · 信道 ${sta.channel}`:''],
+['地址获取',s.wifiSaved&&s.network?(net.ipMode==='static'?'固定 IP':'自动获取（DHCP）'):''],
+['主机名',s.wifiSaved?net.hostname:''],
+]);
+$('wifiEmpty').hidden=!!s.wifiSaved;
+facts('apFacts',[
+['热点名称',ap.ssid?`${ap.ssid}${ap.hidden?'（隐藏，需手动输入名称）':''}`:'未读取到热点名称'],
+['名称来源',s.portal?(s.portal.custom?'自定义':'默认随机，每次进入重新生成'):''],
+['安全',ap.security],
+['信道',ap.channel],
+['最多连接设备',typeof ap.maxClients==='number'?`${ap.maxClients} 台`:''],
+['当前连接设备',typeof ap.clients==='number'?`${ap.clients} 台`:''],
+['剩余设置时间',typeof s.remainingSeconds==='number'?`${Math.max(0,Math.floor(s.remainingSeconds/60))} 分钟`:''],
+]);
+facts('nexusFacts',nx.configured?[
+['设备 ID',nx.deviceId],
+['Broker',nx.broker||'未读取到地址'],
+['传输',nx.tls?'MQTT over TLS':'MQTT（未加密）'],
+['设备账号',nx.account],
+['证书',nx.customCa?'自定义 CA':'系统信任包'],
+['连接状态','配置已保存（设置模式不连接 Broker）'],
+]:[]);
+$('nexusEmpty').hidden=!!nx.configured;}
+function render(s){if(s.revision>errorRevision&&errorRevision>=0){lastError='';errorRevision=-1;}state=s;let message=names[s.state]||'请稍候…';if(s.state==='ready'&&s.wifiSaved&&s.wifiConnected)message=`家庭 Wi-Fi 已连接（${s.wifiSsid||'已保存'}），可修改设置或返回主页。`;if(s.state==='failed'){message=s.errorCode===263?'连接或对时超时，请检查网络后重试。':s.errorCode===259?'请先连接并保存 Wi-Fi，或刷新后重试。':s.errorCode===258?'配置无效，请核对内容。':message;}if(!rebooting){$('status').textContent=lastError||message;$('status').classList.toggle('error',!!lastError||s.state==='failed');}$('wifiResult').textContent=s.wifiSaved?(s.wifiConnected?'已保存，并已取得 IP 地址。':'Wi-Fi 已保存，当前尚未连接；可重新输入后重试。'):'';$('voiceResult').textContent=s.voiceSaved?'语音连接配置已保存。完成后可长按 BOOT 进入菜单，选择按住说话。':'也可以稍后配置，先使用宠物主页。';$('serviceResult').textContent=s.nexusSaved?'已有管理台连接配置。留空不会覆盖它；更换 Wi-Fi 会保留原配置。':'';$('binding').hidden=!s.activationCode;$('code').textContent=s.activationCode||'';overview(s);if(s.portal)portalSync(s.portal);if(s.network)networkSync(s.network);buttons();}
 async function refresh(){try{const s=await api('/api/state');failures=0;render(s);}catch(error){failures++;if(rebooting){$('status').textContent='设备正在重开热点。等待约 20 秒后，用新的热点名称重新连接本页（名称见设备屏幕）。';}else{$('status').textContent=failures<3?'设备正在切换网络，等待重新连接…':'无法连接设备。请确认仍连接屏幕显示的热点，再刷新页面。';}$('status').classList.add('error');}}
 async function act(path,body,clear){if(!state||posting)return false;posting=true;lastError='';buttons();let ok=false;try{await api(path,body);ok=true;}catch(error){errorRevision=state.revision;lastError=error.message;$('status').textContent=lastError;$('status').classList.add('error');}finally{posting=false;buttons();}if(ok){if(clear)clear();await refresh();}return ok;}
 $('wifi').addEventListener('submit',event=>{event.preventDefault();act('/api/wifi',{ssid:$('ssid').value,password:$('password').value},()=>{$('password').value='';});});

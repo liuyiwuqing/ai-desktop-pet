@@ -25,3 +25,10 @@ bool pet_setup_portal_parse_partial(const char *json, size_t bytes, pet_setup_po
 /* 家庭网络地址：与凭据校验、netif 应用共用 pet/netcfg.h 的规则。 */
 void pet_setup_netcfg_default(pet_setup_netcfg_t *netcfg);
 bool pet_setup_netcfg_valid(const pet_setup_netcfg_t *netcfg);
+
+/* 状态页展示用的安全格式化：只保留可公开字段，纯字符串处理便于主机验证。 */
+const char *pet_setup_ap_security(bool open);
+/* 从 mqtt(s):// URI 中取出 host[:port] 与是否 TLS；不含账号、口令和路径。 */
+bool pet_setup_broker_parse(const char *uri, bool *tls, char *host, size_t capacity);
+/* 设备账号脱敏：保留首个 UTF-8 字符，其余用 *** 代替；空值返回 false。 */
+bool pet_setup_mask_account(const char *account, char *out, size_t capacity);

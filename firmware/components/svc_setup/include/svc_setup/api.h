@@ -53,6 +53,18 @@ typedef struct {
     char hostname[PET_NETCFG_HOSTNAME_MAX + 1];
 } pet_setup_netcfg_t;
 
+#define PET_SETUP_DEVICE_ID_MAX 40u
+#define PET_SETUP_BROKER_MAX 127u
+#define PET_SETUP_ACCOUNT_MAX 16u
+
+/* 管理台连接摘要：只保留可公开的标识与地址，不含密码、令牌或完整 URI。 */
+typedef struct {
+    bool configured, tls, has_ca;
+    char device_id[PET_SETUP_DEVICE_ID_MAX + 1];
+    char broker[PET_SETUP_BROKER_MAX + 1]; /* 仅 host[:port]，已去掉协议、账号与路径。 */
+    char account[PET_SETUP_ACCOUNT_MAX];   /* 脱敏后的设备账号，仅用于确认用的是哪个账号。 */
+} pet_setup_nexus_t;
+
 typedef struct {
     pet_setup_state_t state;
     esp_err_t error;
@@ -63,6 +75,7 @@ typedef struct {
     char wifi_ssid[PET_SETUP_SSID_MAX + 1];
     pet_setup_portal_t portal; /* 已保存的偏好，不代表当前热点已经重开。 */
     pet_setup_netcfg_t netcfg;
+    pet_setup_nexus_t nexus;
 } pet_setup_snapshot_t;
 
 /* 专用启动模式独占 Wi-Fi/HTTP；正常语音/消息服务启动前由组合根调用。 */

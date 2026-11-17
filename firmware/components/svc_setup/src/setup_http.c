@@ -111,6 +111,34 @@ static esp_err_t status(httpd_req_t *r)
             cJSON_AddNumberToObject(sta,"channel",ap.primary);
         }
     }
+    /* 设备热点现状：名称/安全形态来自实际配置，客户端数与信道取当前射频值。 */
+    cJSON *ap_now=cJSON_AddObjectToObject(root,"ap");
+    if(ap_now) {
+        const bool open=snapshot.ap_password[0]==0;
+        cJSON_AddStringToObject(ap_now,"ssid",snapshot.ap_ssid);
+        cJSON_AddBoolToObject(ap_now,"hidden",snapshot.ap_hidden);
+        cJSON_AddBoolToObject(ap_now,"open",open);
+        cJSON_AddStringToObject(ap_now,"security",pet_setup_ap_security(open));
+        cJSON_AddNumberToObject(ap_now,"maxClients",snapshot.portal.max_clients);
+        uint8_t primary=0;wifi_second_chan_t second=WIFI_SECOND_CHAN_NONE;
+        if(esp_wifi_get_channel(&primary,&second)==ESP_OK)
+            cJSON_AddNumberToObject(ap_now,"channel",primary);
+        wifi_sta_list_t clients={0};
+        if(esp_wifi_ap_get_sta_list(&clients)==ESP_OK)
+            cJSON_AddNumberToObject(ap_now,"clients",clients.num);
+    }
+    /* 管理台摘要：设置模式不建立 MQTT 连接，因此只报告已保存的配置，不伪造在线状态。 */
+    cJSON *nexus=cJSON_AddObjectToObject(root,"nexus");
+    if(nexus) {
+        cJSON_AddBoolToObject(nexus,"configured",snapshot.nexus.configured);
+        if(snapshot.nexus.configured) {
+            cJSON_AddStringToObject(nexus,"deviceId",snapshot.nexus.device_id);
+            if(snapshot.nexus.broker[0]) cJSON_AddStringToObject(nexus,"broker",snapshot.nexus.broker);
+            cJSON_AddBoolToObject(nexus,"tls",snapshot.nexus.tls);
+            if(snapshot.nexus.account[0]) cJSON_AddStringToObject(nexus,"account",snapshot.nexus.account);
+            cJSON_AddBoolToObject(nexus,"customCa",snapshot.nexus.has_ca);
+        }
+    }
     char *json=cJSON_PrintUnformatted(root);cJSON_Delete(root);
     if(!json) return ESP_ERR_NO_MEM;
     esp_err_t err=json_response(r,"200 OK",json);cJSON_free(json);return err;
