@@ -73,6 +73,31 @@ edge 网络在项目名为 `nexus-production` 时通常叫 `nexus-production_edg
 
 `device.json` 提供设备的 Broker 地址、专属凭据和 CA；登记设备不等于设备已联网。AI/Halo/记忆/Bridge/清理/OTA/成长同步沿用现有默认开关，不会因部署本文件自动开启。
 
+## 从 `230c809` 升级到 `e76732b`
+
+[docker-compose.nexus-production.yml](docker-compose.nexus-production.yml) 是线上实例（`pet.muyin.site`）编排的升级目标，结构与初始化镜像生成的 `compose.1panel.yml` 一致，只有四处差异：`core.image` 换成 `e76732b` 发布的 digest；`core.environment` 增加 `NEXUS_AUTH_SESSION_DIRECTORY: /var/lib/nexus/sessions`；`core.volumes` 增加 `console-sessions:/var/lib/nexus/sessions`；顶层 `volumes` 增加 `console-sessions:`。其余服务、端口插值、只读根、`cap_drop`、健康检查与绝对路径不变。
+
+会话卷不是可选项。新镜像把浏览器会话写在私有目录，`read_only: true` 下该目录位于只读根文件系统，缺少可写挂载时创建会话抛 IO 错误并映射为 `503 session_store_unavailable`——表现是管理台登录直接失败，而不是仅仅“重启后掉登录态”。`/var/lib/nexus/sessions` 在镜像内已为 UID 65534 且 0700，挂卷后权限与判等条件（必须恰为 0700）保持不变。
+
+`e76732b` 相对 `230c809` 另有三个 Flyway 迁移 `V21`–`V23`（设备遥测历史表，以及网络/WiFi 质量列），只有 `CREATE TABLE` 与 `ADD COLUMN`，CORE 启动时自动执行。升级前仍必须备份数据库和私有目录；升级后不能直接把镜像回滚成 `230c809`，旧镜像的迁移集合里没有 V21–V23，Flyway 校验会失败并拒绝启动，需要还原备份或显式关闭该校验。
+
+在服务器 root 终端执行（先备份，再校验编排，最后只重建 CORE）：
+
+```sh
+cd /etc/nexus/docker
+cp compose.1panel.yml compose.1panel.yml.bak-$(date +%Y%m%d)
+docker ps --format '{{.Names}}' | grep postgres        # 确认实际容器名，下面按它替换
+docker exec <postgres 容器名> pg_dump -U nexus -d nexus -Fc > /root/nexus-$(date +%F).dump
+docker pull ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba
+docker compose -p nexus-production -f compose.1panel.yml config -q
+docker compose -p nexus-production -f compose.1panel.yml up -d
+docker compose -p nexus-production -f compose.1panel.yml ps
+```
+
+用本文文件替换 `compose.1panel.yml` 或在 1Panel 编排里粘贴后再执行。保留原项目名、`postgres-data` 卷、`core.env` 与 `/etc/nexus/docker` 目录，不重新运行初始化镜像。新卷首次创建为空，升级后需要重新登录一次；之后在同一卷、有效期内重启可恢复。启动后用 `docker compose logs core` 确认 V21–V23 迁移与健康检查，再核对 `/api/v1/status` 的 database 与 mqtt 均为 ready。
+
+包已改为 Public，`docker pull` 不需要 `docker login`；若后续改回私有，才需要在服务器与 1Panel 配置只读凭据。
+
 ## 验证与边界
 
 2026-11-15 本地 `docker compose -f deployment/1panel/docker-compose.yml config --no-env-resolution -q` 退出 0，Compose 版本为 `v5.5.0`。隔离运行使用本机缓存的真实发布 amd64 CORE（上述镜像 ID）、arm64 PostgreSQL/Mosquitto 和本地 arm64 初始化镜像；临时编排只替换私有目录和随机回环端口，使用独立项目/卷，通过 `up -d --no-build --wait --wait-timeout 240` 启动。
