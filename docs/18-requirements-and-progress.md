@@ -670,3 +670,5 @@ CORE `e76732b3792313ea5f3744b09970a7972fc89a36` 已正常提交并推送至 `ori
 CORE 配套 `f75d0f388554e9db3cf4cb17ce58d914647fd60a` 仅改 `docs/1panel-deployment.md`：新增镜像发布记录表、公开包匿名拉取说明与旧编排升级需补的三处会话卷改动；已推送并 `git ls-remote` 核对远端包含该提交。该提交只含 docs，不匹配 Docker deployment 的 push paths，按 SHA 查询无新运行。
 
 部署边界：当前没有目标服务器，未连接、未修改任何线上编排，也未执行 `docker compose up`；线上更新由用户按其实际 1Panel 环境执行，结果以其机器为准。新镜像对应 `e76732b`，其 1Panel 模板相对 `043f134` 仅增加 `NEXUS_AUTH_SESSION_DIRECTORY`、`console-sessions` 挂载与同名顶层卷三处；旧编排不补这三项时容器仍可启动，但重启后登录会话不再保留。04 `deployment/1panel/docker-compose.yml` 的 DEL-08 本地编排仍固定 `230c809`，本项未改，需另行验收。
+
+本项 04 配套提交为 `8b3b7d11479d1c9fb74e764eb1cde9899bd3c874`（`deployment/README.md` 发布口径 + 本文档），已推送并 `git ls-remote` 核对 `origin/main` 包含该提交。远程 [Software checks 44096057248](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44096057248) 六个 firmware job 全部 success；docs 改动未触及 CORE 源码，不产生新的 Docker deployment 运行。
