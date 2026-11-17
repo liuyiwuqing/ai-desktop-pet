@@ -517,3 +517,6 @@ CONSOLE-21 推送核对：CORE `959e7b7` / 04 `20ece8e` 均已推送且远端分
 - **浏览器验证**：8 组实际 Vue + 环回 RAM HTTP/SSE 共 328 次通过：表单 38、主题/12 页按钮 47、元数据 CSV 48、正文 CSV 15、消息 33、管理 64、列表筛选 44、角色 39。新增折叠草稿保留、已应用高级数量和清空、历史评论导入展开/草稿检查；主题专项曾发现鼠标打开导出后焦点留在 body、Escape 未关闭，主动落焦后复跑主题/元数据/正文导出通过。已查看 1440px/390px 明暗截图，CSS、浮层和浏览器 CSP 检查通过。截图在忽略目录 `firmware/build-ui-console-forms/`、`firmware/build-ui-console-theme/`，结果在 `firmware/build-ui-console-22/`。
 - **构建验证**：类型/74 token 守卫/生产前端、Shell/Python 语法、`git diff --check` 通过。`python3 tools/run_local.py build` 退出 0，121 条中 116 通过、5 条条件跳过；最终导入/焦点 UI 复测后以 `mvn -s .mvn/settings.xml -B -ntp -DskipTests package` 重新纳入静态资源，Java 未改。JAR 的 23 份前端和 V1–V23 迁移逐字节一致，无旧哈希文件。Vite 入口略超 500 kB 为非阻断告警，本项不扩为拆包重构。
 - **交付边界**：CORE `11f6007` 已推送并核对远端分支，04 配套随本项提交。5173 开发预览与当前 Vue 模块返回正常；没有修改后端/固件、重启真实 8088、迁移真实库、发送真实消息或验收设备。远程 CI 与本地结果独立核对。
+
+
+CONSOLE-22 推送核对：CORE `11f600731a73f19cc7baee5de6c345ce94480a70` / 04 `8705dd6261f017c548357e84420f60ea9f643de7` 均已推送，远端分支包含对应提交。本轮 [CORE Docker CI 44020100421](https://github.com/liuyiwuqing/nexus-core/actions/runs/44020100421) 与 [04 Software checks 44020146376](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44020146376) 已实际启动（与上一轮未启动的计费阻断分别记录）；截至 2026-11-17 12:53，本轮仍运行中，CORE 初始化 CLI 步骤 success、源码构建进行中，尚不记为远程 CI 通过。本条只补充交付状态，不改变已验证实现。
