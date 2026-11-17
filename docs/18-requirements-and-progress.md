@@ -764,3 +764,5 @@ CORE `V25__device_credentials.sql` 新增 `device_credentials`（`device_id` 主
 命令与环境偏差如实记录：`python3 tools/run_local.py build` 在本机失败于沙箱批量删除守卫（vite 清空 `target/frontend/assets` 的 56 项超过阈值，报 `SAFE_DELETE_BULK_CONFIRM_REQUIRED`），不是构建错误；改为先手动清理 `target/frontend/assets`、`target/classes/static`，再分别执行该脚本的三步（`npm run check`、`npm run build`、`mvn verify`），覆盖范围一致。本机未安装 `rg`，浏览器脚本用等价 `grep -qE` 临时 shim 运行，未提交该 shim；CI 环境自带 ripgrep，脚本本身未改。
 
 边界：未连接真实 Broker、未对真实设备写入新密钥、未迁移生产库、未轮换任何真实凭据；宽限期结束不跑后台任务清理指纹，只在读取时判定状态；台账无法证明 Broker 已应用或设备已切换。
+
+推送与 CI（2026-11-18）：CORE `1d670e2e37850bcd5937ef78b595a34bcb5d329e` 已推送，`git ls-remote` 核对 `origin/codex/core-baseline` 为该提交；04 `86e68523f5391f451c0caf2380b8850d8de104fd` 已推送并核对 `origin/main`。远程 [CORE Docker deployment 44128785484](https://github.com/liuyiwuqing/nexus-core/actions/runs/44128785484) 的 docker-compose job 全部步骤 success（初始化 CLI、源码镜像与无源码初始化镜像构建、真实隔离 Compose、1Panel 编排、报告归档）；[04 Software checks 44128860781](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44128860781) 八个 job 全部 success。两项 CI 只覆盖容器构建与固件预设，不替代真实 Broker 应用、设备重连与生产迁移验收。
