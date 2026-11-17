@@ -12,7 +12,7 @@
 
 CORE `043f134` 已推送并核对远端：CLI 11 项、原 Compose 六组、新增镜像部署七组通过；实际本地镜像为 `linux/arm64`，包含无源码/socket 初始化、私有权限/哈希、原样拒绝重复初始化、特殊路径/env、认证/实际 JAR 页面、MQTT TLS、重建持久性。初始化镜像默认网络构建因 Alpine DNS 失败，host 网络构建通过，未修改全局网络或软件源。Actions 的 actionlint 检查通过，未运行无关业务修改或生产迁移。
 
-发布工作流先验证，再以仓库短期 `GITHUB_TOKEN` 发布 amd64/arm64 两种架构，随后在新 job 中按 digest 从 GHCR 回拉并验证实际镜像。私有仓库/包可见性不变；服务器和 1Panel 需一次性配置 GHCR 的读取凭据，不能把令牌写进编排。CORE `043f134` 的发布运行 [43584412344](https://github.com/liuyiwuqing/nexus-core/actions/runs/43584412344) 已成功，最终 digest 为 `ghcr.io/liuyiwuqing/nexus-core@sha256:2653a588d45b7e46fdf3c8e9672d62bb8be2223a7d5058b7292b01820dbe259c` 与 `ghcr.io/liuyiwuqing/nexus-core-init@sha256:6195bb0732f248eaf6c43cda4778bbe115c67c69f0633c165461bb55c460759c`；发布后回拉验证 7 项通过。Debian/1Panel 目标机尚未连接或验收。
+发布工作流先验证，再以仓库短期 `GITHUB_TOKEN` 发布 amd64/arm64 两种架构，随后在新 job 中按 digest 从 GHCR 回拉并验证实际镜像。仓库 Public 不会自动让 GHCR 包公开：2026-11-17 两个包已改为 Public，之后服务器与 1Panel 可直接匿名 `docker pull`，无需 `docker login` 或面板账号；匿名按 digest 与 `sha-<提交号>` 标签取 manifest 均 200。若包改回私有，才需要一次性配置只读凭据，且不能把令牌写进编排。当前发布为 `e76732b`（运行 44094002890），CORE `sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba` 与 INIT `sha256:9b4d60ccc175fbcd2d349d7117ceeb068d06d26f98f868132e8dc8a2a85faad6`，回拉验证 7 项通过；前次 `043f134` 的 digest 见 [台账 DEL-07](../docs/18-requirements-and-progress.md)。Debian/1Panel 目标机尚未连接或验收。
 
 ## 管理台 Docker 部署（DEL-06）
 

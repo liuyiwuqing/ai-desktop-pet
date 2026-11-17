@@ -43,7 +43,7 @@
 | DEL-04 | 成长镜像配套离线包 | CORE `3e38ee5` / 04 `69b6308` 干净快照，18 文件；包内实际 JAR 的 Linux 启动/重启、V1–V12、admin 文件轮换通过；见 [21](21-growth-sync.md) | 包仅保留本地忽略目录；目标机、生产 TLS、真实供应商及实机仍待验收 |
 | DEL-05 | Linux Memory MCP/stdio 热轮换 | 04 `f99a118` 已推送；同一 `3e38ee5` 包实际 JAR/CLI/stdio 通过过渡、到期、撤销、范围隔离、异常拒绝/恢复；同一 stdio 进程不重初始化、不转发/重放失败请求；见 [20](20-credential-rotation.md#linux-memory-mcp-与-stdio-验证) | 原 admin 模式/交付 CLI 10 项通过；[43384944971](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43384944971) 六个 job 全绿；真实 provider、生产 TLS/systemd/不同用户目录仍待验收 |
 | DEL-06 | 管理台 Docker 线上部署方案 | CORE `9026e41` / 04 `5f9c15c` 已推送并核对远端；源码镜像/Compose/私有初始化/健康检查与 [部署说明](../deployment/README.md#管理台-docker-部署del-06)；本地 CLI 11 项、完整构建 62 通过/5 跳过、实际 Linux Compose 六组检查通过 | [Docker CI 43398869944](https://github.com/liuyiwuqing/nexus-core/actions/runs/43398869944) 全步骤及 [04 CI 43398982965](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43398982965) 七个 job success；尚无目标服务器，公网证书/真实升级恢复/生产资源与设备仍待验收 |
-| DEL-07 | 1Panel 拉取镜像与无源码初始化 | CORE `043f134` 已推送并核对远端；私有 GHCR 发布/双架构/回拉验证工作流、独立初始化镜像、普通 env 的完整三服务编排及 [部署说明](../deployment/README.md#1panel-镜像部署del-07) 已补齐；本地 CLI 11 项、原部署六组、新镜像部署七组通过，actionlint 通过；发布运行 [43584412344](https://github.com/liuyiwuqing/nexus-core/actions/runs/43584412344) 成功，两个 digest 回拉后 7 项验证通过 | 已有用户提供的 Debian/1Panel 信息，目标机、HTTPS/网络与设备仍待验收 |
+| DEL-07 | 1Panel 拉取镜像与无源码初始化 | CORE `043f134` 已推送并核对远端；GHCR 发布/双架构/回拉验证工作流、独立初始化镜像、普通 env 的完整三服务编排及 [部署说明](../deployment/README.md#1panel-镜像部署del-07) 已补齐；本地 CLI 11 项、原部署六组、新镜像部署七组通过，actionlint 通过；发布运行 [43584412344](https://github.com/liuyiwuqing/nexus-core/actions/runs/43584412344) 成功，两个 digest 回拉后 7 项验证通过；2026-11-17 对 `e76732b` 重发布 [44094002890](https://github.com/liuyiwuqing/nexus-core/actions/runs/44094002890) 成功，两个包改为 Public 后匿名回拉 200，见末尾 | 已有用户提供的 Debian/1Panel 信息，目标机、HTTPS/网络与设备仍待验收 |
 | DEL-08 | 1Panel 本地镜像编排 | 本地 7 组检查通过；[部署文件](../deployment/1panel/docker-compose.yml)与[使用说明](../deployment/1panel/README.md)使用 CORE 完整提交标签/amd64/禁止自动拉取，基础服务缺失时拉取，保留原私有目录/项目名/卷/安全配置；04 `1436113` 已推送并核对 origin/main | 实际已发布 amd64 CORE 在本机模拟运行，PG/MQTT/初始化为本地 arm64；解析、缺镜像拒绝、启动/鉴权/TLS、重建保留通过；[CI 43729640797](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43729640797) 运行中，目标服务器/HTTPS/设备未验收 |
 | CI-01 | 首次远程 CI 与容器 Git 所有权 | 首次运行的交付/桥接检查通过；四预设在 Git 源码清单处退出 128，尚未编译。真实 Git 所有权模拟复现并建立回归 | `5183050` 修复 Git 所有权，`43169dd` / `1ad19cf` 修复 Linux C17 的 `strnlen` / `strlcpy` 依赖；本地主机检查通过；远程 OTA `0910e5f` 的 [43366086540](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43366086540) 六个 job 全绿 |
 | SW-04 | 远程 OTA 管理 | 软件已验证；CORE 配套 `2808ed7` 已推送，协议、设备事务、管理台/审计/ACL 见 [19](19-remote-ota.md)；四固件预设、主机/实际 Java–MQTT–C、浏览器通过 | 04 `0910e5f` 已推送、远程 CI 六个 job 全绿；生产钥/HTTPS 与实机 OTA 仍待验收 |
@@ -651,3 +651,22 @@ Linux 真实 HTTPS 夹具首次在 Secure Cookie 标志处失败，诊断确认�
 CORE `e76732b3792313ea5f3744b09970a7972fc89a36` 已正常提交并推送至 `origin/codex/core-baseline`，已用 `git ls-remote` 核对远端分支包含本次提交。04 本项仅提交 18/23 配套文档；现有 `.workbuddy/`、私有 env/会话、生成镜像/JAR 与测试证据均不纳入版本。远程 CI 另查当前 SHA，不以前项成功代替。
 
 04 配套 `7b01867c2fa5d176c8cd3058995e89259669b3df` 已推送并核对 `origin/main` 包含该提交；该提交仅 docs，不匹配 Software checks 的 push paths，按 SHA 查询无新运行。CORE 本项远程 [Docker deployment #44074830487](https://github.com/liuyiwuqing/nexus-core/actions/runs/44074830487) 当前 `in_progress`，尚未获得远程完成结论；不计作 CI 通过。最终 5173 与 8088 HTTP 首页均 200，CORE 工作区干净；04 除原有未跟踪 `.workbuddy/` 外无其他遗留改动。
+
+## DEL-07 续 · CORE 新镜像发布与公开访问（2026-11-17）
+
+按用户要求把 nexus-core 代码推上线、发布新镜像以便更新线上部署。核对后代码不需要再推：本地 HEAD 与 `origin/codex/core-baseline` 同为 `e76732b3792313ea5f3744b09970a7972fc89a36`，`git rev-list --left-right --count` 为 0/0，工作区干净，仓库可见性已是 PUBLIC；因此本项实际交付是镜像发布、包可见性与部署口径。
+
+镜像发布运行 [44094002890](https://github.com/liuyiwuqing/nexus-core/actions/runs/44094002890) 最终 success。首次触发时 `validate` 在 `docker build -t nexus-core:ci .` 的 `mvn -s .mvn/settings.xml -B -ntp -DskipTests package` 阶段失败，原因为 Maven Central 对构建机返回 429（`Non-resolvable parent POM ... spring-boot-starter-parent:pom:4.1.2 ... status code: 429`），当时未产出任何镜像；原样重试失败 job 后 `validate`、`publish`（core 与 init 各双架构）、`verify-published` 全部通过，未修改源码、Dockerfile、镜像源或重试参数，失败与重试分别记录，不把首轮失败计作通过。
+
+发布产物（`verify-published` 的 `published-image-verification` artifact 内 `published-images.env` 原值）：
+
+- CORE `ghcr.io/liuyiwuqing/nexus-core@sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba`
+- INIT `ghcr.io/liuyiwuqing/nexus-core-init@sha256:9b4d60ccc175fbcd2d349d7117ceeb068d06d26f98f868132e8dc8a2a85faad6`
+
+两者同时带 `sha-e76732b3792313ea5f3744b09970a7972fc89a36` 标签；回拉后的 7 项隔离容器检查通过，含无源码/socket 初始化、重复初始化拒绝、1Panel 三服务编排解析、非 root/只读启动与实际 JAR 资源鉴权、MQTT TLS、重建后数据与凭据保留。
+
+可见性：仓库开源不会自动让 GHCR 包公开。改前用匿名令牌请求 `ghcr.io` 的 `nexus-core`、`nexus-core-init` 均返回 `UNAUTHORIZED`（同环境对照公开包可正常取 token），`gh` 令牌无 `read:packages`/`write:packages`，查询与 PATCH 均不可用，故由用户在 GitHub 包设置把两个包改为 Public。改后匿名 token 获取成功，按 digest 与 `sha-e76732b...` 标签请求 manifest 均为 200，manifest 含 `linux/amd64` 与 `linux/arm64`；服务器与 1Panel 因此无需 `docker login`。2026-11-17 起该结论取代此前“私有包 + PAT 登录”的口径。
+
+CORE 配套 `f75d0f388554e9db3cf4cb17ce58d914647fd60a` 仅改 `docs/1panel-deployment.md`：新增镜像发布记录表、公开包匿名拉取说明与旧编排升级需补的三处会话卷改动；已推送并 `git ls-remote` 核对远端包含该提交。该提交只含 docs，不匹配 Docker deployment 的 push paths，按 SHA 查询无新运行。
+
+部署边界：当前没有目标服务器，未连接、未修改任何线上编排，也未执行 `docker compose up`；线上更新由用户按其实际 1Panel 环境执行，结果以其机器为准。新镜像对应 `e76732b`，其 1Panel 模板相对 `043f134` 仅增加 `NEXUS_AUTH_SESSION_DIRECTORY`、`console-sessions` 挂载与同名顶层卷三处；旧编排不补这三项时容器仍可启动，但重启后登录会话不再保留。04 `deployment/1panel/docker-compose.yml` 的 DEL-08 本地编排仍固定 `230c809`，本项未改，需另行验收。
