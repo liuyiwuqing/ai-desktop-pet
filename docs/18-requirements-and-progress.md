@@ -619,3 +619,5 @@ CORE 远程 CI [Docker deployment 44055865803](https://github.com/liuyiwuqing/ne
 CORE 实现 `b546e1974f190ffaa2a66ebf59535138fb5aec18` 已正常推送至 `origin/codex/core-baseline`，`git ls-remote` 与本地 HEAD 一致。配套 04 的 23 组脚本、使用说明与台账随本项提交；`.workbuddy/` 和所有秘密/生成产物未暂存。
 
 [CORE Docker deployment 44063434295](https://github.com/liuyiwuqing/nexus-core/actions/runs/44063434295) 当前 `in_progress`，结论 `尚未结束`；远程 CI 与本地构建/浏览器验证分别记录。
+
+04 配套实现/检查/说明 `580e2eb4bcdbbe7601a9a4ce580796f558159a55` 已正常推送并核对 `origin/main`；两仓源码工作项已交付，后端和前端预览继续运行。 [04 Software checks 44063551850](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44063551850) 为 `in_progress`，结论 `尚未结束`。
