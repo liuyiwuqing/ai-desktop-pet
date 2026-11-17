@@ -508,7 +508,7 @@ TELEMETRY-07 只在快照里显示「上次断线」，无法回看此前掉线�
 管理台在状态历史下方新增「最近断线」折叠区：断线时刻（未对时退回记录时刻并注明）、原因名称、记录时间；未收录的原因码显示数字。无断线原因且列表为空时整块不渲染；打开面板、点「刷新状态」或设备上报新的断线时刻时重读。CORE `docs/device-telemetry-history.md`、`docs/console-ui.md` 已同步接口口径与界面说明。
 
 - **验证**：`DeviceManagementFlowTest` 新增断线历程序例（401/404/400、原因变化立即成条、时刻变化随心跳成条、同一对值跨心跳去重、无原因样本不计入、`limit` 截断），测试 Broker 增加 `dodo-disconnects` 凭据；CORE 全量构建 136 条中 131 通过、5 条条件跳过、0 失败，前端类型检查、74 token 守卫与生产构建通过。`test_management_ui.sh` 由 64 增至 66 项：实际 Vue + 环回夹具断言三条事件、原因名称（含未知码 777）、未对时说明与只读端点 `limit=20`，390px 仍无横向溢出。
-- **未做**：未纳入 BSSID 与信道带宽，未做断线次数统计、筛选、导出或趋势图；不覆盖保留期外或已清理的样本，未对时且原因为空的历史无法补造；未迁移真实库、未部署、未烧录或实机验收。CORE `6306809` 已推送并核对 `origin/codex-core-baseline`；[CORE Docker CI 44102984359](https://github.com/liuyiwuqing/nexus-core/actions/runs/44102984359) 的 docker-compose job 成功。04 夹具、检查脚本与本文档随本项提交，04 远程 CI 见推送后记录。
+- **未做**：未纳入 BSSID 与信道带宽，未做断线次数统计、筛选、导出或趋势图；不覆盖保留期外或已清理的样本，未对时且原因为空的历史无法补造；未迁移真实库、未部署、未烧录或实机验收。CORE `6306809` 已推送并核对 `origin/codex-core-baseline`；[CORE Docker CI 44102984359](https://github.com/liuyiwuqing/nexus-core/actions/runs/44102984359) 的 docker-compose job 成功。04 `75047d0` 已推送并核对 `origin/main`；[04 Software checks 44103563880](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44103563880) 八个 job 全部成功。
 
 ## CONSOLE-21 · 紧凑布局与 Naive UI 表单（2026-11-17，CORE `959e7b7`）
 
