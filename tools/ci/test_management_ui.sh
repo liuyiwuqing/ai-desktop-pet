@@ -93,7 +93,7 @@ await expect("document.querySelector('.device-card')?.innerText.includes('HomeLa
 await tap('设置与状态');
 await expect("document.querySelector('#device-management-panel')?.innerText.includes('尚未收到设备状态')",'empty device state');
 await tap('状态历史');
-await expect("document.querySelector('.telemetry-history .history-empty')?.innerText.includes('没有采样点') && !document.querySelector('.telemetry-chart')",'history empty state is explicit');
+await expect("document.querySelector('.telemetry-history .console-state--empty')?.innerText.includes('没有采样点') && !document.querySelector('.telemetry-chart')",'history empty state is explicit');
 await fixture({mode:'fresh'});await tap('刷新状态');
 await expect("document.querySelectorAll('.management-form [role=slider]').length===2",'fresh readback is editable');
 await expect("document.querySelector('.telemetry-history')?.innerText.includes('状态历史') && document.querySelector('.telemetry-history')?.innerText.includes('来自设备已上报的遥测')",'history section explains its source');

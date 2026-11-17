@@ -81,7 +81,7 @@ await input('收件开始','2026-11-14T18:00');let reads=(await state()).queryRe
 await expect("document.querySelector('.filter-feedback[role=alert]')?.innerText==='收件开始必须早于截止时间。'",'inverted range has local feedback');
 if((await state()).queryRequests.length!==reads)throw new Error('Invalid range issued HTTP');results.push('invalid range does not issue a list request');
 await input('收件开始','2026-11-14T16:00');await input('来源标识','missing');await tap('应用筛选');await expect("document.querySelector('h2')?.innerText==='没有符合条件的消息' && [...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='导出元数据').disabled",'empty filtered messages disable export');await ready();
-await fixture({queryError:'messages'});await input('来源标识','manual');await tap('应用筛选');await expect("document.querySelector('h2')?.innerText==='消息读取失败' && document.querySelectorAll('.message-row').length===0 && [...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='导出元数据').disabled",'read failure hides stale rows and disables export');
+await fixture({queryError:'messages'});await input('来源标识','manual');await tap('应用筛选');await expect("document.querySelectorAll('.content > .feedback.error').length===1 && document.querySelector('.content > .feedback.error')?.innerText.includes('HTTP 503') && document.querySelectorAll('.message-row').length===0 && [...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='导出元数据').disabled",'read failure hides stale rows and disables export');
 await fixture({queryError:''});await tap('重试');await ready();await expect("document.querySelector('.section-heading p')?.innerText==='31 条消息' && document.querySelector('input[aria-label=来源标识]')?.value==='manual'",'read recovery keeps the selected source and range');
 await freshDownloadDir();
 for(const [mode,text]of [['large','结果超过 5000 条'],['error','CORE 处理失败'],['invalid','未能导出元数据']]){
@@ -96,7 +96,7 @@ await freshDownloadDir();await fixture({exportDelay:1});await tap('导出元数�
 if(files().length!==3)throw new Error('Abandoned export downloaded after navigation');results.push('navigation discards a delayed export');
 await expect("document.querySelector('input[aria-label=\"设备 ID\"]')?.value==='device-a' && document.querySelector('.list-filters .n-select')?.textContent.trim()==='投递失败'",'delivery facets survive a return visit');await ready();
 await fixture({exportDelay:0,queryDelay:1});await input('设备 ID','device-b');await tap('应用筛选');
-await expect("document.querySelector('.empty-state[role=status]')?.innerText==='正在加载投递…' && document.querySelector('.list-filters input').disabled",'filter loading clears old delivery rows');
+await expect("document.querySelector('.loading-state[role=status]')?.innerText==='正在加载投递…' && document.querySelector('.list-filters input').disabled",'filter loading clears old delivery rows');
 await expect("document.querySelector('.section-heading p')?.innerText.startsWith('1 条投递')",'delayed delivery filter finishes');await ready();await fixture({queryDelay:0});
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
 await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.list-filters input,.list-filters .n-select,.filter-actions button')].every(e=>e.getBoundingClientRect().right<=390)",'all delivery facets and actions fit 390 CSS pixels');

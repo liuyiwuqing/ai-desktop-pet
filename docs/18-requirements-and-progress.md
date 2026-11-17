@@ -57,6 +57,7 @@
 | CONSOLE-22 | 常用筛选折叠与全站按钮统一 | 软件本地已验证：消息状态/来源常驻，时间条件折叠并显示生效数量；导航/列表/图表/导出入口使用 Naive 按钮，见 [23](23-console-completion.md#console-22--常用筛选与全站按钮) | 8 组浏览器 328 次检查通过；完整构建、跨仓提交与 CI 见末尾；5173 开发预览持续运行 |
 | CONSOLE-23 | 全站紧凑布局与一致按钮 | 软件本地已验证：十二页操作按钮统一描边/尺寸，侧栏账户重排；低频条件与记录折叠，校验与异常自动展开，见 [23](23-console-completion.md#console-23--紧凑页面与一致按钮) | 21 组浏览器 900 次检查通过；完整构建、配套提交与 CI 见末尾；5173 预览持续运行 |
 | CONSOLE-24 | 紧凑表格、卡片与浮层 | 软件本地已验证：共享表面/标题/间距规范，确认区与浮层同步，见 [23](23-console-completion.md#console-24--紧凑表格卡片与浮层) | 21 组浏览器 913 次检查通过；完整构建及跨仓交付见末尾 |
+| CONSOLE-25 | 统一加载、空状态与错误反馈 | 软件本地已验证：统一展示组件、读取状态去重与紧凑提示，保留校验/核对/重试 | 22 组浏览器 1038 次检查、完整构建与最终包通过；跨仓交付见末尾 |
 | CONSOLE-02 | 管理台完成度与验收清单 | `65eb2ef` 已推送；已按八导航、原完整规划及真实控制器核对；当前功能/验证/缺项见 [23](23-console-completion.md#console-02--当前实现与完整规划的差距) | 完整规划尚未全部实现；文档核对不算缺项完成。状态筛选已单独交付 CONSOLE-03 |
 | CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；更多筛选/元数据导出见 CONSOLE-13，取消/时间线见 CONSOLE-04 |
 | CONSOLE-04 | 投递状态时间线与受限取消 | CORE `109b83f` / 04 `0dec4b6` 已推送并核对远程；HTTP/worker/隔离 SQL 6 项，实际 Vue 新增 62/既有 191 项，Java→固件 C→Java 契约通过；完整构建 70 通过/5 跳过、JAR 一致；见 [23](23-console-completion.md#console-04--事务状态时间线与受限取消) | CORE [43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) Docker job、04 [43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job 全绿；V13 只在隔离库验证，旧行历史未知，无设备撤回或生产迁移 |
@@ -561,3 +562,25 @@ CORE `450c54f6dffad1fc7b2802738fa350b5d723c85b` 已正常推送至 `codex/core-b
 - CORE 远程 CI [Docker deployment 44038263653](https://github.com/liuyiwuqing/nexus-core/actions/runs/44038263653) 已启动，本次检查为 `in_progress`，尚未据此声明远程通过；本地结果见上。
 
 配套验证/文档 `a487854fcfd01905d8b4163582e53bd8df5ebbc9` 已推送 `main` 并核对远端；原 `.workbuddy/` 未暂存。2026-11-17 15:24 +08:00：CORE [Docker deployment 44038263653](https://github.com/liuyiwuqing/nexus-core/actions/runs/44038263653)、04 [Software checks 44038366787](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44038366787) 均为 `in_progress`，远程完成结果不由本地通过代替。此后仅追加本条交付记录，不改变已验证实现或脚本。
+
+
+## CONSOLE-25 · 统一加载、空状态与错误反馈（2026-11-17）
+
+按用户要求继续统一十二页的读取反馈与设备内联面板。新增 `ConsoleState` 仅负责骨架、紧凑加载、空结果与语义错误/警告/成功展示，沿用现有主题 token、图标和 Naive 组件，不引入依赖。异步页面骨架复用；局部读取错误不再单独吸顶，只有外壳反馈保持吸顶。手机长错误和动作可换行，减少动态效果偏好继续生效。
+
+消息/投递去除页头和失败卡片的重复说明，由外壳保留一次错误原因与重试；加载、空结果和失败分支互斥。设备、接入透传已有读取状态，读取失败不显示空清单。新增权限令牌/审计、设备记录等空态，减少“零指标＋尚无记录”重复文案；配置/来源核验、时效/未知历史、操作后果和权限信息保留。AI 分析仅在成功读到配置时才提示未启用。未知提交继续用 `StatusNote` 的 alert、焦点及原身份核对/重试流程，投递取消提示统一到相同语义；没有改业务请求或草稿规则。
+
+验证使用新增十二页状态矩阵 `tools/ci/test_console_states_ui.sh`，配合既有 21 组实际 Vue/环回 RAM HTTP/SSE 脚本、类型/token、生产构建和完整 CORE 构建。截图与运行日志留在忽略目录 `firmware/build-ui-console-25/`，本地预览与远程 CI/真实验收分别记录。下方补充实际退出结果和交付状态。
+
+
+- **源码核对**：22 个既有业务脚本在忽略展示 import/props 后与 CORE 原 HEAD 完全一致，核对清单 `business-script-check.json`；无后端/API/权限/数据库/固件变更。
+- **构建与预览**：类型/74 token、生产前端及完整 `python3 tools/run_local.py build` 退出 0，121 项中 116 通过、5 条件跳过，无失败/错误。`package-check.json` 核对 JAR 的 25 份前端/23 份迁移逐字节一致，无旧资源；`preview-check.json` 中 5173 页面/新组件/CSS/消息代理与 8088 状态 GET 五项都是 200。8088 稳定副本未重启，未迁移真实库、发送真实消息、操作设备或目标机。
+
+- **初轮与修正**：原筛选/元数据、概览、历史空态检查中的旧标题/样式钩子改为唯一错误条、实际零指标和统一状态，但原筛选/无旧行/导出禁用/恢复等行为断言保留。状态矩阵初始化自身明暗偏好，避免沿用上轮深色状态。鼠标追踪观察到高层 `click` 会将 1440px 视口改回原生 1698px，旧坐标落在表单空白；表单/主题脚本改用当前坐标的 CDP 实际鼠标按下/释放，宽度和功能断言不删。另修正页头读取时的高度变化，新增加载中筛选区不位移断言；失败后自动轮询不再与错误条叠加初始加载面板。来源及表单曾停在异步骨架，保留失败日志；来源用新 URL 重载并前置 QA 页后完整 38 次通过，表单前置 QA 页后完整 48 次通过。所有截图和原始/复跑日志保留，不把初轮失败计成通过。
+
+- **最终浏览器**：22 组实际 Vue/环回 RAM HTTP/SSE 共 1038 次检查通过：console_states 125、list_filters 44、operations 96、overview 17、console_theme 68、console_forms 48、metadata_export 51、management 64、routing 35、automation_conditions 17、automation_edit 99、automation_lifecycle 52、templates 33、roles 43、delivery_history 66、growth_sync 18、pull 32、sources 38、remote_ota 23、message_compose 33、content_export 15、events 21。状态矩阵最终 125 次含十二页延迟/503/原入口恢复、空/未启用状态、加载与错误去重、筛选区不位移、明暗/390px、ARIA/reduced-motion/CSP；原 21 组共 913 次业务检查仍通过。`verified-results.json` 只引用最终退出 0 的日志，初轮失败与复跑单独保留。已查看桌面加载/空/错误、手机空/明暗错误、表单/设备截图；原校验、草稿、确认、权限、未知结果身份、分页与导出路径继续验证。
+- **最终静态包**：失败轮询展示条件收紧后复跑状态/筛选及表单，类型/74 token 与生产前端通过；Java 未改，`mvn -s .mvn/settings.xml -B -ntp -DskipTests package` 退出 0，最终 25 份前端/23 迁移与当前输出逐字节一致（无旧资源）。该步骤不替代前述完整 121 项构建，原构建日志和最终打包日志分别保留。最后五项预览 GET 再次 200。
+
+CORE `b5e58d87ffaeafafe66714ef7bf5563127cb6259` 已推送至 `codex/core-baseline` 并核对远端分支；04 配套脚本和台账同项交付。
+
+CORE 远程 CI [Docker deployment 44055865803](https://github.com/liuyiwuqing/nexus-core/actions/runs/44055865803) 已触发，本次检查为 `in_progress`；远程结果与本地验证分别记录。

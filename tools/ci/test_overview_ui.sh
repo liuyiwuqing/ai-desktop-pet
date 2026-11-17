@@ -41,7 +41,7 @@ await expect("document.querySelector('.overview-panel [role=status]')?.innerText
 await fixture({mode:'error'});await tap('刷新概览');
 await expect("!!document.querySelector('.overview-panel [role=alert]') && !document.querySelector('.overview-panel dl')",'failed read hides stale counts instead of showing empty or healthy');
 await fixture({mode:'empty'});await tap('刷新概览');
-await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='0' && document.querySelector('[data-metric=failure-rate] dd')?.childNodes[0]?.textContent.trim()==='—' && document.querySelector('.overview-panel')?.innerText.includes('尚未登记设备')",'empty snapshot has zero counts and no fabricated zero-percent failure rate');
+await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='0' && document.querySelector('[data-metric=failure-rate] dd')?.childNodes[0]?.textContent.trim()==='—' && document.querySelector('[data-metric=online] dd')?.childNodes[0]?.textContent.trim()==='0'",'empty snapshot has zero counts and no fabricated zero-percent failure rate');
 await fixture({mode:'success',delay:1});await tap('刷新概览');
 await expect("document.querySelector('.overview-panel [aria-busy=true]')?.innerText==='正在读取概览…' && document.querySelector('.overview-panel button').disabled && !document.querySelector('.overview-panel dl')",'loading and repeat clicks are explicit');
 await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='7'",'delayed snapshot finishes');await fixture({delay:0});
