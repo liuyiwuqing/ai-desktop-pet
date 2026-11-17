@@ -54,6 +54,7 @@
 | CONSOLE-01 | 测试消息未知结果重试 | CORE `07e3c53` 已推送；固定逻辑提交 ID/正文、导航恢复、确认后释放、拒绝/退出清理。新增浏览器 33 项与既有 78 项通过，CORE 59 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md) | 页面刷新/关闭后不恢复正文，应先核对列表；不是跨浏览器或设备展示保证。04 配套检查/文档同项提交 |
 | CONSOLE-14 | Naive UI 与管理台界面统一 | 软件本地已验证：三组导航/手机抽屉、消息筛选与导出、设备卡片、统一按钮与样式 nonce；见 [23](23-console-completion.md#console-14--naive-ui-与界面统一) | 完整 CORE 113 通过/5 条件跳过，19 组原页面 750 次与新增主题 21 次检查通过；CORE `9dc7ad9` 已推送并核对远端；JAR 三资源/20 迁移一致，04 配套与 CI 见末尾，部署/设备验收独立 |
 | CONSOLE-21 | 紧凑布局与 Naive UI 表单 | 已实施：缩小侧栏/页头/卡片间距、设备设置满宽、原生表单与下拉统一组件；见 [23](23-console-completion.md#console-21--紧凑布局与-naive-ui-表单) | 本轮检查、构建和配套提交见末尾；不改变 API、权限与未知结果重试契约 |
+| CONSOLE-22 | 常用筛选折叠与全站按钮统一 | 软件本地已验证：消息状态/来源常驻，时间条件折叠并显示生效数量；导航/列表/图表/导出入口使用 Naive 按钮，见 [23](23-console-completion.md#console-22--常用筛选与全站按钮) | 8 组浏览器 328 次检查通过；完整构建、跨仓提交与 CI 见末尾；5173 开发预览持续运行 |
 | CONSOLE-02 | 管理台完成度与验收清单 | `65eb2ef` 已推送；已按八导航、原完整规划及真实控制器核对；当前功能/验证/缺项见 [23](23-console-completion.md#console-02--当前实现与完整规划的差距) | 完整规划尚未全部实现；文档核对不算缺项完成。状态筛选已单独交付 CONSOLE-03 |
 | CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；更多筛选/元数据导出见 CONSOLE-13，取消/时间线见 CONSOLE-04 |
 | CONSOLE-04 | 投递状态时间线与受限取消 | CORE `109b83f` / 04 `0dec4b6` 已推送并核对远程；HTTP/worker/隔离 SQL 6 项，实际 Vue 新增 62/既有 191 项，Java→固件 C→Java 契约通过；完整构建 70 通过/5 跳过、JAR 一致；见 [23](23-console-completion.md#console-04--事务状态时间线与受限取消) | CORE [43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) Docker job、04 [43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job 全绿；V13 只在隔离库验证，旧行历史未知，无设备撤回或生产迁移 |
@@ -507,3 +508,12 @@ CORE 侧 V22 为样本表追加 `wifi_ip`/`wifi_rssi`：地址变化立即成条
 
 
 CONSOLE-21 推送核对：CORE `959e7b7` / 04 `20ece8e` 均已推送且远端分支包含对应提交。[CORE Docker CI 44008225925](https://github.com/liuyiwuqing/nexus-core/actions/runs/44008225925) 与 [04 Software checks 44008403882](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44008403882) 均未开始执行步骤；已读取 check-run 注释，GitHub 明确报告账户付款失败或 spending limit 需要提高。远程 CI 未通过，本地检查结果不替代它；本条后续提交仅补记录，不改变已验证代码。
+
+
+## CONSOLE-22 · 常用筛选与全站按钮（2026-11-17，CORE `11f6007`）
+
+消息页默认只显示消息状态、来源标识，收件时间条件收进“更多筛选”，已应用数量直接显示在按钮上。折叠保留草稿和已应用条件，分页/UTC 查询/导出继续使用同一条件，清空一并重置；倒置时间会展开并报错。投递页条件全部可见。导航、消息列表项、图表“重置缩放”、历史评论导入和“导出”入口统一使用 `NButton`，用 Naive 的主/次/危险层级与选中态，删除旧原生按钮背景/悬停/边框/焦点覆盖；保留正文导出确认、禁用/权限与原身份重试。导出打开时明确焦点归属，Escape 关闭后返回入口。
+
+- **浏览器验证**：8 组实际 Vue + 环回 RAM HTTP/SSE 共 328 次通过：表单 38、主题/12 页按钮 47、元数据 CSV 48、正文 CSV 15、消息 33、管理 64、列表筛选 44、角色 39。新增折叠草稿保留、已应用高级数量和清空、历史评论导入展开/草稿检查；主题专项曾发现鼠标打开导出后焦点留在 body、Escape 未关闭，主动落焦后复跑主题/元数据/正文导出通过。已查看 1440px/390px 明暗截图，CSS、浮层和浏览器 CSP 检查通过。截图在忽略目录 `firmware/build-ui-console-forms/`、`firmware/build-ui-console-theme/`，结果在 `firmware/build-ui-console-22/`。
+- **构建验证**：类型/74 token 守卫/生产前端、Shell/Python 语法、`git diff --check` 通过。`python3 tools/run_local.py build` 退出 0，121 条中 116 通过、5 条条件跳过；最终导入/焦点 UI 复测后以 `mvn -s .mvn/settings.xml -B -ntp -DskipTests package` 重新纳入静态资源，Java 未改。JAR 的 23 份前端和 V1–V23 迁移逐字节一致，无旧哈希文件。Vite 入口略超 500 kB 为非阻断告警，本项不扩为拆包重构。
+- **交付边界**：CORE `11f6007` 已推送并核对远端分支，04 配套随本项提交。5173 开发预览与当前 Vue 模块返回正常；没有修改后端/固件、重启真实 8088、迁移真实库、发送真实消息或验收设备。远程 CI 与本地结果独立核对。

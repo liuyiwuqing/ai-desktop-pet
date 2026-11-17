@@ -15,6 +15,11 @@ class OverviewFixture(Fixture):
     overview_requests = 0
 
     def do_GET(self):
+        if urlparse(self.path).path == '/api/v1/connectors':
+            if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
+                return self.json_response(401, {'error': 'unauthorized'})
+            return self.json_response(200, {'items': [{'id': 'halo-ui', 'source': 'halo', 'configured': True,
+                                                      'enabled': True, 'state': 'ready'}]})
         if urlparse(self.path).path != '/api/v1/overview':
             return super().do_GET()
         if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
