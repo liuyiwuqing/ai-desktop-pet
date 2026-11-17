@@ -729,6 +729,6 @@ HW-11/HW-12（2026-11-17）：配网页扩展到设备热点与家庭网络地�
 
 本地证据：`tools/ci/test_host.sh` 退出 0（114 条 `passed`，含新增 `test_setup_portal` 热点/地址用例与 `test_config_service` 固定地址接受、非法掩码/网关/主机名拒绝、改回 DHCP 后 `ip` 键消失）；`tools/ci/test_ui_host.sh` 10/10（新增 `setup-long`、`setup-open` 两帧断言截断与开放文案）；隔离构建 `firmware/build-hw11` 应用 3,005,728 B（`0x2ddd20`，剩余 28%），SHA256 `d77d353a7939ed08f7c5a33b882efc654e72a5df53ef3889debd0e0a31968873`；浏览器在 390×844 下用实际 `setup.html` 加本机模拟 API 验证偏好回显、开放模式确认、`restart:true` 请求体、地址非法输入前后端一致拒绝与无横向溢出。以上均未烧录、未在设备运行。
 
-提交 `2a75eeb`（热点）与 `50fd47c`（地址）已推送，`git ls-remote` 核对 `origin/main` 为 `50fd47c8d47f088f8b16c3d6e2b040edf98a520f`；远程 CI [44115358427](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44115358427) 与 [44117701555](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44117701555) 八个 job 全部 success。远程 CI 只构建固件预设，不覆盖真实射频或路由器行为。
+提交 `2a75eeb`（热点）与 `50fd47c`（地址）已推送，`git ls-remote` 核对 `origin/main` 为 `50fd47c8d47f088f8b16c3d6e2b040edf98a520f`；远程 CI [44115358427](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44115358427) 与 [44117701555](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44117701555) 八个 job 全部 success。远程 CI 只构建固件预设，不覆盖真实射频或路由器行为。本段随文档提交（`5b562fd` 起）推送；工作流只筛 `firmware/**`、`config/**`、`tools/**` 等路径，纯 `docs/**` 提交不触发，故不为此单独列 run。
 
 未验收：改自定义热点名/隐藏后手机重连、开放热点、信道与连接数实际表现、重开热点的重启时序、实机 LCD 两行截断；固定地址在真实路由器下的连通、填错掩码断网后的恢复、DHCP 主机名在路由器列表中的显示，以及实机状态文案。这些不能用主机测试、浏览器模拟或构建结果替代。
