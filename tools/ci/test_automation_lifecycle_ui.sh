@@ -21,7 +21,7 @@ const name='NEXUS automation lifecycle',base='http://127.0.0.1:18814',id='111111
 const prior=(await listTaskSpaces()).find(s=>s.name===name);
 if(prior && prior.ownership!=='agent')throw new Error('Existing space requires confirmation');
 await useOrCreateTaskSpace(name);await openOrReuseTab(base,{wait:true,timeout:15});
-await cdp('Network.setCacheDisabled',{cacheDisabled:true});
+await cdp('Network.setCacheDisabled',{cacheDisabled:true});await cdp('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
 const checks=[];
 async function qa(value={}){return JSON.parse(await serverFetch(base+'/__qa/operations',{method:'POST',headers:{'Content-Type':'application/json','X-QA-Key':'isolated-ui-fixture-control'},body:JSON.stringify(value)}));}
 async function expect(expression,label){for(let i=0;i<100;i++){if(await js(expression).catch(()=>false)){checks.push(label);return;}await wait(.1);}cliLog(await snapshotText());throw new Error(label);}
@@ -51,7 +51,7 @@ state=await qa();if(deletions(state).length!==2||deletions(state).some(r=>r.vers
 await reset();await openDelete();await confirmName();await qa({next_write:'conflict'});await tap('确认删除规则','.rule-delete');await expect("document.querySelector('.rule-delete')?.innerText.includes('尚未确认')",'conflict keeps request for readback');await tap('关闭','.rule-delete');await expect("!document.querySelector('.rule-delete')",'close does not delete rule');
 await reset();await qa({write_delay:1});await tap('测试预演','.record-card');await nav('消息');await wait(1.2);await expect("!document.querySelector('.rule-preview')",'late preview cannot change another page');
 await reset();await openDelete();await confirmName();await qa({next_write:'unauthorized'});await tap('确认删除规则','.rule-delete');await expect("!!document.querySelector('.login-card') && !document.querySelector('.rule-delete')",'401 clears deletion and session');
-await reset();await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await openDelete();await expect("document.documentElement.scrollWidth<=390",'390px confirmation fits viewport');cliLog(await captureScreenshot());
+await reset();await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await openDelete();await expect("document.documentElement.scrollWidth<=390",'390px confirmation fits viewport');await cdp('Page.bringToFront');await wait(.3);const fs=await import('node:fs');fs.mkdirSync('/tmp/nexus-console-surfaces',{recursive:true});const screenshot=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('/tmp/nexus-console-surfaces/delete-confirmation-mobile.png',Buffer.from(screenshot.data,'base64'));
 cliLog({passed:checks.length,checks});
 EOF
 ego-browser nodejs <<'EOF'

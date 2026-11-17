@@ -65,6 +65,13 @@ if(exportQuery.get('source')!=='manual'||exportQuery.get('readStatus')!=='unread
 await navigate('投递');await expect("document.querySelector('h1')?.innerText==='投递'",'delivery list opens');await ready();
 await tap('更多筛选');await choose('投递状态','failed');await input('设备 ID','device-a');await input('收件开始','2026-11-14T16:00');await input('收件截止','2026-11-14T17:00');await tap('应用筛选');
 await expect("document.querySelector('.section-heading p')?.innerText.startsWith('31 条投递') && document.querySelectorAll('tbody tr').length===30",'device and message receipt window combine with delivery state');await ready();
+await expect("(()=>{const table=document.querySelector('.table-shell table'),th=getComputedStyle(table.querySelector('th')),td=getComputedStyle(table.querySelector('td'));return th.paddingTop==='8px'&&th.paddingLeft==='12px'&&td.paddingTop==='8px'&&td.paddingLeft==='12px'&&[...table.querySelectorAll('th')].every(h=>h.scope==='col')})()",'delivery table uses compact cells and named column headers');
+const shots='/tmp/nexus-console-surfaces';fs.mkdirSync(shots,{recursive:true});
+async function shot(name,width,height){await cdp('Page.bringToFront');await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<761});await js('window.scrollTo(0,0)');await wait(.3);const r=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(shots,name+'.png'),Buffer.from(r.data,'base64'));}
+await cdp('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await shot('deliveries-compact-desktop',1226,976);
+await shot('deliveries-compact-mobile',390,844);await expect("document.documentElement.scrollWidth<=390 && getComputedStyle(document.querySelector('.table-shell thead')).display==='none' && document.querySelectorAll('.table-shell td[data-label]').length>=30",'mobile table preserves row labels and fits the viewport');
+await js("document.querySelector('[aria-label=切换到深色主题]')?.click()");await expect("document.documentElement.dataset.theme==='dark'",'table supports the dark palette');await shot('deliveries-compact-dark',390,844);await js("document.querySelector('[aria-label=切换到浅色主题]').click()");await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});await wait(.2);
+
 await tap('导出元数据');await downloaded(2,'browser saves real delivery CSV');await ready();
 csv=fs.readFileSync(path.join(downloadDir,'deliveries-metadata.csv'),'utf8');
 if(csv.split('\r\n').length!==33||!csv.includes('event-30')||csv.includes('event-31')||csv.includes('title'))throw new Error('Wrong delivery CSV content');results.push('delivery metadata includes all filtered rows and no title');
