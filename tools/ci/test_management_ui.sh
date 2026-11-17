@@ -89,6 +89,7 @@ await expect("document.querySelector('.device-name-heading h2').innerText==='客
 renameState=await state();if(renameState.renameSubmissions.length!==2)throw new Error('Rename was unexpectedly replayed');
 results.push('unknown rename never resends automatically');
 await tap('加载当前名称');await tap('取消');
+await expect("document.querySelector('.device-card')?.innerText.includes('192.168.1.20') && document.querySelector('.device-card')?.innerText.includes('-52 dBm')",'device card shows the latest Wi-Fi address and signal');
 await tap('设置与状态');
 await expect("document.querySelector('#device-management-panel')?.innerText.includes('尚未收到设备状态')",'empty device state');
 await expect("document.querySelector('.telemetry-history .history-empty')?.innerText.includes('没有采样点') && !document.querySelector('.telemetry-chart')",'history empty state is explicit');

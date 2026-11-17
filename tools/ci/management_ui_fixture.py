@@ -64,7 +64,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
             if path=='/api/v1/devices':
                 delay=state['deviceReadDelay'];state['deviceReadDelay']=0
                 if delay:time.sleep(delay)
-                value={'items':[{'deviceId':'dodo-ui-fixture','name':state['deviceName'],'enabled':True,'online':True,'lastSeen':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]}
+                value={'items':[{'deviceId':'dodo-ui-fixture','name':state['deviceName'],'enabled':True,'online':True,'lastSeen':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'wifiIp':'192.168.1.20','wifiRssi':-52,'telemetryAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]}
             elif state['listMode'] and path in ('/api/v1/messages','/api/v1/deliveries'):
                 state['listRequests'].append(self.path)
                 if state['listDelay']:time.sleep(state['listDelay'])
