@@ -302,6 +302,14 @@ export interface PetTelemetry {
   wifiIp?: string;
   /** 当前 AP 的 RSSI（dBm，<=0）；未关联或取不到时省略。 */
   wifiRssi?: number;
+  /** 当前 AP 的 SSID（UTF-8，最多 32 字节）；未关联、取不到或空口字节不是可打印 UTF-8 时省略。不含口令。 */
+  wifiSsid?: string;
+  /** 当前 AP 的主信道（1–196）；未关联或取不到时省略。 */
+  wifiChannel?: number;
+  /** 本次启动以来最近一次 Wi-Fi 断线原因（ESP-IDF wifi_err_reason_t）；从未断线时省略。 */
+  wifiDisconnectReason?: number;
+  /** 最近一次断线的设备时间（Unix 秒）；未对时或从未断线时省略。 */
+  wifiDisconnectedAt?: number;
   /** 设备运行期用户配置（NVS pet_cfg），不含凭据。 */
   config?: PetTelemetryConfig;
 }

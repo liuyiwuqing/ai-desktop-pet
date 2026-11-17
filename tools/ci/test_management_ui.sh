@@ -89,7 +89,7 @@ await expect("document.querySelector('.device-name-heading h2').innerText==='客
 renameState=await state();if(renameState.renameSubmissions.length!==2)throw new Error('Rename was unexpectedly replayed');
 results.push('unknown rename never resends automatically');
 await tap('加载当前名称');await tap('取消');
-await expect("document.querySelector('.device-card')?.innerText.includes('192.168.1.20') && document.querySelector('.device-card')?.innerText.includes('-52 dBm')",'device card shows the latest Wi-Fi address and signal');
+await expect("document.querySelector('.device-card')?.innerText.includes('HomeLab-2.4G') && document.querySelector('.device-card')?.innerText.includes('192.168.1.20') && document.querySelector('.device-card')?.innerText.includes('-52 dBm')",'device card shows the latest Wi-Fi network, address and signal');
 await tap('设置与状态');
 await expect("document.querySelector('#device-management-panel')?.innerText.includes('尚未收到设备状态')",'empty device state');
 await expect("document.querySelector('.telemetry-history .history-empty')?.innerText.includes('没有采样点') && !document.querySelector('.telemetry-chart')",'history empty state is explicit');
@@ -102,7 +102,8 @@ await expect("document.body.innerText.includes('实时快照') && !document.quer
 await hover(0.55);
 await expect("document.querySelector('.chart-tooltip')?.textContent.includes('KB')",'chart hover reads a real sample');
 await expect("document.querySelector('.history-metrics')?.innerText.includes('内存') && document.querySelector('.history-metrics')?.innerText.includes('音量') && document.querySelector('.history-metrics')?.innerText.includes('未读') && document.querySelector('.history-metrics')?.innerText.includes('音频') && document.querySelector('.history-metrics')?.innerText.includes('网络')",'metric switcher exposes all history metrics');
-await expect("document.querySelector('.management-metrics')?.innerText.includes('192.168.1.20') && document.querySelector('.management-metrics')?.innerText.includes('-52 dBm')",'snapshot shows the device Wi-Fi address and signal');
+await expect("document.querySelector('.management-metrics')?.innerText.includes('HomeLab-2.4G') && document.querySelector('.management-metrics')?.innerText.includes('192.168.1.20') && document.querySelector('.management-metrics')?.innerText.includes('信道 6') && document.querySelector('.management-metrics')?.innerText.includes('-52 dBm')",'snapshot shows the device Wi-Fi network, address, channel and signal');
+await expect("document.querySelector('.management-metrics')?.innerText.includes('上次断线') && document.querySelector('.management-metrics')?.innerText.includes('201 找不到目标 AP')",'snapshot names the last disconnect reason');
 await tap('音量');
 await expect("document.querySelector('.chart-legend')?.innerText.includes('音量') && document.querySelector('.chart-legend')?.innerText.includes('%') && !document.querySelector('.telemetry-chart .series-secondary')",'volume metric draws a single percent series');
 await hover(0.55);
@@ -125,7 +126,7 @@ await js("(()=>{window.__csv=null;window.__csvName='';window.__csvText='';const 
 await tap('导出 CSV');
 await expect("window.__csvName.startsWith('telemetry-dodo-ui-fixture-6h-') && window.__csvName.endsWith('.csv') && window.__csv?.size>500",'history export downloads a CSV');
 await js("(()=>{window.__csv.text().then(text=>{window.__csvText=text;});return true;})()");
-await expect("window.__csvText.includes('采样时间') && window.__csvText.includes('音频欠载') && window.__csvText.includes('Wi-Fi IP') && window.__csvText.includes('192.168.1.2') && window.__csvText.split('\\r\\n').length>=70",'exported CSV has a header and every bucket row');
+await expect("window.__csvText.includes('采样时间') && window.__csvText.includes('音频欠载') && window.__csvText.includes('Wi-Fi IP') && window.__csvText.includes('192.168.1.2') && window.__csvText.includes('SSID') && window.__csvText.includes('HomeLab-2.4G') && window.__csvText.split('\\r\\n').length>=70",'exported CSV has a header and every bucket row');
 await js("(()=>{delete HTMLAnchorElement.prototype.click;return true;})()");
 await js("(()=>{const svg=document.querySelector('.telemetry-chart');const rect=svg.getBoundingClientRect();const at=ratio=>[rect.left+rect.width*ratio,rect.top+rect.height*0.5];const [x1,y1]=at(0.35),[x2,y2]=at(0.6);svg.dispatchEvent(new MouseEvent('mousedown',{button:0,clientX:x1,clientY:y1,bubbles:true}));svg.dispatchEvent(new MouseEvent('mousemove',{clientX:x2,clientY:y2,bubbles:true}));window.dispatchEvent(new MouseEvent('mouseup',{button:0,clientX:x2,clientY:y2,bubbles:true}));return true;})()");
 await expect("!!document.querySelector('.chart-reset')",'drag selection zooms the history chart');

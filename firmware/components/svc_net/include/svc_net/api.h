@@ -35,5 +35,16 @@ esp_err_t pet_net_local_ip(char *out, size_t capacity);
 /* 当前 AP 的 RSSI（dBm，<=0）；未关联或取不到时返回 ESP_ERR_INVALID_STATE。 */
 esp_err_t pet_net_rssi(int *dbm);
 
+/* 当前 AP 的 SSID（NUL 结尾，最多 32 字节）；空口字节不是可打印 UTF-8 时返回
+   ESP_ERR_INVALID_ARG，由调用方省略该字段，避免污染遥测 JSON。 */
+esp_err_t pet_net_ssid(char *out, size_t capacity);
+
+/* 当前 AP 的主信道（1–196）；未关联或取不到时返回 ESP_ERR_INVALID_STATE。 */
+esp_err_t pet_net_channel(int *channel);
+
+/* 本次启动以来最近一次运行期断线原因（ESP-IDF wifi_err_reason_t）与设备时刻；
+   epoch_seconds 在未对时时为 0。从未断线时返回 ESP_ERR_INVALID_STATE。 */
+esp_err_t pet_net_last_disconnect(int *reason, uint32_t *epoch_seconds);
+
 const char *pet_net_state_name(pet_net_state_t state);
 const char *pet_net_error_name(pet_net_error_t error);

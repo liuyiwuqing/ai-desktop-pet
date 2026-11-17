@@ -97,6 +97,26 @@ esp_err_t pet_net_rssi(int *dbm)
     return ESP_ERR_NOT_SUPPORTED;
 }
 
+esp_err_t pet_net_ssid(char *out, size_t capacity)
+{
+    (void)out;
+    (void)capacity;
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
+esp_err_t pet_net_channel(int *channel)
+{
+    (void)channel;
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
+esp_err_t pet_net_last_disconnect(int *reason, uint32_t *epoch_seconds)
+{
+    (void)reason;
+    (void)epoch_seconds;
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
 const pet_net_t *pet_fake_net_driver(void)
 {
     static const pet_net_t driver = {

@@ -64,7 +64,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
             if path=='/api/v1/devices':
                 delay=state['deviceReadDelay'];state['deviceReadDelay']=0
                 if delay:time.sleep(delay)
-                value={'items':[{'deviceId':'dodo-ui-fixture','name':state['deviceName'],'enabled':True,'online':True,'lastSeen':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'wifiIp':'192.168.1.20','wifiRssi':-52,'telemetryAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]}
+                value={'items':[{'deviceId':'dodo-ui-fixture','name':state['deviceName'],'enabled':True,'online':True,'lastSeen':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'wifiIp':'192.168.1.20','wifiRssi':-52,'wifiSsid':'HomeLab-2.4G','telemetryAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]}
             elif state['listMode'] and path in ('/api/v1/messages','/api/v1/deliveries'):
                 state['listRequests'].append(self.path)
                 if state['listDelay']:time.sleep(state['listDelay'])
@@ -122,7 +122,10 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                         'brightness':state['config']['brightness'],'muted':False,'dnd':False,'unread':i%3,
                         'freeHeap':heap,'freeHeapMin':heap,'freeHeapMax':heap,'minFreeHeap':90000-(i%5)*100,
                         'audioUnderruns':(i*13)%4,'inferenceMaxMs':200+i,'displayMaxMs':20,'audioFaulted':i%17==5,
-                        'wifiIp':'192.168.1.%d'%(20+i%3),'wifiRssi':-40-(i*7)%35})
+                        'wifiIp':'192.168.1.%d'%(20+i%3),'wifiRssi':-40-(i*7)%35,
+                        'wifiSsid':'HomeLab-2.4G','wifiChannel':6+i%3,
+                        'wifiDisconnectReason':201 if i%5==0 else None,
+                        'wifiDisconnectedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(start+i*step-1800)) if i%5==0 else None})
                 value={'deviceId':'dodo-ui-fixture','from':query.get('from',[''])[0] or time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(start)),
                     'to':query.get('to',[''])[0] or time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(end)),'bucket':bucket,
                     'sampleSeconds':30,'retentionDays':30,'truncated':False,'points':points}
@@ -130,7 +133,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 telemetry=None if mode=='empty' else {'observedAt':now-(120 if mode=='stale' else 0),'firmwareVersion':'0.4.0-ui-fixture',
                     'configRevision':state['revision'],'configWritable':mode!='readonly','muted':False,'dnd':False,'volume':state['config']['volume'],
                     'brightness':state['config']['brightness'],'unread':0,'freeHeap':100000,'minFreeHeap':90000,
-                    'wifiIp':'192.168.1.20','wifiRssi':-52,'config':state['config']}
+                    'wifiIp':'192.168.1.20','wifiRssi':-52,'wifiSsid':'HomeLab-2.4G','wifiChannel':6,
+                    'wifiDisconnectReason':201,'wifiDisconnectedAt':now-3600,'config':state['config']}
                 value={'deviceId':'dodo-ui-fixture','fresh':mode not in ('empty','stale'),'canConfigure':mode not in ('empty','stale','readonly'),
                     'configBlock':'config_storage_readonly' if mode=='readonly' else 'config_readback_required' if mode in ('empty','stale') else '',
                     'telemetry':telemetry,'receivedAt':None,'configRequests':state['requests']}

@@ -47,6 +47,8 @@ static bool s_time_synced;
 static bool s_sntp_started;
 static bool s_handlers_registered;
 static uint16_t s_reconnect_count;
+static uint8_t s_disconnect_reason;
+static uint32_t s_disconnect_epoch;
 static uint32_t s_retry_delay_ms;
 static char s_status_topic[PET_NET_TOPIC_MAX];
 static char s_inbox_topic[PET_NET_TOPIC_MAX];
@@ -262,6 +264,10 @@ static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t event_i
         if (!s_running) {
             return;
         }
+        /* 只记录运行期断线；正常 stop 的主动断开会先清 s_running，不算故障。 */
+        s_disconnect_reason = event != NULL ? event->reason : 0;
+        const time_t now = time(NULL);
+        s_disconnect_epoch = now >= 1600000000 ? (uint32_t)now : 0;
         ESP_LOGW(TAG, "wifi disconnected, reason=%d", event != NULL ? event->reason : -1);
         publish_state(PET_NET_STATE_RECONNECTING, PET_NET_ERROR_WIFI);
         schedule_wifi_retry();
@@ -615,6 +621,8 @@ static esp_err_t esp_net_start(const pet_net_config_t *config)
 
     s_config = config;
     s_reconnect_count = 0;
+    s_disconnect_reason = 0;
+    s_disconnect_epoch = 0;
     s_retry_delay_ms = 0;
     s_mqtt_connected = false;
     s_mqtt_started = false;
@@ -753,6 +761,102 @@ esp_err_t pet_net_rssi(int *dbm)
         return ESP_ERR_INVALID_STATE;
     }
     *dbm = ap.rssi;
+    return ESP_OK;
+}
+
+/* SSID 是空口字节，不保证是可打印 UTF-8；非法序列整条省略，
+   否则一个坏字节就会让整份遥测 JSON 无法解析。 */
+static bool ssid_printable_utf8(const uint8_t *text, size_t length)
+{
+    for (size_t i = 0; i < length;) {
+        const uint8_t lead = text[i];
+        if (lead < 0x20 || lead == 0x7f) {
+            return false;
+        }
+        if (lead < 0x80) {
+            i++;
+            continue;
+        }
+        size_t extra;
+        uint32_t code;
+        if ((lead & 0xe0) == 0xc0) {
+            extra = 1;
+            code = lead & 0x1f;
+        } else if ((lead & 0xf0) == 0xe0) {
+            extra = 2;
+            code = lead & 0x0f;
+        } else if ((lead & 0xf8) == 0xf0) {
+            extra = 3;
+            code = lead & 0x07;
+        } else {
+            return false;
+        }
+        if (i + extra >= length) {
+            return false;
+        }
+        for (size_t k = 1; k <= extra; k++) {
+            if ((text[i + k] & 0xc0) != 0x80) {
+                return false;
+            }
+            code = (code << 6) | (text[i + k] & 0x3f);
+        }
+        if ((extra == 1 && code < 0x80) || (extra == 2 && code < 0x800) ||
+            (extra == 3 && code < 0x10000) || code > 0x10ffff ||
+            (code >= 0xd800 && code <= 0xdfff)) {
+            return false;
+        }
+        i += extra + 1;
+    }
+    return true;
+}
+
+esp_err_t pet_net_ssid(char *out, size_t capacity)
+{
+    if (out == NULL || capacity < 2) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    wifi_ap_record_t ap;
+    if (esp_wifi_sta_get_ap_info(&ap) != ESP_OK) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    const size_t length = strnlen((const char *)ap.ssid, sizeof(ap.ssid));
+    if (length == 0) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (length + 1 > capacity) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    if (!ssid_printable_utf8(ap.ssid, length)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    memcpy(out, ap.ssid, length);
+    out[length] = '\0';
+    return ESP_OK;
+}
+
+esp_err_t pet_net_channel(int *channel)
+{
+    if (channel == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    wifi_ap_record_t ap;
+    if (esp_wifi_sta_get_ap_info(&ap) != ESP_OK || ap.primary == 0) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    *channel = ap.primary;
+    return ESP_OK;
+}
+
+esp_err_t pet_net_last_disconnect(int *reason, uint32_t *epoch_seconds)
+{
+    if (reason == NULL || epoch_seconds == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (s_disconnect_reason == 0) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    *reason = s_disconnect_reason;
+    *epoch_seconds = s_disconnect_epoch;
     return ESP_OK;
 }
 
