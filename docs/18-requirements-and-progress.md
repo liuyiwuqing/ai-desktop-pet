@@ -1023,3 +1023,5 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 - 概览浏览器检查 59 → 65 项：原因行 2 项及计数/合计、点选后 `aria-pressed` 与失败图说明、摘要保留窗口总数、请求实际带 `reason=ack_timeout`、筛选后仍保留完整原因列表、清空后请求不再带 `reason=`、390px 原因行不溢出。
 
 边界：原因码不做固定集合校验，新增原因仍要同步前端中文文案；折行只覆盖保留策略尚未清理的投递历史，清理后窗口分布会随之减少；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库大数据量验证。
+
+推送与 CI（2026-11-18）：CORE `e0280fd` / 04 `f3e53b3` 已推送，`git ls-remote` 核对远端分支均指向该提交。CI：CORE `Docker deployment` [#44249292575](https://github.com/liuyiwuqing/nexus-core/actions/runs/44249292575) `success`；04 `Software checks` [#44249305286](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44249305286) `success`（八个 job 全绿）。两项 workflow 不运行本项 65 项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署或实机验收。
