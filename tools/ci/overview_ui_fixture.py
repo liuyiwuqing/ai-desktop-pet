@@ -183,7 +183,7 @@ class OverviewFixture(Fixture):
         time.sleep(delay)
         if mode in ('error', 'unauthorized'):
             return self.json_response(401 if mode == 'unauthorized' else 503, {'error': 'unauthorized' if mode == 'unauthorized' else 'unavailable'})
-        value = {'asOf': '2026-11-13T10:00:00Z', 'dayStart': '2026-11-13T00:00:00Z', 'timezone': 'UTC',
+        value = {'asOf': '2026-11-13T10:00:00Z', 'dayStart': '2026-11-12T16:00:00Z', 'timezone': 'Asia/Shanghai',
                  'devices': {'total': 5, 'online': 2, 'offline': 3, 'disabled': 1},
                  'today': {'messages': 7, 'deliveries': 12, 'failedDeliveries': 3, 'deliveryFailureRate': 0.25},
                  'backlog': {'pending': 4, 'sent': 2}, 'failedDeliveries': 8, 'mqtt': 'ready'}

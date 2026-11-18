@@ -35,7 +35,7 @@ await login();
 await expect("[...document.querySelectorAll('.sidebar nav button')].some(b=>b.textContent.includes('概览'))",'overview navigation exists');
 await navigate('概览');
 await expect("document.querySelector('h1')?.innerText==='运行概览' && document.querySelector('.overview-panel')?.innerText.includes('25.0%')",'overview loads its own authenticated HTTP snapshot');
-await expect("document.querySelector('.overview-panel')?.innerText.includes('2026-11-13 · UTC') && document.querySelector('[data-metric=online] dd')?.childNodes[0]?.textContent.trim()==='2' && document.querySelector('[data-metric=offline] dd')?.childNodes[0]?.textContent.trim()==='3'",'UTC day and device counts are explicit');
+await expect("document.querySelector('.overview-panel')?.innerText.includes('2026-11-13 · Asia/Shanghai 当日起算') && document.querySelector('[data-metric=online] dd')?.childNodes[0]?.textContent.trim()==='2' && document.querySelector('[data-metric=offline] dd')?.childNodes[0]?.textContent.trim()==='3'",'the local day and configured zone are explicit rather than a sliced UTC date');
 await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='7' && document.querySelector('[data-metric=backlog] dd')?.childNodes[0]?.textContent.trim()==='6' && document.querySelector('.overview-panel')?.innerText.includes('停用 1 台')",'message, backlog and overlapping disabled counts are distinct');
 // 告警阈值：安静快照不造告警，但要把服务端阈值说出来；样本不足时条形不染色。
 await expect("!document.querySelector('.overview-alerts') && document.querySelector('.overview-panel')?.innerText.includes('告警阈值：今日失败率 ≥ 10.0%') && document.querySelector('.overview-panel')?.innerText.includes('积压 ≥ 100 条')",'a quiet snapshot states the server thresholds without inventing alerts');

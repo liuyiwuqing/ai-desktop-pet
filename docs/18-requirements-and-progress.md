@@ -108,6 +108,7 @@
 | AUDIT-PAGE-01 | 阈值变更审计列表与向前翻页 | 软件本地已验证：`GET /api/v1/overview/thresholds` 新增 `historyTotal`；新增 `GET /api/v1/overview/thresholds/audit?before=&size=`（所有认证角色可读，`before` 为已加载最旧 `sequence`，`size` 1–100，返回 `items/total/hasMore`，新写入只落在更大序号一侧）；调整阈值表单列出最新 20 条审计（版本前后/操作者/时间/四项阈值），标题「已显示 N / 共 M 条」，「加载更早变更」按游标追加、失败保留已加载行，保存后回到最新；CORE 160 项 0 失败/5 条件跳过（新增 1 项）、前端 check/build、概览 68 项浏览器检查（新增 3 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#阈值配置--alert-config-01) | 审计行不清理，但没有删除/导出/按操作者或时间筛选；`sequence` 是内部序号，不承诺跨环境稳定；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | TREND-REASON-01 | 趋势失败原因折行与按原因收窄 | 软件本地已验证：`GET /api/v1/overview/trend` 新增可选 `reason`（去空白后 1–64 字符，空/超长 400，未知原因返回空序列）与响应 `reason`、`failureReasons`、`totals.allFailures`；折行始终覆盖整个窗口（按数量降序、同量按码升序），`reason` 只收窄 `points[].failures` 与 `totals.failures`；概览趋势在失败图下显示原因计数，点选/「全部原因」切换并保留窗口总数；CORE 159 项 0 失败/5 条件跳过（新增 1 项）、前端 check/build、概览 65 项浏览器检查（新增 6 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#历史趋势--overview-trend-01) | 原因码来自投递历史 `last_error`，不做固定集合校验；折行合计与 `allFailures` 同源，但 `totals.failures` 会被收窄；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
+| OVERVIEW-TZ-01 | 概览今日时区可配置 | 软件本地已验证：`nexus.overview.timezone`（`NEXUS_OVERVIEW_TIMEZONE`，默认 `UTC`）决定 `dayStart` 与“今日”窗口，响应 `timezone` 返回解析后的时区 ID；配置非法时启动失败；页面按该时区显示当地日期，不再截取 UTC 字符串；趋势桶仍固定 UTC 对齐；见 [CORE 契约](../../nexus-core/docs/console-overview.md) | 时区是部署级配置，不能按用户/设备切换，也没有页面入口；测试使用无 DST 的 `Asia/Shanghai`，夏令时边界依赖 PostgreSQL `AT TIME ZONE` 未单独演练；推送与 CI 见文末 |
 
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
@@ -1043,3 +1044,21 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 边界：审计行不清理，但未提供删除、导出、按操作者或时间筛选；`sequence` 是数据库内部序号，不承诺跨环境稳定；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库大数据量验证。
 
 推送与 CI（2026-11-18）：CORE `1f62d78` / 04 `59a2e22` 已推送，`git ls-remote` 核对远端分支均指向该提交。CI：CORE `Docker deployment` [#44251278173](https://github.com/liuyiwuqing/nexus-core/actions/runs/44251278173) `success`（docker-compose）；04 `Software checks` [#44251277011](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44251277011) `success`（八个 job 全绿）。两项 workflow 不运行本项 68 项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署或实机验收。
+
+## OVERVIEW-TZ-01 · 概览“今日”时区可配置
+
+概览此前把“今日”固定为 UTC 日界，页面只能截取 `dayStart` 的 UTC 日期；对 UTC+8 的部署，当地凌晨 0–8 点收的消息会被算进前一天。本项把日起算时区改为部署配置 `nexus.overview.timezone`（环境变量 `NEXUS_OVERVIEW_TIMEZONE`），默认 `UTC`，保持既有行为。CORE 启动时解析时区，非法配置直接启动失败，不静默回退。响应里的 `timezone` 是解析后的时区 ID，`dayStart` 是该时区的当地零点，“今日”窗口仍是 `[dayStart, asOf]`；趋势桶继续按固定 UTC 原点对齐，不受此配置影响。
+
+页面不再截取 ISO 字符串，而是按 `snapshot.timezone` 把 `dayStart` 格式化为当地日期并显示时区名。没有新增页面入口或持久化状态；时区是部署级配置，不能按管理员、设备或来源分别设置。
+
+验证：
+
+- CORE `python3 tools/run_local.py build` 退出 0：161 项中 156 通过、5 条条件跳过、0 失败/错误，Flyway V26，JAR 重打包成功。
+- `ConsoleOverviewFlowTest` 整个 HTTP 专项改用 `Asia/Shanghai` 启动：`timezone` 返回配置值、`dayStart` 等于当地零点、本地日界前 1 秒的收件不计入今日；新增纯单元检查覆盖默认/空白 → `UTC`、合法时区解析、非法时区抛错。
+- 第一次全量构建出现与本项无关的 `MessageDeliveryBatchFlowTest` 偶发失败（期望 3 个候选、实际 0），单独复跑该测试与随后完整重跑均通过，未修改该测试或相关生产代码。
+- 浏览器 `bash tools/ci/test_overview_ui.sh` 68 项通过：夹具改为 `Asia/Shanghai` 且 `dayStart` 为 `2026-11-12T16:00:00Z`，页面显示 `2026-11-13 · Asia/Shanghai 当日起算`，证明显示按服务端时区而不是截取 UTC 日期；概览、告警、趋势、审计其余检查不变。
+- 浏览器仍使用实际编译的 Vue + 回环 RAM HTTP，不连接真实 CORE、数据库、Broker 或设备。
+
+边界：只验证了无夏令时的 `Asia/Shanghai`，DST 日界依赖 PostgreSQL `AT TIME ZONE`，未单独演练；切换配置会让“今日”瞬间跨日，且没有配置变更审计；趋势、导出窗口与设备在线口径不变。
+
+推送与 CI：待本项提交后补记。
