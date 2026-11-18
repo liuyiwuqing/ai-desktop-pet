@@ -83,6 +83,7 @@
 | CONSOLE-09-C | 消息条件与限定动作组合 | CORE `f39ecec` / 04 `343e23b` 均已推送并核对远端；来源/类型/关键词/优先级 AND、新消息固定提醒、公开分析原授权保护、自动提醒回环排除；HTTP/隔离库新增 3 项与原编辑/创建共 17 项 verify 通过，实际 Vue 新增 17/原编辑 99/删除 52 检查通过；见 [CORE 契约](../../nexus-core/docs/automation-conditions.md) | 同步契约/页面/专项；不开放任意动作，真实规则/消息与生产库未操作 |
 | DEVICE-CRED-01 | 设备 MQTT 凭据台账与轮换 | 软件本地已验证：V25 台账（只存 SHA-256 指纹、一次性密钥、宽限期、撤销）、管理员限定签发/轮换/撤销、接入引导按设备显示台账状态、设备详情新增凭据区块；CORE 139 项 0 失败/5 条件跳过、`DeviceCredentialFlowTest` 3 项、前端 check/build、设备页 73 项浏览器检查（新增 7 项）通过；见 [契约](../../nexus-core/docs/device-credentials.md) | CORE 不写 Broker（配置为只读绑定），应用步骤见 [1Panel 说明](../deployment/1panel/README.md#设备-mqtt-凭据device-cred-01)；真实 Broker/设备/生产库未验收；推送与 CI 见文末 |
 | OVERVIEW-TREND-01 | 概览收件/投递/失败历史趋势 | 软件本地已验证：`GET /api/v1/overview/trend`（`15m`/`1h`/`6h`/`1d` 固定桶、`date_bin` 固定原点对齐、1–168 小时、最多 400 点、末桶标 `partial`）、收件/投递/失败事件三条序列、概览页 6h/24h/7d 与独立刷新；CORE 141 项 0 失败/5 条件跳过（新增 2 项）、前端 check/build、概览页 24 项浏览器检查（新增 7 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#历史趋势--overview-trend-01) | 趋势只覆盖仍保留的记录，失败按投递历史事件计数而非当前失败回看；仍无告警阈值、推送与时区选项；未对生产库/大数据量验证；推送与 CI 见文末 |
+| MSG-BATCH-01 | 单条消息的投递批量撤销与重试 | 软件本地已验证：`POST /api/v1/messages/{id}/deliveries/{cancel,retry}`（`dryRun` 只读预演、确认令牌写入、单条 `UPDATE … RETURNING`、500 条上限拒绝对截断）、跳过原因按单条判定条件的否定归并、消息详情新增批量折叠区；CORE 145 项 0 失败/5 条件跳过（新增 4 项）、前端 check/build、消息批量 16 项浏览器检查与既有筛选 44/发送 33 项回归通过；见 [契约](../../nexus-core/docs/message-delivery-batch.md) | 仍无跨消息批量操作，也不能撤回设备已保存/展示的内容；真实 Broker、设备回执竞态与生产库未验收；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
@@ -790,3 +791,26 @@ CORE 新增 `GET /api/v1/overview/trend?hours=&bucket=`，与快照接口分开�
 边界：未对生产库或大数据量验证分桶耗时；趋势只覆盖保留策略尚未清理的记录，清理后对应桶会变空，不是永久累计；仍没有告警阈值、推送和时区选项。本机 `rg` 缺失的处理与 DEVICE-CRED-01 相同（临时 `grep -qE` shim，未提交）。
 
 推送与 CI（2026-11-18）：CORE `c4598ccc719fe550a52e5377ecfe9050b5b4cd75` 已推送，`git ls-remote` 核对 `origin/codex/core-baseline` 为该提交；04 `773a797`（夹具与页面检查）随文档提交一并推送，`git ls-remote` 核对 `origin/main` 为 `486822c1dfb9e9182aee437bab3a3279518ab906`。远程 [CORE Docker deployment 44216294567](https://github.com/liuyiwuqing/nexus-core/actions/runs/44216294567) 的 docker-compose job 全部步骤 success（2 分 25 秒，与上一次 2 分 19 秒同量级）；[04 Software checks 44216315178](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44216315178) 八个 job 全部 success。两项 CI 只覆盖容器构建与固件预设，不覆盖趋势接口在大数据量下的耗时，也不替代生产库与实机验收。
+
+## MSG-BATCH-01 · 单条消息的投递批量撤销与重试（2026-11-18）
+
+差距表这条一直写着「无按消息批量取消」。实际痛点不是没有取消，而是取消只能进单条投递的时间线：一条消息发给几台设备，就要重复点几次、看几条时间线。本项补按消息的批量入口，**不扩大可处理范围**——条件就是单条接口的条件。
+
+CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `dryRun=true` 只读预演，非预演必须带 `confirm=CANCEL_MESSAGE_DELIVERIES` / `RETRY_MESSAGE_DELIVERIES`。响应分开 `counts.candidates`（请求开始时可处理）、`applied`（实际改动）、`counts.remaining`（结束后仍可处理），以及 `skipped[]` 的逐条原因；三者不一致只可能是并发，不会被写成一笔全成功。
+
+判定条件没有第二个副本：`DeliveryService.CAN_CANCEL` / `CAN_RETRY` 从私有常量提为包内共享，批量直接拼进 SQL。跳过原因是这些合取项的**否定**，按同一顺序判定，因此「`reason` 为空」与「可处理」在构造上等价。测试里直接把批量结论和投递页的 `canCancel` 逐条对拍，而不是再抄一遍规则。
+
+写入是一条 `UPDATE … RETURNING event_id`，不是循环：与 `claim()` 争用的行自然不再匹配，`RETURNING` 给出真正改动的集合。事务内先分类、再更新、再分类，`skipped` 用更新后的原因，所以竞态里的行会显示「已经尝试过发送」而不是原来的「可撤销」。超过 500 条返回 `409 batch_too_large`，不静默截断——那通常说明扇出异常，应由管理员去投递页核对。逐条改动仍由 `delivery_history` 触发器记录 `state_changed` / `retry_requested`，时间线与单条操作完全一致。
+
+权限与单条同级：`RoleTokens.permits` 的 operator 白名单只新增这两个路径，viewer 仍是只读。
+
+管理台在消息详情底部加「投递批量操作…」折叠区（`MessageDeliveryBatch.vue`，不新增导航页，十二页与 h1 指纹不变）：展开即并发读两个计划，显示「可撤销 N 条」「可重试 N 条」和按原因归并的跳过摘要；只有存在候选时才出现确认按钮，写入后自动重新核对。读取失败时清空旧计划——不能把上一次的条数和错误并排显示成「还能撤销 N 条」。
+
+验证（2026-11-18，本机 macOS/Docker 29.8.2）：
+- `mvn -Dtest=MessageDeliveryBatchFlowTest test`：真实 HTTP + 隔离 PostgreSQL/MQTT，4 项通过。预演不写库且与单条 `canCancel` 逐条一致；撤销只改从未开始的投递并逐条写 `state_changed`、重放报告新原因；重试恢复失败投递但保留 `cancel_blocked`（曾预留过的行仍不可撤销）；确认令牌缺失 400、viewer 403、operator 200、未知消息 404、已读/过期/设备停用三种跳过原因、501 条以上 409。
+- `mvn verify`：145 项，0 失败/0 错误，5 项条件跳过；此前基线 141 项。
+- 前端 `npm run check`（74 token 无散落 hex）与 `npm run build` 通过。
+- 新增 04 `tools/ci/test_message_batch_ui.sh`：16 项浏览器检查，覆盖展开即两次预演且不带确认令牌、跳过原因归并文案、两个确认令牌分别只发一次、写入后重新核对、无投递的显式文案、读取失败隐藏旧计划后恢复、390 px 与折叠。夹具 `management_ui_fixture.py` 新增 `batchMode`（normal/empty/fail）与 `batchRequests` 记录。
+- 回归：`test_list_filters_ui.sh` 44 项、`test_message_compose_ui.sh` 33 项仍全部通过（消息详情多了这个折叠区，两个脚本的既有断言未受影响）。
+
+边界：未连接真实 Broker、未对真实设备撤销或重试、未迁移生产库；设备已保存或展示的内容不会因为撤销而消失；批量只作用于当前消息，没有跨消息批量；接近 500 条时的耗时未测。本机 `rg` 仍用临时 shim 运行浏览器脚本，未提交。
