@@ -42,6 +42,14 @@ MANY_DEVICES = [
      'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None, 'telemetryAt': None}
     for index in range(26)
 ]
+# 顶栏搜索样本：120 台超过默认每页 100 台，只有搜索才能选到第 120 台。
+CROWD_DEVICES = [
+    {'deviceId': 'dodo-crowd-%03d' % index, 'name': '海量设备 %03d' % index,
+     'enabled': True, 'online': index < 100,
+     'lastSeen': '2026-11-13T09:58:00Z' if index < 100 else None,
+     'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None, 'telemetryAt': None}
+    for index in range(120)
+]
 
 
 def alerts_for(value, thresholds):
@@ -176,8 +184,9 @@ class OverviewFixture(Fixture):
             with self.lock:
                 mode = type(self).overview_mode
                 type(self).device_requests.append(self.path)
-            # 告警模式给两台"非在线"设备；分页模式给 26 台；其它模式沿用管理台夹具的在线设备。
-            rows = MANY_DEVICES if mode == 'many' else ALERT_DEVICES if mode == 'alerts' else None
+            # 告警模式给两台"非在线"设备；分页模式给 26 台；海量模式给 120 台；其它模式沿用管理台夹具的在线设备。
+            rows = (MANY_DEVICES if mode == 'many' else CROWD_DEVICES if mode == 'crowd'
+                    else ALERT_DEVICES if mode == 'alerts' else None)
             if rows is None:
                 return super().do_GET()
             return self.json_response(200, self.device_list(rows))

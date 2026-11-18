@@ -65,7 +65,7 @@ await expect("document.querySelector('h1')?.innerText==='设备'",'the device al
 // 设备页按「启用且离线」过滤：停用样机虽同样不在线，但不属于这次告警。
 await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-card')?.innerText.includes('离线样机') && !document.querySelector('.device-card')?.innerText.includes('停用样机')",'the device drill shows only enabled offline devices');
 await expect("document.querySelector('.device-state-filter')?.innerText.includes('离线') && document.querySelector('.content .section-heading p')?.innerText.includes('显示 1 / 共 2 台')",'the device page states the state it filtered to and how many it hid');
-async function pickState(label){await js("document.querySelector('.device-state-filter .n-base-selection').click()");await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)})`,'state option '+label+' is offered');await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].find(o=>o.innerText.trim()===${JSON.stringify(label)});o.click();})()`);}
+async function pickState(label){await js("document.querySelector('.device-state-filter .n-base-selection').click()");await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)})`,'state option '+label+' is offered');await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].find(o=>o.innerText.trim()===${JSON.stringify(label)});o.click();})()`);await expect(`document.querySelector('.device-state-filter')?.innerText.includes(${JSON.stringify(label)})`,'state filter shows '+label);}
 await pickState('全部');
 await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.device-state-filter')?.innerText.includes('全部')",'switching the state back to all restores every device');
 // 设备分页：26 台样本由服务端分页，页头写全表总数；外壳下拉仍读未过滤的完整清单。
@@ -99,6 +99,38 @@ if(!queryReads.deviceRequests.some(path=>/[?&]q=25(&|$)/.test(path)))throw new E
 if(!queryReads.deviceRequests.some(path=>path.includes('sort=name')&&path.includes('order=desc')))throw new Error('device sort did not reach the server: '+JSON.stringify(queryReads.deviceRequests));
 if(!queryReads.deviceRequests.some(path=>path.includes('size=12')&&path.includes('page=1')))throw new Error('device page size did not reach the server: '+JSON.stringify(queryReads.deviceRequests));
 results.push('device search, sort and page size are server-side and reset to page 1');
+// 顶栏设备选择器：输入按名称/ID 走服务端搜索，选中后进入单设备视图；搜索本身不改设备页。
+async function pickViewInput(value){await js("document.querySelector('.device-view .n-base-selection').click()");await fillInput('.device-view input',value);}
+async function pickViewOption(label){await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)})`,'device view option '+label+' is offered');await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].find(o=>o.innerText.trim()===${JSON.stringify(label)});o.click();})()`);}
+const pickerBase=(await fixture({})).deviceRequests.length;
+await pickViewInput('25');
+await expect("[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()==='分页设备 25') && ![...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.includes('分页设备 01'))",'the topbar search offers only matching devices');
+await expect("document.querySelectorAll('.device-card').length===12",'typing in the topbar leaves the device page untouched');
+const pickerReads=(await fixture({})).deviceRequests.slice(pickerBase);
+if(!pickerReads.some(path=>/[?&]q=25(&|$)/.test(path)&&path.includes('size=50')&&path.includes('sort=name')&&path.includes('order=asc')))throw new Error('topbar search did not reach the server: '+JSON.stringify(pickerReads));
+results.push('the topbar device search is a debounced server read');
+await pickViewOption('分页设备 25');
+await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-grid')?.innerText.includes('分页设备 25') && document.querySelector('.content .section-heading p')?.innerText.includes('1 台设备') && document.querySelector('.n-select[aria-label=设备视图]')?.innerText.includes('分页设备 25')",'choosing a search result shows that device');
+// 空结果要明确说出来，而不是留下一个空下拉。
+await pickViewInput('不存在的设备');
+await expect("[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()==='没有匹配的设备'&&o.classList.contains('n-base-select-option--disabled'))",'an empty search result is named');
+await js("document.querySelector('.device-view input').blur()");
+await expect("document.querySelectorAll('.device-card').length===1",'closing the search keeps the chosen device view');
+await js("document.querySelector('.device-view .n-base-selection').click()");
+await pickViewOption('全部设备');
+await expect("document.querySelectorAll('.device-card').length===12 && document.querySelector('.n-select[aria-label=设备视图]')?.innerText.includes('全部设备')",'the global view is restorable');
+// 超过默认 100 台：搜索能选到第 120 台，整表刷新不能把选择清空。
+await fixture({mode:'crowd'});await tap('刷新');
+await expect("document.querySelectorAll('.device-card').length===12 && document.querySelector('.content .section-heading p')?.innerText.includes('120 台设备')",'the crowd fixture loads 120 devices through one default page');
+await pickViewInput('119');
+await pickViewOption('海量设备 119');
+await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-grid')?.innerText.includes('海量设备 119')",'a device beyond the default 100 is selectable');
+const crowdRefreshBase=(await fixture({})).deviceRequests.length;
+await tap('刷新');
+await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-grid')?.innerText.includes('海量设备 119')",'a full refresh keeps a device outside the default list selected');
+const crowdRefresh=(await fixture({})).deviceRequests.slice(crowdRefreshBase);
+if(!crowdRefresh.some(path=>!path.includes('q=')))throw new Error('full refresh did not reread the default device list: '+JSON.stringify(crowdRefresh));
+results.push('the selected search-only device survives the unfiltered list refresh');
 await fixture({mode:'alerts'});await navigate('概览');await clickWhenReady('.overview-panel .section-heading button','the overview refresh control returns after the device checks');
 await navigate('概览');
 await expect("document.querySelectorAll('.overview-alerts [data-alert-action]').length===3",'drilling leaves the overview intact on return');
@@ -119,7 +151,7 @@ const cleared=(await fixture({})).deliveryRequests.slice(clearBase);
 if(!cleared.length||cleared.some(path=>path.includes('lastError=')||path.includes('status=')))throw new Error('clearing left a filter behind: '+JSON.stringify(cleared));
 results.push('clearing removes both status and lastError from the read');
 await navigate('概览');
-await fixture({mode:'alerts',thresholds:{failureRate:0.3}});await tap('刷新概览');
+await fixture({mode:'alerts',thresholds:{failureRate:0.3}});await clickWhenReady('.overview-panel .section-heading button','the overview refresh control is ready after returning');
 await expect("document.querySelectorAll('.overview-alerts .overview-alert').length===2 && !document.querySelector('.overview-alerts [data-alert=delivery_failure_rate]') && document.querySelector('.overview-panel')?.innerText.includes('≥ 30.0%')",'the console follows the server threshold instead of a local constant');
 await expect("!!document.querySelector('.health-bar') && !document.querySelector('.health-bar').classList.contains('health-bar--warn')",'raising the threshold stops colouring the same 22.5% rate');
 await fixture({mode:'success',thresholds:{failureRate:0.1}});await tap('刷新概览');
