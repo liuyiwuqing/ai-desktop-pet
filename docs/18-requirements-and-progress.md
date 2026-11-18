@@ -1005,4 +1005,4 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 
 边界：阈值是全局单行，不能按设备/来源分组；审计接口只回最近 20 条，更早记录仍在库中但没有读取入口；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库执行迁移；本项没有开启清理策略或发送真实消息。
 
-推送与 CI（2026-11-18）：待补。
+推送与 CI（2026-11-18）：CORE `98f7993`（11 个文件）与 04 `6dbc094`（4 个文件）分别提交并推送，`git ls-remote` 核对远端分支均指向该提交。CI：CORE `Docker deployment` [#44246903345](https://github.com/liuyiwuqing/nexus-core/actions/runs/44246903345) `success`（含隔离 Compose 部署与仅镜像初始化复验）；04 `Software checks` [#44246897596](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44246897596) `success`（八个 job 全绿）。远程 CI 不等于真实部署或实机验收；本项仍未连接真实 CORE/PostgreSQL/Broker/设备。
