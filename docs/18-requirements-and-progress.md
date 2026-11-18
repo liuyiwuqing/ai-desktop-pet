@@ -856,3 +856,5 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 - **未被本项修复的旧说法**：`docs/18` 里"差距表这条一直写着「无按消息批量取消」"是本项对历史的引用，不是当前结论；`console-ui.md` 中"JAR 恰含 V1–V23"写的是那次打包事实，与当前 V25 不矛盾，保留原文不改成"最新"。
 
 边界：没有烧录、没有连接真实设备、没有目标服务器与生产库操作；浏览器回归全部使用回环 RAM 夹具，不能替代 CORE/Broker/设备联调；5 项条件跳过仍是可选环境用例；`test_server_release.py` 的 4 项沙箱失败按环境限制记录，未写成通过。
+
+推送与 CI（2026-11-18）：CORE `6b39d126d71a285d7945bf376833eb0762f05a0b` 已推送，`git ls-remote` 核对 `origin/codex/core-baseline` 为该提交；该提交只改 `README.md`，CORE 工作流按路径过滤，未产生新的 run，因此本轮 CORE 侧没有新的远程证据，构建结论仍来自本地 `mvn verify`。04 `bc68894`（脚本修复与源码指纹）与 `70751ca`（台账与文档）已推送，`git ls-remote` 核对 `origin/main` 为 `70751ca8b9ea41ad93e315582ad6ba906fdd3437`；[04 Software checks 44223193740](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44223193740) 八个 job 全部 success，其中 `server-delivery-tools` 正是本地受沙箱 mkdir 限制的那 4 项用例——这是"环境限制而非仓库缺陷"的直接证据。该 workflow 只跑固件预设与交付检查，不执行本轮的 24 个浏览器脚本，也不覆盖契约脚本之外的文档一致性核对。
