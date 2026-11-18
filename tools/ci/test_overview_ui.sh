@@ -84,6 +84,21 @@ if(!filteredReads.length||!filteredReads.every(path=>path.includes('page=1')&&pa
 if(!deviceReads.deviceRequests.some(path=>!path.includes('state=')&&!path.includes('page=')&&!path.includes('size=')))throw new Error('the shell device picker lost its unfiltered read: '+JSON.stringify(deviceReads.deviceRequests));
 results.push('device reads carry state/page/size while the shell keeps the unfiltered list');
 await pickState('全部');
+// 设备搜索/排序/页大小：均由服务端处理，条件变化后回到第一页。
+async function pickFilter(selector,label){await js(`document.querySelector('${selector} .n-base-selection').click()`);await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)})`,'option '+label+' is offered');await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].find(o=>o.innerText.trim()===${JSON.stringify(label)});o.click();})()`);}
+await fillInput('.device-search input','25');
+await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-grid')?.innerText.includes('分页设备 25') && document.querySelector('.content .section-heading p')?.innerText.includes('显示 1 / 共 26 台')",'a device search is applied by the server');
+await fillInput('.device-search input','');
+await expect("document.querySelectorAll('.device-card').length===24 && document.querySelector('.content .section-heading p')?.innerText.includes('26 台设备')",'clearing the search restores the unbounded page');
+await pickFilter('.device-sort-filter','名称：Z→A');
+await expect("document.querySelectorAll('.device-card').length===24 && document.querySelector('.device-card')?.innerText.includes('分页设备 25') && !document.querySelector('.device-grid')?.innerText.includes('分页设备 01')",'sorting is applied by the server');
+await pickFilter('.device-size-filter','每页 12 台');
+await expect("document.querySelectorAll('.device-card').length===12 && document.querySelector('.device-pagination')?.innerText.includes('1 / 3')",'the chosen page size is applied by the server');
+const queryReads=await fixture({});
+if(!queryReads.deviceRequests.some(path=>/[?&]q=25(&|$)/.test(path)))throw new Error('device search did not reach the server: '+JSON.stringify(queryReads.deviceRequests));
+if(!queryReads.deviceRequests.some(path=>path.includes('sort=name')&&path.includes('order=desc')))throw new Error('device sort did not reach the server: '+JSON.stringify(queryReads.deviceRequests));
+if(!queryReads.deviceRequests.some(path=>path.includes('size=12')&&path.includes('page=1')))throw new Error('device page size did not reach the server: '+JSON.stringify(queryReads.deviceRequests));
+results.push('device search, sort and page size are server-side and reset to page 1');
 await fixture({mode:'alerts'});await navigate('概览');await clickWhenReady('.overview-panel .section-heading button','the overview refresh control returns after the device checks');
 await navigate('概览');
 await expect("document.querySelectorAll('.overview-alerts [data-alert-action]').length===3",'drilling leaves the overview intact on return');

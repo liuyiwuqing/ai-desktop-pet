@@ -115,19 +115,36 @@ class OverviewFixture(Fixture):
                 'failureReasons': reasons, 'points': points, 'totals': totals}
 
     def device_list(self, rows):
-        """Mirror the CORE device list: state filter and page slice, counts over the whole set."""
+        """Mirror the CORE device list: literal search, state filter, sorting, paging and counts."""
         query = parse_qs(urlparse(self.path).query)
         state = query.get('state', ['all'])[0] or 'all'
+        q = query.get('q', [''])[0].strip()
+        sort = query.get('sort', ['created'])[0]
+        order = query.get('order', ['asc'])[0]
         page = int(query.get('page', ['1'])[0])
         size = int(query.get('size', ['100'])[0])
+        all_rows = rows
+        if q:
+            needle = q.lower()
+            rows = [row for row in rows if needle in row['name'].lower() or needle in row['deviceId'].lower()]
         online = lambda row: bool(row['online'])
         offline = lambda row: bool(row['enabled']) and not row['online']
+        if sort == 'name':
+            rows = sorted(rows, key=lambda row: (row['name'].lower(), row['deviceId']), reverse=order == 'desc')
+        elif sort == 'last_seen':
+            # Never-seen devices stay last in both directions, like the backend's NULLS LAST.
+            dated = [row for row in rows if row['lastSeen']]
+            undated = [row for row in rows if not row['lastSeen']]
+            rows = sorted(dated, key=lambda row: row['lastSeen'], reverse=order == 'desc') + undated
+        elif order == 'desc':
+            rows = list(reversed(rows))
         groups = {'online': [row for row in rows if online(row)],
                   'offline': [row for row in rows if offline(row)],
                   'disabled': [row for row in rows if not row['enabled']]}
         filtered = groups.get(state, rows)
-        return {'items': filtered[(page - 1) * size:page * size], 'total': len(rows),
+        return {'items': filtered[(page - 1) * size:page * size], 'total': len(all_rows),
                 'matched': len(filtered), 'page': page, 'size': size, 'state': state,
+                'q': q, 'sort': sort, 'order': order,
                 'counts': {'online': sum(1 for row in rows if online(row)),
                            'offline': sum(1 for row in rows if offline(row)),
                            'disabled': sum(1 for row in rows if not row['enabled'])}}

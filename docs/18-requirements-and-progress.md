@@ -110,7 +110,8 @@
 | TREND-REASON-01 | 趋势失败原因折行与按原因收窄 | 软件本地已验证：`GET /api/v1/overview/trend` 新增可选 `reason`（去空白后 1–64 字符，空/超长 400，未知原因返回空序列）与响应 `reason`、`failureReasons`、`totals.allFailures`；折行始终覆盖整个窗口（按数量降序、同量按码升序），`reason` 只收窄 `points[].failures` 与 `totals.failures`；概览趋势在失败图下显示原因计数，点选/「全部原因」切换并保留窗口总数；CORE 159 项 0 失败/5 条件跳过（新增 1 项）、前端 check/build、概览 65 项浏览器检查（新增 6 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#历史趋势--overview-trend-01) | 原因码来自投递历史 `last_error`，不做固定集合校验；折行合计与 `allFailures` 同源，但 `totals.failures` 会被收窄；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 | OVERVIEW-TZ-01 | 概览今日时区可配置 | 软件本地已验证：`nexus.overview.timezone`（`NEXUS_OVERVIEW_TIMEZONE`，默认 `UTC`）决定 `dayStart` 与“今日”窗口，响应 `timezone` 返回解析后的时区 ID；配置非法时启动失败；页面按该时区显示当地日期，不再截取 UTC 字符串；趋势桶仍固定 UTC 对齐；见 [CORE 契约](../../nexus-core/docs/console-overview.md) | 时区是部署级配置，不能按用户/设备切换，也没有页面入口；测试使用无 DST 的 `Asia/Shanghai`，夏令时边界依赖 PostgreSQL `AT TIME ZONE` 未单独演练；推送与 CI 见文末 |
-| DEVICE-LIST-01 | 设备列表服务端筛选与分页 | 软件本地已验证：`GET /api/v1/devices` 新增 `state=all\|online\|offline\|disabled`、`page`、`size`（默认 100 保持旧形状），返回 `total`/`matched`/`counts`（均按整张设备表统计）；设备页 24 台一页，筛选与翻页由服务端完成，页头写全表总数与在线数；壳层设备下拉仍读未过滤清单；CORE 新增 3 项 HTTP（默认形状、状态筛选含 90 秒新鲜度、跨页与全局计数）、前端 check/build、概览 76 项（新增 8 项）、管理台、空态 125 项、主题 68 项、事件 21 项通过；见文末 | 状态与计数按整表统计，但不提供按名称搜索或自定义排序；壳层下拉仍最多 100 台；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
+| DEVICE-LIST-01 | 设备列表服务端筛选与分页 | 软件本地已验证：`GET /api/v1/devices` 新增 `state=all\|online\|offline\|disabled`、`page`、`size`（默认 100 保持旧形状），返回 `total`/`matched`/`counts`（均按整张设备表统计）；设备页 24 台一页，筛选与翻页由服务端完成，页头写全表总数与在线数；壳层设备下拉仍读未过滤清单；CORE 新增 3 项 HTTP（默认形状、状态筛选含 90 秒新鲜度、跨页与全局计数）、前端 check/build、概览 76 项（新增 8 项）、管理台、空态 125 项、主题 68 项、事件 21 项通过；见文末 | 状态与计数按整表统计；壳层下拉仍最多 100 台；搜索、排序与页大小由 DEVICE-LIST-02 承接；未连真实 CORE/PostgreSQL/Broker/设备 |
+| DEVICE-LIST-02 | 设备名称搜索、排序与每页条数 | 软件本地已验证：`GET /api/v1/devices` 新增 `q`（名称/ID 字面量、大小写不敏感、≤80 字）、`sort=created\|name\|last_seen`、`order=asc\|desc`；排序白名单 + `device_id` 稳定次序，`last_seen` 空值两种方向都靠后；`total` 仍为整表，`matched` 与三类计数按搜索结果统计；设备页新增搜索（300ms 防抖）、排序与 12/24/48/96 页大小，条件变化回第 1 页，空结果给清空入口；CORE `DeviceListFlowTest` 5 项、完整 170 项（5 条件跳过）、前端 check/build、概览浏览器 83 项通过；见文末 | 名称排序依赖数据库排序规则，中文按库默认 collation；搜索只覆盖名称与设备 ID，不搜遥测/备注；未连真实 CORE/PostgreSQL/Broker/设备，生产库大数据量与索引未验证 |
 
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
@@ -1082,9 +1083,28 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 - 概览浏览器检查 68 → 76 项：26 台样本首屏 24 张卡片、页头“26 台设备 · 22 台在线”、分页“1 / 2”；下一页 2 张且为第 25、26 台；离线筛选由服务端返回 2 台并回到第 1 页、分页条消失；主动刷新后筛选仍在；请求记录证明分页读带 `state/page/size`，壳层仍有一次不带参数的完整读。
 - 回归：管理台、空态 125 项、主题 68 项、事件 21 项通过。空态回归同时修掉一处夹具遮蔽：概览钻取的投递样本只在告警模式生效，不再把其它页面的投递空态替换成 3 条钻取样本。
 
-边界：设备页不提供按名称搜索、自定义排序或每页条数选择；壳层设备下拉仍受 100 台上限；计数与筛选依赖应用进程的 `now()` 与数据库时间一致；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库大数据量验证。
+边界：设备页不提供按名称搜索、自定义排序或每页条数选择（搜索、排序与页大小已由 DEVICE-LIST-02 承接）；壳层设备下拉仍受 100 台上限；计数与筛选依赖应用进程的 `now()` 与数据库时间一致；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库大数据量验证。
 
 推送与 CI（2026-11-18）：CORE `a2ceebd` / 04 `2cd60b0` 已推送，`git ls-remote` 核对远端分支分别指向 `a2ceebde38eef9fd741d90d5eb8392b34d6381cc` 与 `2cd60b05ece035cb779c9873e27ac58e0ff72ac1`。CI：CORE `Docker deployment` [#44265240571](https://github.com/liuyiwuqing/nexus-core/actions/runs/44265240571) `success`；04 `Software checks` [#44265253462](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44265253462) `success`。两项 workflow 不运行本项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署或生产库验证。
+
+## DEVICE-LIST-02 · 设备名称搜索、排序与每页条数
+
+DEVICE-LIST-01 把状态筛选与分页移到服务端后，设备多起来仍只能按创建顺序逐页翻。本项补齐同一工具条上的搜索、排序和页大小，全部由服务端执行：
+
+- `GET /api/v1/devices` 新增 `q`（可选，去空白后 ≤80 字；超长返回 400）、`sort=created|name|last_seen`（默认 `created`）、`order=asc|desc`（默认 `asc`）；非法值返回 400。`size` 继续接受 1–100，前端提供 12/24/48/96。
+- 搜索按字面量同时匹配名称与设备 ID，大小写不敏感；`%`、`_` 不是 SQL 通配符。纯空白搜索等同于不搜索。
+- 排序使用白名单列，并追加 `device_id` 作为稳定次序；`last_seen` 使用 `NULLS LAST`，从未连接的设备在升序和降序都排在最后。
+- `total` 仍是整表；`matched` 与 `counts{online,offline,disabled}` 按搜索结果统计（`state` 只收窄当前页）。这样页头“显示 X / 共 Y 台 · Z 台在线”与状态筛选不会各说各话。响应回显 `q/sort/order`。
+- 设备页页头下方新增工具条：搜索（300ms 防抖，回车立即生效，清空恢复）、状态、排序（六种字段+方向组合）、每页条数；任一条件变化都回到第 1 页。搜索结果为空时标题写明“没有匹配…的设备”，并提供“清空搜索”；状态筛选为空时保留“查看全部设备”。
+- 壳层设备下拉仍读不带参数的未过滤完整清单；告警钻取仍清空单设备选择与搜索，只带状态。
+
+验证（2026-11-18，本机 macOS/Docker）：
+
+- CORE `DeviceListFlowTest` 5 项通过（原 3 项 + 新增 2 项）：搜索命中名称与设备 ID、大小写不敏感、`%`/`_` 字面量、空白搜索；搜索与状态组合时 `matched`/`counts` 一致；名称升/降序、创建时间降序、最近连接升/降序且空值靠后、跨页请求、非法 `sort`/`order`/`size=101`/`q` 81 字均返回 400；默认响应回显 `q=""`、`sort=created`、`order=asc`。
+- `python3 tools/run_local.py build`：前端 `npm run check`（74 tokens）与生产构建通过；完整 CORE 170 项 0 失败/5 条件跳过，退出 0。
+- 概览浏览器检查 76 → 83 项：搜索“25”只回 1 台且页头“显示 1 / 共 26 台”；清空恢复 24 台；名称 Z→A 首张为“分页设备 25”且第 1 页不含 01；每页 12 台后为 12 张、分页“1 / 3”；请求记录证明 `q=25`、`sort=name&order=desc`、`size=12&page=1` 都到达服务端。
+
+边界：名称排序依赖数据库默认 collation，中文顺序与部署环境相关；搜索只覆盖名称与设备 ID，不搜遥测、备注或消息；未连接真实 CORE/PostgreSQL/Broker/设备，未在生产规模数据上验证索引与响应时间；浏览器检查使用 RAM 夹具，不是真实服务或设备验收。
 
 ## MSG-BATCH-02 · 跨消息批量撤销与重试
 
