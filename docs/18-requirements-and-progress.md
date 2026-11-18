@@ -1181,3 +1181,5 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 - 修复：在 `management_ui_fixture.py` 增加共享 `FixtureServer`（`request_queue_size=128`、`daemon_threads=True`）；16 个 UI 夹具（含管理台主夹具）统一改用它，登录夹具原先局部放宽的 64 也并入共享值。未改业务代码、真实 CORE、Broker 或设备协议。
 - 验证（2026-11-18，本机 macOS）：修复前角色脚本 3 次中 1 次失败，诊断脚本 6 轮×3 角色登录复现，失败请求为 `/api/v1/devices`。修复后诊断 10 轮×3 登录 30 次全过；`test_roles_ui.sh` 连跑 5 次全过；概览 125 项 → 事件 21 项 → 操作 96 项 → 角色 43 项四套连跑 2 轮全过。`python3 -m py_compile tools/ci/*_ui_fixture.py` 通过。
 - 边界：这是本地回环夹具设置，不代表真实 CORE 或生产负载；浏览器套件不在远程 CI 运行，远程 CI 只覆盖源码检查与打包；未验证更高并发或极端端口耗尽。
+
+推送与 CI（2026-11-18）：04 `74cd1a4` 已推送，`git ls-remote` 核对 `main` 指向 `74cd1a46840cd55ba1249dc87e794cd7ac0b76ac`。CI `Software checks` [#44347892513](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44347892513) 八个 job 全部 `success`。该 workflow 不运行浏览器套件，本项的 30 次诊断登录与连跑压测仍为本地证据；远程 CI 通过不代表回环夹具在生产并发下的表现。
