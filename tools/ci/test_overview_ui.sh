@@ -127,6 +127,17 @@ await expect("!document.querySelector('.overview-alerts')",'alerts clear without
 await fixture({mode:'empty',delay:1});await tap('刷新概览');await navigate('消息');
 await wait(1.2);await expect("document.querySelector('h1')?.innerText==='消息' && !document.querySelector('.overview-panel')",'late response cannot restore an unmounted overview');
 await fixture({mode:'success',delay:0});await navigate('概览');await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='7'",'returning to overview reads a fresh snapshot');
+// 阈值配置：读写同一份服务端状态，版本与变更审计随响应返回，保存后概览立即采用。
+await tap('调整阈值');
+await expect("!!document.querySelector('#threshold-failure-rate') && document.querySelector('.threshold-editor')?.innerText.includes('当前 v1')",'the admin threshold form opens with the current revision');
+await fillInput('#threshold-failure-rate','30');
+await fillInput('#threshold-failure-sample','5');
+await tap('保存阈值');
+await expect("document.querySelector('.threshold-editor')?.innerText.includes('当前 v2') && document.querySelector('.threshold-editor')?.innerText.includes('已记录 1 次变更')",'saving bumps the revision and records one audit entry');
+await expect("document.querySelector('.overview-panel')?.innerText.includes('≥ 30.0%') && document.querySelector('.overview-panel')?.innerText.includes('投递 ≥ 5 条')",'the overview caption uses the saved thresholds');
+const thresholdState=await fixture({});
+if(thresholdState.thresholdVersion!==2||thresholdState.thresholdUpdates.length!==1||thresholdState.thresholdUpdates[0].thresholds.failureRate!==0.3)throw new Error('threshold save did not reach the server: '+JSON.stringify(thresholdState));
+results.push('the threshold save carried version and values to the server');
 await fixture({mode:'empty',delay:1});await tap('刷新概览');await tap('退出登录');await wait(1.2);
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.overview-panel') && document.querySelector('.token-label input').value===''",'logout discards delayed snapshot and token');
 const beforeAuth=(await fixture({mode:'unauthorized',delay:0})).requests;

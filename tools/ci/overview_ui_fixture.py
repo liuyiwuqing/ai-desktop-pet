@@ -69,6 +69,11 @@ class OverviewFixture(Fixture):
     trend_mode = 'success'
     thresholds = dict(THRESHOLDS)
     delivery_requests = []
+    # 阈值配置的版本与审计：只在 PUT 时推进，让界面的"当前 vN / 已记录 N 次变更"有真实来源。
+    threshold_version = 1
+    threshold_updated_at = '2026-11-13T10:00:00Z'
+    threshold_updates = []
+    threshold_history = []
 
     def trend(self, mode):
         query = parse_qs(urlparse(self.path).query)
@@ -117,6 +122,15 @@ class OverviewFixture(Fixture):
             if mode != 'alerts':
                 return super().do_GET()
             return self.json_response(200, {'items': ALERT_DEVICES})
+        if path == '/api/v1/overview/thresholds':
+            if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
+                return self.json_response(401, {'error': 'unauthorized'})
+            with self.lock:
+                cls = type(self)
+                value = {'thresholds': dict(cls.thresholds), 'version': cls.threshold_version,
+                         'updatedBy': 'overview-ui-fixture', 'updatedAt': cls.threshold_updated_at,
+                         'history': list(cls.threshold_history)}
+            return self.json_response(200, value)
         if path == '/api/v1/connectors':
             if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
                 return self.json_response(401, {'error': 'unauthorized'})
@@ -168,6 +182,33 @@ class OverviewFixture(Fixture):
         except (BrokenPipeError, ConnectionResetError):
             pass  # A navigation/logout deliberately aborts the delayed read.
 
+    def do_PUT(self):
+        if urlparse(self.path).path != '/api/v1/overview/thresholds':
+            return super().do_PUT()
+        if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
+            return self.json_response(401, {'error': 'unauthorized'})
+        body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0'))))
+        wanted = body.get('thresholds') or {}
+        keys = ('failureRate', 'failureRateMinSample', 'backlogPending', 'onlineMin')
+        with self.lock:
+            cls = type(self)
+            if body.get('version') != cls.threshold_version:
+                return self.json_response(409, {'error': 'alert_threshold_version_conflict'})
+            if any(not isinstance(wanted.get(key), (int, float)) for key in keys):
+                return self.json_response(400, {'error': 'invalid_alert_thresholds'})
+            cls.thresholds = {**THRESHOLDS, **wanted}
+            cls.threshold_version += 1
+            cls.threshold_updated_at = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+            cls.threshold_history.insert(0, {'sequence': len(cls.threshold_history) + 1, 'actor': 'overview-ui-fixture',
+                                             'fromVersion': body['version'], 'toVersion': cls.threshold_version,
+                                             **{key: cls.thresholds[key] for key in keys},
+                                             'recordedAt': cls.threshold_updated_at})
+            cls.threshold_updates.append({'version': body['version'], 'thresholds': dict(cls.thresholds)})
+            value = {'thresholds': dict(cls.thresholds), 'version': cls.threshold_version,
+                     'updatedBy': 'overview-ui-fixture', 'updatedAt': cls.threshold_updated_at,
+                     'history': list(cls.threshold_history)}
+        return self.json_response(200, value)
+
     def do_POST(self):
         if urlparse(self.path).path != '/__qa/overview':
             return super().do_POST()
@@ -185,7 +226,9 @@ class OverviewFixture(Fixture):
             if 'delay' in value:
                 cls.overview_delay = min(max(float(value['delay']), 0), 2)
             return self.json_response(200, {'requests': cls.overview_requests,
-                                            'deliveryRequests': list(cls.delivery_requests)})
+                                            'deliveryRequests': list(cls.delivery_requests),
+                                            'thresholdVersion': cls.threshold_version,
+                                            'thresholdUpdates': list(cls.threshold_updates)})
 
 
 def main():

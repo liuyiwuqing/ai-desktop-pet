@@ -104,6 +104,7 @@
 | ALERT-DRILL-01 | 概览告警钻取到已筛选列表 | 软件本地已验证：`alerts[].target{tab,status}` 由服务端下发（积压→投递 `status=pending`、失败率→`failed`、无在线设备→设备页、传输不可用为 `null` 且不给按钮）；跳转前清空旧搜索、状态筛选取代叠加，先备条件再切页签只读一次；CORE 154 项 0 失败/5 条件跳过（新增 1 项纯函数）、前端 check/build、概览 40 项浏览器检查（新增 8 项，含夹具核对请求真带 `status`）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警钻取--alert-drill-01) | 交付时只跳现存筛选：设备页没有离线筛选，故只打开页面而不筛（已由 DEVICE-FILTER-01 补上）；投递页只能按状态筛；未连真实 CORE/Broker/设备；推送与 CI 见文末 |
 | DELIVERY-FAILURE-REASONS-01 | 概览失败原因归并与二级钻取 | 软件本地已验证：`GET /api/v1/overview` 新增 `failureReasons`（按 `last_error` 归并，合计由同一 CTE 求和得出 `today.failedDeliveries`）；`GET /deliveries`、`/deliveries/export` 新增 `lastError` 筛选（`[a-z_]{1,32}`，`unknown` 落回 `IS NULL`）；概览每条原因可「只看这类」跳到 `status=failed` + `lastError`；CORE 156 项 0 失败/5 条件跳过（新增 2 项）、前端 check/build、概览 51 项浏览器检查（新增 11 项）、筛选 44 项与主题 68 项回归通过；源码指纹已核对更新；见 [CORE 契约](../../nexus-core/docs/console-overview.md#失败原因--delivery-failure-reasons-01) | 原因码是代码写死的集合，新增原因要同步前端文案；未连真实 CORE/Broker/设备，未对生产库大数据量验证；推送与 CI 见文末 |
 | DEVICE-FILTER-01 | 设备页状态筛选与离线告警钻取 | 软件本地已验证：`devices_online` 目标改为 `{"tab":"devices","status":"offline"}`；设备页新增「全部/在线/离线/已停用」筛选，离线=`enabled && !online`（与告警同口径），停用单列；筛选在已读取的 `GET /devices` 结果内完成，不新增接口参数；命中 0 台给空态与「查看全部设备」；钻取前清掉壳层单设备选择，壳层另选设备时回到「全部」；CORE `OverviewAlertsTest` 7 项、`ConsoleOverviewFlowTest` 7 项（含 `devices:offline` 断言）、前端 check/build、概览 55 项浏览器检查（新增 4 项）、设备 73 项与主题 68 项回归通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警钻取--alert-drill-01) | 筛选只作用于 `GET /devices` 已返回的前 100 台，超量库需先分页；未连真实 CORE/PostgreSQL/Broker/设备；阈值仍不可配置；推送与 CI 见文末 |
+| ALERT-CONFIG-01 | 概览告警阈值可配置与变更审计 | 软件本地已验证：V26 新增 `alert_thresholds` 单行表（失败率/样本下限/积压/在线下限，默认 0.10/20/100/1）与 `alert_threshold_audit`；`GET/PUT /api/v1/overview/thresholds`（所有认证角色可读、仅管理员可写，`version` 乐观并发冲突 409、越界 400、更新与审计同事务）；概览计数与阈值由同一 SQL 快照读出；管理台概览「调整阈值」表单（失败率按百分比输入，400/409 就地提示）；CORE 158 项 0 失败/5 条件跳过（新增 1 项纯函数 + 1 项 HTTP）、前端 check/build、概览 59 项浏览器检查（新增 4 项）、管理台 73 项与主题 68 项回归通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#阈值配置--alert-config-01) | 阈值是全局单行，不能按设备/来源分组；审计接口只回最近 20 条（库内保留全部）；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
@@ -982,3 +983,26 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 边界：筛选只发生在 `GET /devices` 已返回的前 100 台内，库中设备超过 100 台时需要先做服务端分页/搜索，否则按状态找设备仍可能漏；这是本项刻意不扩接口的代价，已记在台账。未连接真实 CORE/PostgreSQL/Broker/设备；未在超量设备库验证。
 
 推送与 CI（2026-11-18）：CORE `a13903b`（7 个文件）与 04 `26e19f7`（4 个文件）分别提交并推送，`git ls-remote` 核对远端分支均指向该提交。CI：CORE `Docker deployment` [#44244210429](https://github.com/liuyiwuqing/nexus-core/actions/runs/44244210429) `success`（含隔离 Compose 部署复验）；04 `Software checks` [#44244216523](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44244216523) `success`（八个 job 全绿）。远程 CI 不等于真实部署或实机验收；本项仍未连接真实 CORE/PostgreSQL/Broker/设备。
+
+### ALERT-CONFIG-01 · 概览告警阈值可配置与变更审计（2026-11-18）
+
+概览的四个阈值此前是 `OverviewAlerts` 里的常量，改一次要改代码、发版并重跑回归。本项把它们移入数据库：
+
+- V26 新增 `alert_thresholds` 单行表（`singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton)`）与 `alert_threshold_audit`。默认值保持原行为：失败率 0.10、样本下限 20、积压 100、在线下限 1，`version=1`、`updated_by='system'`。
+- `GET /api/v1/overview/thresholds` 所有已认证角色可读，返回 `thresholds`、`version`、`updatedBy`、`updatedAt` 与最近 20 条变更；`PUT` 仅管理员，body 为 `{version, thresholds}`。版本不符返回 409 `alert_threshold_version_conflict`，越界/缺字段返回 400 `invalid_alert_thresholds`。
+- 写入在同一事务里 `SELECT … FOR UPDATE` 比对版本、更新单行并 `version+1`，同时追加审计行（操作者、前后版本、写入后的完整阈值），不会出现"阈值改了但不知道谁改的"。
+- 概览 SQL 改为 `CROSS JOIN alert_thresholds`，阈值与计数同快照；`thresholds` 与 `alerts[].threshold` 都来自库值，前端不再保存常量。
+
+管理台的「调整阈值」放在概览说明句旁，仅 `admin` 可见。表单放在快照分支之外，5 秒轮询不会把它卸载；失败率按百分比输入（保留一位小数，30 表示 0.30），保存成功后刷新快照文案，400/409 在表单内提示并保留已填内容。
+
+实现中修掉一处测试预期错误：首次用 `version=0` 期望 409，实际先触发"version ≥ 1"的 400；改用未来版本 2 才真正覆盖乐观并发冲突。访问令牌创建接口实际返回 200 而非 201，断言按真实行为写。
+
+验证（2026-11-18，本机 macOS/Docker 29.8.2）：
+- CORE `python3 tools/run_local.py build`：158 项 0 失败/5 条件跳过，Flyway 应用到 V26；新增 `OverviewAlertsTest.configuredThresholdsJudgeTheSameSnapshot`（同一快照在默认/严格阈值下分别 0/3 条告警）与 `ConsoleOverviewFlowTest.thresholdsAreReadableEditableAuditedAndVersioned`（GET v1/空历史、旧版本 409、越界 400、PUT v1→v2、审计 actor 为登录身份、新阈值立即改变概览三条告警、operator 写 403）。
+- 前端 `npm --prefix frontend run check` 与 `run build` 通过（74 tokens）。
+- 概览浏览器检查 55 → 59 项：新增「调整阈值」打开表单、当前 v1 文案、保存后「当前 v2 / 已记录 1 次变更」、概览改为「≥ 30.0%」「投递 ≥ 5 条」，并核对夹具只收到一次 PUT 且 `failureRate=0.3`。
+- 回归：管理台 73 项、主题 68 项通过（新表单控件纳入按钮高度与 CSP 检查）。
+
+边界：阈值是全局单行，不能按设备/来源分组；审计接口只回最近 20 条，更早记录仍在库中但没有读取入口；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库执行迁移；本项没有开启清理策略或发送真实消息。
+
+推送与 CI（2026-11-18）：待补。
