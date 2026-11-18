@@ -66,7 +66,12 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
             if path=='/api/v1/devices':
                 delay=state['deviceReadDelay'];state['deviceReadDelay']=0
                 if delay:time.sleep(delay)
-                value={'items':[{'deviceId':'dodo-ui-fixture','name':state['deviceName'],'enabled':True,'online':True,'lastSeen':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'wifiIp':'192.168.1.20','wifiRssi':-52,'wifiSsid':'HomeLab-2.4G','telemetryAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]}
+                query=parse_qs(urlparse(self.path).query);stateKey=query.get('state',['all'])[0] or 'all'
+                page=int(query.get('page',['1'])[0]);size=int(query.get('size',['100'])[0])
+                rows=[{'deviceId':'dodo-ui-fixture','name':state['deviceName'],'enabled':True,'online':True,'lastSeen':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'wifiIp':'192.168.1.20','wifiRssi':-52,'wifiSsid':'HomeLab-2.4G','telemetryAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]
+                if stateKey=='offline':rows=[]  # 唯一设备在线，离线筛选没有命中
+                if stateKey=='disabled':rows=[]
+                value={'items':rows[(page-1)*size:page*size],'total':1,'matched':len(rows),'page':page,'size':size,'state':stateKey,'counts':{'online':1,'offline':0,'disabled':0}}
             elif state['listMode'] and path in ('/api/v1/messages','/api/v1/deliveries'):
                 state['listRequests'].append(self.path)
                 if state['listDelay']:time.sleep(state['listDelay'])

@@ -34,6 +34,14 @@ ALERT_DEVICES = [
     {'deviceId': 'dodo-ui-disabled', 'name': '停用样机', 'enabled': False, 'online': False,
      'lastSeen': '2026-11-12T20:00:00Z', 'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None, 'telemetryAt': None},
 ]
+# 分页样本：22 在线、2 启用离线、2 停用；24 台一页，第二页只剩停用的两台。
+MANY_DEVICES = [
+    {'deviceId': 'dodo-many-%02d' % index, 'name': '分页设备 %02d' % index,
+     'enabled': index < 24, 'online': index < 22,
+     'lastSeen': '2026-11-13T09:58:00Z' if index < 22 else None,
+     'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None, 'telemetryAt': None}
+    for index in range(26)
+]
 
 
 def alerts_for(value, thresholds):
@@ -70,6 +78,7 @@ class OverviewFixture(Fixture):
     thresholds = dict(THRESHOLDS)
     delivery_requests = []
     trend_requests = []
+    device_requests = []
     # 阈值配置的版本与审计：只在 PUT 时推进；history 保留全部行，读取时只给最新 20 条。
     threshold_version = 1
     threshold_updated_at = '2026-11-13T10:00:00Z'
@@ -105,12 +114,34 @@ class OverviewFixture(Fixture):
                 'hours': hours, 'bucket': bucket, 'bucketSeconds': seconds, 'reason': reason or None,
                 'failureReasons': reasons, 'points': points, 'totals': totals}
 
+    def device_list(self, rows):
+        """Mirror the CORE device list: state filter and page slice, counts over the whole set."""
+        query = parse_qs(urlparse(self.path).query)
+        state = query.get('state', ['all'])[0] or 'all'
+        page = int(query.get('page', ['1'])[0])
+        size = int(query.get('size', ['100'])[0])
+        online = lambda row: bool(row['online'])
+        offline = lambda row: bool(row['enabled']) and not row['online']
+        groups = {'online': [row for row in rows if online(row)],
+                  'offline': [row for row in rows if offline(row)],
+                  'disabled': [row for row in rows if not row['enabled']]}
+        filtered = groups.get(state, rows)
+        return {'items': filtered[(page - 1) * size:page * size], 'total': len(rows),
+                'matched': len(filtered), 'page': page, 'size': size, 'state': state,
+                'counts': {'online': sum(1 for row in rows if online(row)),
+                           'offline': sum(1 for row in rows if offline(row)),
+                           'disabled': sum(1 for row in rows if not row['enabled'])}}
+
     def do_GET(self):
         path = urlparse(self.path).path
         if path == '/api/v1/deliveries':
-            # 只服务于钻取检查：按 status 过滤并记录请求，证明页面真的带着筛选读了一次。
+            # 钻取样本只属于告警演示；其它模式的投递空态/列表交给管理台夹具。
             if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
                 return self.json_response(401, {'error': 'unauthorized'})
+            with self.lock:
+                mode = type(self).overview_mode
+            if mode != 'alerts':
+                return super().do_GET()
             query = parse_qs(urlparse(self.path).query)
             status = query.get('status', [''])[0]
             reason = query.get('lastError', [''])[0]
@@ -127,10 +158,12 @@ class OverviewFixture(Fixture):
                 return self.json_response(401, {'error': 'unauthorized'})
             with self.lock:
                 mode = type(self).overview_mode
-            # 只在告警模式给两台"非在线"设备；其它模式沿用管理台夹具的在线设备。
-            if mode != 'alerts':
+                type(self).device_requests.append(self.path)
+            # 告警模式给两台"非在线"设备；分页模式给 26 台；其它模式沿用管理台夹具的在线设备。
+            rows = MANY_DEVICES if mode == 'many' else ALERT_DEVICES if mode == 'alerts' else None
+            if rows is None:
                 return super().do_GET()
-            return self.json_response(200, {'items': ALERT_DEVICES})
+            return self.json_response(200, self.device_list(rows))
         if path == '/api/v1/overview/thresholds/audit':
             if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
                 return self.json_response(401, {'error': 'unauthorized'})
@@ -265,6 +298,7 @@ class OverviewFixture(Fixture):
                 cls.threshold_version = max(count, 1)
             return self.json_response(200, {'requests': cls.overview_requests,
                                             'deliveryRequests': list(cls.delivery_requests),
+                                            'deviceRequests': list(cls.device_requests),
                                             'trendRequests': list(cls.trend_requests),
                                             'auditRequests': list(cls.audit_requests),
                                             'thresholdVersion': cls.threshold_version,

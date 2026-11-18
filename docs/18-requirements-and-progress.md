@@ -109,6 +109,7 @@
 | TREND-REASON-01 | 趋势失败原因折行与按原因收窄 | 软件本地已验证：`GET /api/v1/overview/trend` 新增可选 `reason`（去空白后 1–64 字符，空/超长 400，未知原因返回空序列）与响应 `reason`、`failureReasons`、`totals.allFailures`；折行始终覆盖整个窗口（按数量降序、同量按码升序），`reason` 只收窄 `points[].failures` 与 `totals.failures`；概览趋势在失败图下显示原因计数，点选/「全部原因」切换并保留窗口总数；CORE 159 项 0 失败/5 条件跳过（新增 1 项）、前端 check/build、概览 65 项浏览器检查（新增 6 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#历史趋势--overview-trend-01) | 原因码来自投递历史 `last_error`，不做固定集合校验；折行合计与 `allFailures` 同源，但 `totals.failures` 会被收窄；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 | OVERVIEW-TZ-01 | 概览今日时区可配置 | 软件本地已验证：`nexus.overview.timezone`（`NEXUS_OVERVIEW_TIMEZONE`，默认 `UTC`）决定 `dayStart` 与“今日”窗口，响应 `timezone` 返回解析后的时区 ID；配置非法时启动失败；页面按该时区显示当地日期，不再截取 UTC 字符串；趋势桶仍固定 UTC 对齐；见 [CORE 契约](../../nexus-core/docs/console-overview.md) | 时区是部署级配置，不能按用户/设备切换，也没有页面入口；测试使用无 DST 的 `Asia/Shanghai`，夏令时边界依赖 PostgreSQL `AT TIME ZONE` 未单独演练；推送与 CI 见文末 |
+| DEVICE-LIST-01 | 设备列表服务端筛选与分页 | 软件本地已验证：`GET /api/v1/devices` 新增 `state=all\|online\|offline\|disabled`、`page`、`size`（默认 100 保持旧形状），返回 `total`/`matched`/`counts`（均按整张设备表统计）；设备页 24 台一页，筛选与翻页由服务端完成，页头写全表总数与在线数；壳层设备下拉仍读未过滤清单；CORE 新增 3 项 HTTP（默认形状、状态筛选含 90 秒新鲜度、跨页与全局计数）、前端 check/build、概览 76 项（新增 8 项）、管理台、空态 125 项、主题 68 项、事件 21 项通过；见文末 | 状态与计数按整表统计，但不提供按名称搜索或自定义排序；壳层下拉仍最多 100 台；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
@@ -1062,3 +1063,22 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 边界：只验证了无夏令时的 `Asia/Shanghai`，DST 日界依赖 PostgreSQL `AT TIME ZONE`，未单独演练；切换配置会让“今日”瞬间跨日，且没有配置变更审计；趋势、导出窗口与设备在线口径不变。
 
 推送与 CI（2026-11-18）：CORE `31fa7b6` / 04 `4b15304` 已推送，`git ls-remote` 核对远端分支均指向该提交。CI：CORE `Docker deployment` [#44256189285](https://github.com/liuyiwuqing/nexus-core/actions/runs/44256189285) `success`（docker-compose）；04 `Software checks` [#44256189987](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44256189987) `success`（八个 job 全绿，含五种固件预设、full 主机/协议/DSP/LVGL 与 server-delivery-tools）。两项 workflow 不运行本项 68 项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署、真实时区切换或实机验收。
+
+## DEVICE-LIST-01 · 设备列表服务端筛选与分页
+
+设备页此前一次读取最多 100 台，状态筛选只在已返回的集合里做；超过 100 台时，筛选结果与页头“N 台设备 · M 台在线”都只是前 100 台的统计。本项把筛选、分页和计数移到服务端：
+
+- `GET /api/v1/devices` 新增可选 `state=all|online|offline|disabled`、`page`（1–100000）、`size`（1–100，默认 100）。不传参数时仍返回按创建时间排序的最多 100 台，旧调用方与壳层设备下拉不需要改动。
+- 响应新增 `total`（全部设备）、`matched`（当前状态命中数）、`page`、`size`、`state` 与 `counts{online,offline,disabled}`；四个计数都在同一条 SQL 里按整表统计，不随返回页变化。
+- 状态口径与既有页面一致：在线=存储标记为在线且 90 秒内有 `last_seen`；离线=启用但不在线；已停用单独一类，即使存储的在线标记仍为 true 也不计入离线。离线筛选使用 `COALESCE`，`last_seen` 为空不会把设备漏掉。
+- 设备页改为 24 台一页，筛选或壳层跳转都把页码复位到 1；翻页只重新读 `devices` 分页接口。若禁用/删除使当前页超出末页，会按 `matched` 自动回到最后一页；改名后同时回写完整清单与分页结果，避免冲突提示把刚保存的名字当成他人修改。
+- 壳层设备下拉仍读 `GET /devices` 的未过滤完整清单；设备页轮询只读分页结果，完整清单在登录、主动刷新和 SSE 失效事件时补齐；登记成功后额外刷新一次完整清单，新设备立刻出现在下拉里。
+
+验证（2026-11-18，本机 macOS/Docker）：
+
+- CORE 新增 `DeviceListFlowTest`（3 项 HTTP，隔离 PostgreSQL/MQTT）：默认请求保持 3 台与旧字段形状，`counts` 为在线 2/离线 1/停用 1；`state` 三种筛选与计数一致，离线设备在 90 秒外的心跳后仍不进入在线；5 台跨页 `page=2&size=2` 只回第 3、4 台且 `total/matched` 仍为 5，筛选后空页不把计数清零；非法 `state`/`size=0` 返回 400。
+- 前端 `npm --prefix frontend run check` 与 `run build` 通过（75 tokens）。
+- 概览浏览器检查 68 → 76 项：26 台样本首屏 24 张卡片、页头“26 台设备 · 22 台在线”、分页“1 / 2”；下一页 2 张且为第 25、26 台；离线筛选由服务端返回 2 台并回到第 1 页、分页条消失；主动刷新后筛选仍在；请求记录证明分页读带 `state/page/size`，壳层仍有一次不带参数的完整读。
+- 回归：管理台、空态 125 项、主题 68 项、事件 21 项通过。空态回归同时修掉一处夹具遮蔽：概览钻取的投递样本只在告警模式生效，不再把其它页面的投递空态替换成 3 条钻取样本。
+
+边界：设备页不提供按名称搜索、自定义排序或每页条数选择；壳层设备下拉仍受 100 台上限；计数与筛选依赖应用进程的 `now()` 与数据库时间一致；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库大数据量验证。

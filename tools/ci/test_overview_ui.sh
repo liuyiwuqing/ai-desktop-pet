@@ -68,6 +68,23 @@ await expect("document.querySelector('.device-state-filter')?.innerText.includes
 async function pickState(label){await js("document.querySelector('.device-state-filter .n-base-selection').click()");await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)})`,'state option '+label+' is offered');await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].find(o=>o.innerText.trim()===${JSON.stringify(label)});o.click();})()`);}
 await pickState('全部');
 await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.device-state-filter')?.innerText.includes('全部')",'switching the state back to all restores every device');
+// 设备分页：26 台样本由服务端分页，页头写全表总数；外壳下拉仍读未过滤的完整清单。
+await fixture({mode:'many'});
+await navigate('概览');await navigate('设备');
+await expect("document.querySelectorAll('.device-card').length===24 && document.querySelector('.content .section-heading p')?.innerText.includes('26 台设备') && document.querySelector('.content .section-heading p')?.innerText.includes('22 台在线') && document.querySelector('.device-pagination')?.innerText.includes('1 / 2')",'the device page reads one server page and states the global total');
+await tap('下一页');
+await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.device-pagination')?.innerText.includes('2 / 2') && document.querySelector('.device-grid')?.innerText.includes('分页设备 24') && document.querySelector('.device-grid')?.innerText.includes('分页设备 25')",'the next page asks the server for the remaining devices');
+await pickState('离线');
+await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.content .section-heading p')?.innerText.includes('显示 2 / 共 26 台') && !document.querySelector('.device-pagination') && document.querySelector('.device-grid')?.innerText.includes('分页设备 22') && !document.querySelector('.device-grid')?.innerText.includes('分页设备 24')",'a state filter is applied by the server and resets to the first page');
+await tap('刷新');
+await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.device-state-filter')?.innerText.includes('离线')",'the filtered device page survives a full refresh');
+const deviceReads=await fixture({});
+const filteredReads=deviceReads.deviceRequests.filter(path=>path.includes('state=offline'));
+if(!filteredReads.length||!filteredReads.every(path=>path.includes('page=1')&&path.includes('size=24')))throw new Error('device filter did not carry state/page/size: '+JSON.stringify(deviceReads.deviceRequests));
+if(!deviceReads.deviceRequests.some(path=>!path.includes('state=')&&!path.includes('page=')&&!path.includes('size=')))throw new Error('the shell device picker lost its unfiltered read: '+JSON.stringify(deviceReads.deviceRequests));
+results.push('device reads carry state/page/size while the shell keeps the unfiltered list');
+await pickState('全部');
+await fixture({mode:'alerts'});await navigate('概览');await clickWhenReady('.overview-panel .section-heading button','the overview refresh control returns after the device checks');
 await navigate('概览');
 await expect("document.querySelectorAll('.overview-alerts [data-alert-action]').length===3",'drilling leaves the overview intact on return');
 // 二级钻取：从失败原因再收敛到"只有这类失败"。
