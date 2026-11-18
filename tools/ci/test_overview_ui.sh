@@ -147,11 +147,20 @@ await expect("!!document.querySelector('#threshold-failure-rate') && document.qu
 await fillInput('#threshold-failure-rate','30');
 await fillInput('#threshold-failure-sample','5');
 await tap('保存阈值');
-await expect("document.querySelector('.threshold-editor')?.innerText.includes('当前 v2') && document.querySelector('.threshold-editor')?.innerText.includes('已记录 1 次变更')",'saving bumps the revision and records one audit entry');
+await expect("document.querySelector('.threshold-editor')?.innerText.includes('当前 v2') && document.querySelector('.threshold-audit')?.innerText.includes('已显示 1 / 共 1 条') && document.querySelectorAll('.threshold-audit li').length===1",'saving bumps the revision and records one audit entry with its true total');
 await expect("document.querySelector('.overview-panel')?.innerText.includes('≥ 30.0%') && document.querySelector('.overview-panel')?.innerText.includes('投递 ≥ 5 条')",'the overview caption uses the saved thresholds');
 const thresholdState=await fixture({});
 if(thresholdState.thresholdVersion!==2||thresholdState.thresholdUpdates.length!==1||thresholdState.thresholdUpdates[0].thresholds.failureRate!==0.3)throw new Error('threshold save did not reach the server: '+JSON.stringify(thresholdState));
 results.push('the threshold save carried version and values to the server');
+// 审计分页：首屏最新 20 条，按最旧 sequence 向前取，追加后不重复并隐藏按钮。
+await fixture({thresholdHistory:25});await tap('取消');await tap('调整阈值');
+await expect("document.querySelector('.threshold-editor')?.innerText.includes('已显示 20 / 共 25 条') && document.querySelectorAll('.threshold-audit li').length===20 && [...document.querySelectorAll('.threshold-audit button')].some(b=>b.innerText.includes('加载更早变更'))",'the audit list caps at 20 and offers older entries');
+await tap('加载更早变更');
+await expect("document.querySelectorAll('.threshold-audit li').length===25 && document.querySelector('.threshold-audit')?.innerText.includes('已显示 25 / 共 25 条') && ![...document.querySelectorAll('.threshold-audit button')].some(b=>b.innerText.includes('加载更早变更'))",'loading older audit rows appends without duplicates');
+const auditCalls=(await fixture({})).auditRequests;
+if(!auditCalls.length||!auditCalls.at(-1).includes('before=6'))throw new Error('audit pagination did not use the oldest loaded cursor: '+JSON.stringify(auditCalls));
+results.push('audit pagination requested before=6');
+await tap('取消');
 await fixture({mode:'empty',delay:1});await tap('刷新概览');await tap('退出登录');await wait(1.2);
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.overview-panel') && document.querySelector('.token-label input').value===''",'logout discards delayed snapshot and token');
 const beforeAuth=(await fixture({mode:'unauthorized',delay:0})).requests;

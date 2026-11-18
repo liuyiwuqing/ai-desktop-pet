@@ -105,6 +105,7 @@
 | DELIVERY-FAILURE-REASONS-01 | 概览失败原因归并与二级钻取 | 软件本地已验证：`GET /api/v1/overview` 新增 `failureReasons`（按 `last_error` 归并，合计由同一 CTE 求和得出 `today.failedDeliveries`）；`GET /deliveries`、`/deliveries/export` 新增 `lastError` 筛选（`[a-z_]{1,32}`，`unknown` 落回 `IS NULL`）；概览每条原因可「只看这类」跳到 `status=failed` + `lastError`；CORE 156 项 0 失败/5 条件跳过（新增 2 项）、前端 check/build、概览 51 项浏览器检查（新增 11 项）、筛选 44 项与主题 68 项回归通过；源码指纹已核对更新；见 [CORE 契约](../../nexus-core/docs/console-overview.md#失败原因--delivery-failure-reasons-01) | 原因码是代码写死的集合，新增原因要同步前端文案；未连真实 CORE/Broker/设备，未对生产库大数据量验证；推送与 CI 见文末 |
 | DEVICE-FILTER-01 | 设备页状态筛选与离线告警钻取 | 软件本地已验证：`devices_online` 目标改为 `{"tab":"devices","status":"offline"}`；设备页新增「全部/在线/离线/已停用」筛选，离线=`enabled && !online`（与告警同口径），停用单列；筛选在已读取的 `GET /devices` 结果内完成，不新增接口参数；命中 0 台给空态与「查看全部设备」；钻取前清掉壳层单设备选择，壳层另选设备时回到「全部」；CORE `OverviewAlertsTest` 7 项、`ConsoleOverviewFlowTest` 7 项（含 `devices:offline` 断言）、前端 check/build、概览 55 项浏览器检查（新增 4 项）、设备 73 项与主题 68 项回归通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警钻取--alert-drill-01) | 筛选只作用于 `GET /devices` 已返回的前 100 台，超量库需先分页；未连真实 CORE/PostgreSQL/Broker/设备；阈值仍不可配置；推送与 CI 见文末 |
 | ALERT-CONFIG-01 | 概览告警阈值可配置与变更审计 | 软件本地已验证：V26 新增 `alert_thresholds` 单行表（失败率/样本下限/积压/在线下限，默认 0.10/20/100/1）与 `alert_threshold_audit`；`GET/PUT /api/v1/overview/thresholds`（所有认证角色可读、仅管理员可写，`version` 乐观并发冲突 409、越界 400、更新与审计同事务）；概览计数与阈值由同一 SQL 快照读出；管理台概览「调整阈值」表单（失败率按百分比输入，400/409 就地提示）；CORE 158 项 0 失败/5 条件跳过（新增 1 项纯函数 + 1 项 HTTP）、前端 check/build、概览 59 项浏览器检查（新增 4 项）、管理台 73 项与主题 68 项回归通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#阈值配置--alert-config-01) | 阈值是全局单行，不能按设备/来源分组；审计接口只回最近 20 条（库内保留全部）；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
+| AUDIT-PAGE-01 | 阈值变更审计列表与向前翻页 | 软件本地已验证：`GET /api/v1/overview/thresholds` 新增 `historyTotal`；新增 `GET /api/v1/overview/thresholds/audit?before=&size=`（所有认证角色可读，`before` 为已加载最旧 `sequence`，`size` 1–100，返回 `items/total/hasMore`，新写入只落在更大序号一侧）；调整阈值表单列出最新 20 条审计（版本前后/操作者/时间/四项阈值），标题「已显示 N / 共 M 条」，「加载更早变更」按游标追加、失败保留已加载行，保存后回到最新；CORE 160 项 0 失败/5 条件跳过（新增 1 项）、前端 check/build、概览 68 项浏览器检查（新增 3 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#阈值配置--alert-config-01) | 审计行不清理，但没有删除/导出/按操作者或时间筛选；`sequence` 是内部序号，不承诺跨环境稳定；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | TREND-REASON-01 | 趋势失败原因折行与按原因收窄 | 软件本地已验证：`GET /api/v1/overview/trend` 新增可选 `reason`（去空白后 1–64 字符，空/超长 400，未知原因返回空序列）与响应 `reason`、`failureReasons`、`totals.allFailures`；折行始终覆盖整个窗口（按数量降序、同量按码升序），`reason` 只收窄 `points[].failures` 与 `totals.failures`；概览趋势在失败图下显示原因计数，点选/「全部原因」切换并保留窗口总数；CORE 159 项 0 失败/5 条件跳过（新增 1 项）、前端 check/build、概览 65 项浏览器检查（新增 6 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#历史趋势--overview-trend-01) | 原因码来自投递历史 `last_error`，不做固定集合校验；折行合计与 `allFailures` 同源，但 `totals.failures` 会被收窄；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 
@@ -1025,3 +1026,18 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 边界：原因码不做固定集合校验，新增原因仍要同步前端中文文案；折行只覆盖保留策略尚未清理的投递历史，清理后窗口分布会随之减少；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库大数据量验证。
 
 推送与 CI（2026-11-18）：CORE `e0280fd` / 04 `f3e53b3` 已推送，`git ls-remote` 核对远端分支均指向该提交。CI：CORE `Docker deployment` [#44249292575](https://github.com/liuyiwuqing/nexus-core/actions/runs/44249292575) `success`；04 `Software checks` [#44249305286](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44249305286) `success`（八个 job 全绿）。两项 workflow 不运行本项 65 项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署或实机验收。
+
+### AUDIT-PAGE-01 · 阈值变更审计列表与向前翻页（2026-11-18）
+
+此前阈值读取只回最近 20 条，表单只显示由列表长度推断的“已记录 N 次变更”；更早的记录虽在库中，却没有读取入口，也没有界面列出每条审计。本项把审计做成可读列表并补上向前翻页：
+
+- `GET /api/v1/overview/thresholds` 增加 `historyTotal`（真实审计行数），`history` 仍只回最新 20 条。
+- 新增 `GET /api/v1/overview/thresholds/audit?before=&size=`：`before` 是当前已加载最旧一行的 `sequence`，只返回更早的行；`size` 默认 20、取值 1–100；返回 `items`、`total`、`hasMore`。新写入只会产生更大的 `sequence`，因此并发保存不会造成偏移翻页的重复或跳过；非法 `before`/`size` 返回 400，未认证返回 401。
+- 调整表单列出每条变更的版本前后、操作者、时间与四项阈值，标题显示“已显示 N / 共 M 条，最新在前”；还有更早记录时提供「加载更早变更」，按游标追加并按 `sequence` 去重，失败就地提示并保留已加载行；保存成功或重开表单回到最新 20 条；关闭、退出或卸载后迟到的审计响应由代次守卫丢弃。
+
+验证（2026-11-18，本机 macOS）：
+- CORE `python3 tools/run_local.py build`：160 项 0 失败/5 条件跳过，Flyway 至 V26。新增 `thresholdAuditPagesBackwardsWithoutDuplicates`：直接布置 25 条审计后验证首屏 20 条、`historyTotal=25`、用最旧 `sequence` 只取更早 5 条且顺序正确、`size=5` 与游标组合的边界、空页 `hasMore=false`、无令牌 401、`before=0`/`size=0`/`size=101` 400；原阈值测试补 `historyTotal` 0→1。
+- 前端 `npm --prefix frontend run check` 与 `run build` 通过（由浏览器脚本先执行）。
+- 概览浏览器检查 65 → 68 项：保存后审计显示真实总数、布置 25 条后首屏 20 条并提供「加载更早变更」、点击后追加到 25 条且按钮消失、请求实际带 `before=6`。390px 断言沿用既有范围（概览、告警按钮、原因行、趋势图），审计列表未在该视口单独检查。
+
+边界：审计行不清理，但未提供删除、导出、按操作者或时间筛选；`sequence` 是数据库内部序号，不承诺跨环境稳定；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库大数据量验证。

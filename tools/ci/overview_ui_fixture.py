@@ -70,11 +70,12 @@ class OverviewFixture(Fixture):
     thresholds = dict(THRESHOLDS)
     delivery_requests = []
     trend_requests = []
-    # 阈值配置的版本与审计：只在 PUT 时推进，让界面的"当前 vN / 已记录 N 次变更"有真实来源。
+    # 阈值配置的版本与审计：只在 PUT 时推进；history 保留全部行，读取时只给最新 20 条。
     threshold_version = 1
     threshold_updated_at = '2026-11-13T10:00:00Z'
     threshold_updates = []
     threshold_history = []
+    audit_requests = []
 
     def trend(self, mode):
         query = parse_qs(urlparse(self.path).query)
@@ -130,6 +131,22 @@ class OverviewFixture(Fixture):
             if mode != 'alerts':
                 return super().do_GET()
             return self.json_response(200, {'items': ALERT_DEVICES})
+        if path == '/api/v1/overview/thresholds/audit':
+            if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
+                return self.json_response(401, {'error': 'unauthorized'})
+            query = parse_qs(urlparse(self.path).query)
+            try:
+                before = int(query['before'][0]) if 'before' in query else None
+                size = int(query.get('size', ['20'])[0])
+            except ValueError:
+                return self.json_response(400, {'error': 'invalid_request'})
+            with self.lock:
+                cls = type(self)
+                cls.audit_requests.append(self.path)
+                rows = [row for row in cls.threshold_history if before is None or row['sequence'] < before]
+                items = rows[:max(size, 1)]
+                return self.json_response(200, {'items': items, 'total': len(cls.threshold_history),
+                                                'hasMore': len(rows) > len(items)})
         if path == '/api/v1/overview/thresholds':
             if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
                 return self.json_response(401, {'error': 'unauthorized'})
@@ -137,7 +154,7 @@ class OverviewFixture(Fixture):
                 cls = type(self)
                 value = {'thresholds': dict(cls.thresholds), 'version': cls.threshold_version,
                          'updatedBy': 'overview-ui-fixture', 'updatedAt': cls.threshold_updated_at,
-                         'history': list(cls.threshold_history)}
+                         'history': list(cls.threshold_history[:20]), 'historyTotal': len(cls.threshold_history)}
             return self.json_response(200, value)
         if path == '/api/v1/connectors':
             if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
@@ -210,14 +227,15 @@ class OverviewFixture(Fixture):
             cls.thresholds = {**THRESHOLDS, **wanted}
             cls.threshold_version += 1
             cls.threshold_updated_at = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-            cls.threshold_history.insert(0, {'sequence': len(cls.threshold_history) + 1, 'actor': 'overview-ui-fixture',
+            sequence = (cls.threshold_history[0]['sequence'] + 1) if cls.threshold_history else 1
+            cls.threshold_history.insert(0, {'sequence': sequence, 'actor': 'overview-ui-fixture',
                                              'fromVersion': body['version'], 'toVersion': cls.threshold_version,
                                              **{key: cls.thresholds[key] for key in keys},
                                              'recordedAt': cls.threshold_updated_at})
             cls.threshold_updates.append({'version': body['version'], 'thresholds': dict(cls.thresholds)})
             value = {'thresholds': dict(cls.thresholds), 'version': cls.threshold_version,
                      'updatedBy': 'overview-ui-fixture', 'updatedAt': cls.threshold_updated_at,
-                     'history': list(cls.threshold_history)}
+                     'history': list(cls.threshold_history[:20]), 'historyTotal': len(cls.threshold_history)}
         return self.json_response(200, value)
 
     def do_POST(self):
@@ -236,9 +254,19 @@ class OverviewFixture(Fixture):
                 cls.thresholds = {**THRESHOLDS, **value['thresholds']}
             if 'delay' in value:
                 cls.overview_delay = min(max(float(value['delay']), 0), 2)
+            if 'thresholdHistory' in value:
+                count = min(max(int(value['thresholdHistory']), 0), 100)
+                stamp = AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ')
+                cls.threshold_history = [{'sequence': i, 'actor': 'overview-ui-fixture',
+                                          'fromVersion': i - 1, 'toVersion': i,
+                                          'failureRate': 0.1, 'failureRateMinSample': 20,
+                                          'backlogPending': 100, 'onlineMin': 1, 'recordedAt': stamp}
+                                         for i in range(count, 0, -1)]
+                cls.threshold_version = max(count, 1)
             return self.json_response(200, {'requests': cls.overview_requests,
                                             'deliveryRequests': list(cls.delivery_requests),
                                             'trendRequests': list(cls.trend_requests),
+                                            'auditRequests': list(cls.audit_requests),
                                             'thresholdVersion': cls.threshold_version,
                                             'thresholdUpdates': list(cls.threshold_updates)})
 
