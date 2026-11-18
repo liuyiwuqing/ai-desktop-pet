@@ -98,7 +98,8 @@
 | CONSOLE-09-C | 消息条件与限定动作组合 | CORE `f39ecec` / 04 `343e23b` 均已推送并核对远端；来源/类型/关键词/优先级 AND、新消息固定提醒、公开分析原授权保护、自动提醒回环排除；HTTP/隔离库新增 3 项与原编辑/创建共 17 项 verify 通过，实际 Vue 新增 17/原编辑 99/删除 52 检查通过；见 [CORE 契约](../../nexus-core/docs/automation-conditions.md) | 同步契约/页面/专项；不开放任意动作，真实规则/消息与生产库未操作 |
 | DEVICE-CRED-01 | 设备 MQTT 凭据台账与轮换 | 软件本地已验证：V25 台账（只存 SHA-256 指纹、一次性密钥、宽限期、撤销）、管理员限定签发/轮换/撤销、接入引导按设备显示台账状态、设备详情新增凭据区块；CORE 139 项 0 失败/5 条件跳过、`DeviceCredentialFlowTest` 3 项、前端 check/build、设备页 73 项浏览器检查（新增 7 项）通过；见 [契约](../../nexus-core/docs/device-credentials.md) | CORE 不写 Broker（配置为只读绑定），应用步骤见 [1Panel 说明](../deployment/1panel/README.md#设备-mqtt-凭据device-cred-01)；真实 Broker/设备/生产库未验收；推送与 CI 见文末 |
 | OVERVIEW-TREND-01 | 概览收件/投递/失败历史趋势 | 软件本地已验证：`GET /api/v1/overview/trend`（`15m`/`1h`/`6h`/`1d` 固定桶、`date_bin` 固定原点对齐、1–168 小时、最多 400 点、末桶标 `partial`）、收件/投递/失败事件三条序列、概览页 6h/24h/7d 与独立刷新；CORE 141 项 0 失败/5 条件跳过（新增 2 项）、前端 check/build、概览页 24 项浏览器检查（新增 7 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#历史趋势--overview-trend-01) | 趋势只覆盖仍保留的记录，失败按投递历史事件计数而非当前失败回看；本项交付时无告警阈值，已由 OVERVIEW-ALERT-01 补上（固定常量、不可配置）；仍无推送与时区选项；未对生产库/大数据量验证；推送与 CI 见文末 |
-| MSG-BATCH-01 | 单条消息的投递批量撤销与重试 | 软件本地已验证：`POST /api/v1/messages/{id}/deliveries/{cancel,retry}`（`dryRun` 只读预演、确认令牌写入、单条 `UPDATE … RETURNING`、500 条上限拒绝对截断）、跳过原因按单条判定条件的否定归并、消息详情新增批量折叠区；CORE 145 项 0 失败/5 条件跳过（新增 4 项）、前端 check/build、消息批量 16 项浏览器检查与既有筛选 44/发送 33 项回归通过；见 [契约](../../nexus-core/docs/message-delivery-batch.md) | 仍无跨消息批量操作，也不能撤回设备已保存/展示的内容；真实 Broker、设备回执竞态与生产库未验收；推送与 CI 见文末 |
+| MSG-BATCH-01 | 单条消息的投递批量撤销与重试 | 软件本地已验证：`POST /api/v1/messages/{id}/deliveries/{cancel,retry}`（`dryRun` 只读预演、确认令牌写入、单条 `UPDATE … RETURNING`、500 条上限拒绝对截断）、跳过原因按单条判定条件的否定归并、消息详情新增批量折叠区；CORE 145 项 0 失败/5 条件跳过（新增 4 项）、前端 check/build、消息批量 16 项浏览器检查与既有筛选 44/发送 33 项回归通过；见 [契约](../../nexus-core/docs/message-delivery-batch.md) | 跨消息范围已由 MSG-BATCH-02 补上；不能撤回设备已保存/展示的内容；真实 Broker、设备回执竞态与生产库未验收；推送与 CI 见文末 |
+| MSG-BATCH-02 | 跨消息批量撤销与重试 | 软件本地已验证：新增 `POST /api/v1/deliveries/batch-{cancel,retry}`（`messageIds`、`dryRun`、批确认令牌）；≤20 条消息且合计 ≤500 条投递，整单一个事务，任一消息不可读 404 且不写入；逐消息复用单条判定与 `delivery_history`；管理台当前页多选、20 条上限、两个预演、写入后重新预演、整单拒绝清空旧计划；CORE 新增 4 项 HTTP、完整构建 168 项 0 失败/5 跳过、前端 check/build、消息批量 30 项浏览器检查与筛选/导出/组合/表单/空态 125 项/管理台/主题/概览/事件回归通过；见文末 | 未验证接近上限耗时、多管理员并发与真实 Broker/设备；换页清空选择，筛选后选择收敛到仍可见消息；推送与 CI 见文末 |
 | REG-01 | 全量软件回归与文档一致性核对 | 本轮不加功能：CORE `mvn verify` 145 项 0 失败/5 条件跳过、24 个管理台浏览器脚本共 1131 项检查（20 个首跑通过、2 个单跑通过、2 个真缺陷修复后通过）、契约与交付类检查通过；修掉 1 处过期选择器（`.management-record` 被断线与凭据区块抢先匹配）与 1 处 390px 竞态；`docs/18` 补 15 行缺失台账、CORE README 补 3 条接口与 3 段说明；114 条相对链接、149 个提交哈希可解析；见本节 | `test_events_ui.sh`/`test_operations_ui.sh` 连跑不稳定（单跑通过）；`test_server_release.py` 4 项受沙箱 mkdir 代理限制、同提交 CI 通过；未烧录、未连真实设备、无目标服务器与生产库操作；推送与 CI 见文末 |
 | OVERVIEW-ALERT-01 | 概览告警阈值与站内提示 | 软件本地已验证：`GET /api/v1/overview` 新增 `alerts`（`mqtt_connection`/`devices_online`/`delivery_backlog`/`delivery_failure_rate`，各带 `threshold`/`comparison`/`unit`）与 `thresholds`；阈值为代码常量（失败率 ≥10% 且样本 ≥20 条、`pending` 积压 ≥100、启用设备在线 <1），失败率条形改由服务端阈值染色；CORE 153 项 0 失败/5 条件跳过（新增 2 项 HTTP + 6 项纯函数）、前端 check/build、概览页 32 项浏览器检查（新增 8 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警阈值--overview-alert-01) | 告警是读时派生状态：不落库、不写审计、不推送、没有持续时间；阈值不可配置（改阈值需改代码发版）；真实 Broker 断开、生产库与实机未验收；推送与 CI 见文末 |
 | ALERT-DRILL-01 | 概览告警钻取到已筛选列表 | 软件本地已验证：`alerts[].target{tab,status}` 由服务端下发（积压→投递 `status=pending`、失败率→`failed`、无在线设备→设备页、传输不可用为 `null` 且不给按钮）；跳转前清空旧搜索、状态筛选取代叠加，先备条件再切页签只读一次；CORE 154 项 0 失败/5 条件跳过（新增 1 项纯函数）、前端 check/build、概览 40 项浏览器检查（新增 8 项，含夹具核对请求真带 `status`）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警钻取--alert-drill-01) | 交付时只跳现存筛选：设备页没有离线筛选，故只打开页面而不筛（已由 DEVICE-FILTER-01 补上）；投递页只能按状态筛；未连真实 CORE/Broker/设备；推送与 CI 见文末 |
@@ -1082,3 +1083,27 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 - 回归：管理台、空态 125 项、主题 68 项、事件 21 项通过。空态回归同时修掉一处夹具遮蔽：概览钻取的投递样本只在告警模式生效，不再把其它页面的投递空态替换成 3 条钻取样本。
 
 边界：设备页不提供按名称搜索、自定义排序或每页条数选择；壳层设备下拉仍受 100 台上限；计数与筛选依赖应用进程的 `now()` 与数据库时间一致；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库大数据量验证。
+
+推送与 CI（2026-11-18）：CORE `a2ceebd` / 04 `2cd60b0` 已推送，`git ls-remote` 核对远端分支分别指向 `a2ceebde38eef9fd741d90d5eb8392b34d6381cc` 与 `2cd60b05ece035cb779c9873e27ac58e0ff72ac1`。CI：CORE `Docker deployment` [#44265240571](https://github.com/liuyiwuqing/nexus-core/actions/runs/44265240571) `success`；04 `Software checks` [#44265253462](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44265253462) `success`。两项 workflow 不运行本项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署或生产库验证。
+
+## MSG-BATCH-02 · 跨消息批量撤销与重试
+
+MSG-BATCH-01 已支持对单条消息批量处理投递，但设备一多、消息一多，逐条进详情仍然重复。本项把批量范围扩到**当前消息页的多条消息**，仍复用同一套判定和审计，不新增后台任务：
+
+- 新增 `POST /api/v1/deliveries/batch-cancel` 与 `/batch-retry`，请求体 `{ "messageIds": [...] }`；`dryRun=true` 只读预演，写入需 `CANCEL_MESSAGE_DELIVERIES_BATCH` / `RETRY_MESSAGE_DELIVERIES_BATCH`。无令牌返回 `400 delivery_batch_confirmation_required`。
+- 一次最多 20 条消息且合计 500 条投递，超出返回 `409 batch_too_large`；空或全空 ID 返回 `400 invalid_request`；重复 ID 去重。
+- 整单在同一个 `@Transactional` 内：先核对全部消息存在，再逐条复用单条 `run(...)`。任一消息不存在（含已被保留策略清除）返回 `404 message_not_found`，整单不写入。
+- 响应同时给出整单 `counts{messages,deliveries,candidates,skipped,remaining}` 与逐消息明细；`applied` 为整单实际改动数。
+- 权限与单条批量相同（管理员/operator 可写，viewer 只读）；每条改动仍由 `delivery_history` 记录 `state_changed` / `retry_requested`。
+- 消息列表当前页每行左侧增加勾选框（仅可写角色），选中后显示「已选 N 条」；20 条时显示上限并禁用其余勾选框。打开「批量投递操作…」并发读取两个预演，展示整单消息数/投递总数/可撤销/可重试与按原因合并的跳过摘要；写入后保留面板并重新预演。换页立即清空选择，筛选/刷新导致消息离开当前页时选择收敛；整单拒绝时清空旧计划，只显示「消息不存在…整单未做任何修改」。
+- 壳层设备下拉、导航页数与 h1 指纹不变，无新增迁移。
+
+验证（2026-11-18，本机 macOS/Docker）：
+
+- CORE 新增 `MessageDeliveryMultiBatchFlowTest`（4 项 HTTP，隔离 PostgreSQL/MQTT）：两次预演不写库且整单合计正确；一次确认撤销跨两条消息并逐条写 `delivery_history`；混入未知消息时整单 404 且前后状态不变；第 21 条消息与合计超过 500 条投递均返回 409。
+- 前端 `npm --prefix frontend run check` 与 `run build` 通过。
+- 04 `test_message_batch_ui.sh` 16 → 30 项：多选计数、两个预演请求形状与空确认、批确认令牌、写入后重新预演、整单拒绝错误与旧计划清除、清空选择、20 条上限、390 px 适配全部通过。
+- 完整 CORE `python3 tools/run_local.py build`：168 项，0 失败/0 错误，5 项条件跳过，BUILD SUCCESS。
+- 回归：列表筛选、元数据导出、消息组合、表单、空态 125 项、管理台、主题、概览、事件检查通过。
+
+边界：未连接真实 CORE/PostgreSQL/Broker/设备；未验证接近 500 条投递时的耗时、多管理员并发处理同一批消息，以及真实 Broker 上的批量结果；跨消息批量不能撤回设备已保存或展示的内容。

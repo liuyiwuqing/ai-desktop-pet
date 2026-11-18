@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Actual Vue console; the per-message delivery batch endpoints are the only fixtures.
+# Actual Vue console; the per-message and cross-message delivery batch endpoints are the only fixtures.
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 nexus_dir="${NEXUS_CORE_DIR:-${repo_root}/../nexus-core}"
@@ -81,6 +81,42 @@ await expect("document.documentElement.scrollWidth<=390 && document.querySelecto
 await cdp('Emulation.clearDeviceMetricsOverride');
 await tap('收起投递批量操作');
 await expect(`!document.querySelector('.delivery-batch-plans') && ${batchText}.includes('投递批量操作…')`,'collapsing hides the plan again');
+
+// 跨消息批量：当前页多选、先预演再确认、整单原子。
+const multiText="document.querySelector('.multi-batch')?.innerText||''";
+const barText="document.querySelector('.message-select-bar')?.innerText||''";
+await js("document.querySelectorAll('.message-select')[0].click()");
+await expect(`${barText}.includes('已选 1 条')`,'one message can be selected from the current page');
+await js("document.querySelectorAll('.message-select')[1].click()");
+await expect(`${barText}.includes('已选 2 条')`,'the selection bar counts every selected message');
+await tap('批量投递操作…');
+await expect(`${multiText}.includes('已选 2 条消息，共 6 条投递记录')`,'opening the cross-message panel restates the selection scope');
+await expect(`${multiText}.includes('可撤销 4 条') && ${multiText}.includes('可重试 2 条')`,'cross-message plans aggregate every selected message');
+await expect(`${multiText}.includes('跳过 4 条：已经尝试过发送 2、已经开始投递 2') && ${multiText}.includes('跳过 6 条：不在失败状态 6')`,'cross-message skips merge by reason');
+const multiOpened=(await state()).multiBatchRequests;
+if(multiOpened.length!==2 || multiOpened.some(request=>request.dryRun!==true || request.confirm!=='' || request.messageIds.length!==2) || multiOpened[0].action!=='cancel' || multiOpened[1].action!=='retry')throw new Error('Cross-message opening must send exactly two dry runs for the selected ids');
+results.push('cross-message opening sends two dry runs for the selection');
+
+await tap('确认撤销 4 条');
+await expect(`${multiText}.includes('已撤销 4 条未开始的投递，涉及 2 条消息') && ${multiText}.includes('没有可撤销的投递') && ${multiText}.includes('可重试 2 条')`,'cross-message cancel reports its scope and re-reads the plan');
+const multiWritten=(await state()).multiBatchRequests.filter(request=>request.dryRun===false);
+if(multiWritten.length!==1 || multiWritten[0].action!=='cancel' || multiWritten[0].confirm!=='CANCEL_MESSAGE_DELIVERIES_BATCH' || multiWritten[0].messageIds.length!==2)throw new Error('Cross-message write must carry the batch confirm token for the whole selection');
+results.push('cross-message cancel write carries its own confirm token');
+
+await fixture({multiBatchMode:'reject'});await tap('收起批量投递操作');await tap('批量投递操作…');
+await expect("document.querySelector('.multi-batch .status-note--danger')?.innerText.includes('消息不存在') && !document.querySelector('.multi-batch-plans')",'one unreadable message rejects the whole selection without a partial plan');
+await fixture({multiBatchMode:'normal'});await tap('收起批量投递操作');await tap('批量投递操作…');
+await expect(`${multiText}.includes('可撤销 4 条')`,'cross-message plans recover after a rejected selection');
+await tap('清空选择');
+await expect(`!document.querySelector('.message-select-bar') && !document.querySelector('.multi-batch')`,'clearing the selection closes the cross-message panel');
+await js("(()=>{const boxes=[...document.querySelectorAll('.message-select')];for(let i=0;i<21;i++)boxes[i].click();return true;})()");
+await expect(`${barText}.includes('已选 20 条（上限）') && document.querySelectorAll('.message-select')[20].className.includes('n-checkbox--disabled')`,'the twenty-first message cannot be selected');
+await tap('清空选择');
+await expect(`!document.querySelector('.message-select-bar')`,'the selection can be cleared after reaching the limit');
+await js("document.querySelectorAll('.message-select')[0].click()");await tap('批量投递操作…');
+await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+await expect("document.documentElement.scrollWidth<=390 && document.querySelector('.multi-batch').getBoundingClientRect().right<=390 && document.querySelector('.message-select-bar').getBoundingClientRect().right<=390",'cross-message selection bar and panel fit 390 CSS pixels');
+await cdp('Emulation.clearDeviceMetricsOverride');
 cliLog({passed:results.length,checks:results,scope:'actual Vue and RAM HTTP boundary; no database, broker or device'});
 EOF
 } | ego-browser nodejs
