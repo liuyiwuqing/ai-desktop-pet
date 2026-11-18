@@ -1041,3 +1041,5 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 - 概览浏览器检查 65 → 68 项：保存后审计显示真实总数、布置 25 条后首屏 20 条并提供「加载更早变更」、点击后追加到 25 条且按钮消失、请求实际带 `before=6`。390px 断言沿用既有范围（概览、告警按钮、原因行、趋势图），审计列表未在该视口单独检查。
 
 边界：审计行不清理，但未提供删除、导出、按操作者或时间筛选；`sequence` 是数据库内部序号，不承诺跨环境稳定；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库大数据量验证。
+
+推送与 CI（2026-11-18）：CORE `1f62d78` / 04 `59a2e22` 已推送，`git ls-remote` 核对远端分支均指向该提交。CI：CORE `Docker deployment` [#44251278173](https://github.com/liuyiwuqing/nexus-core/actions/runs/44251278173) `success`（docker-compose）；04 `Software checks` [#44251277011](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44251277011) `success`（八个 job 全绿）。两项 workflow 不运行本项 68 项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署或实机验收。
