@@ -112,8 +112,8 @@
 | OVERVIEW-TZ-01 | 概览今日时区可配置 | 软件本地已验证：`nexus.overview.timezone`（`NEXUS_OVERVIEW_TIMEZONE`，默认 `UTC`）决定 `dayStart` 与“今日”窗口，响应 `timezone` 返回解析后的时区 ID；配置非法时启动失败；页面按该时区显示当地日期，不再截取 UTC 字符串；趋势桶仍固定 UTC 对齐；见 [CORE 契约](../../nexus-core/docs/console-overview.md) | 时区是部署级配置，不能按用户/设备切换，也没有页面入口；测试使用无 DST 的 `Asia/Shanghai`，夏令时边界依赖 PostgreSQL `AT TIME ZONE` 未单独演练；推送与 CI 见文末 |
 | DEVICE-LIST-01 | 设备列表服务端筛选与分页 | 软件本地已验证：`GET /api/v1/devices` 新增 `state=all\|online\|offline\|disabled`、`page`、`size`（默认 100 保持旧形状），返回 `total`/`matched`/`counts`（均按整张设备表统计）；设备页 24 台一页，筛选与翻页由服务端完成，页头写全表总数与在线数；壳层设备下拉仍读未过滤清单；CORE 新增 3 项 HTTP（默认形状、状态筛选含 90 秒新鲜度、跨页与全局计数）、前端 check/build、概览 76 项（新增 8 项）、管理台、空态 125 项、主题 68 项、事件 21 项通过；见文末 | 状态与计数按整表统计；壳层下拉仍最多 100 台；搜索、排序与页大小由 DEVICE-LIST-02 承接；未连真实 CORE/PostgreSQL/Broker/设备 |
 | DEVICE-LIST-02 | 设备名称搜索、排序与每页条数 | 软件本地已验证：`GET /api/v1/devices` 新增 `q`（名称/ID 字面量、大小写不敏感、≤80 字）、`sort=created\|name\|last_seen`、`order=asc\|desc`；排序白名单 + `device_id` 稳定次序，`last_seen` 空值两种方向都靠后；`total` 仍为整表，`matched` 与三类计数按搜索结果统计；设备页新增搜索（300ms 防抖）、排序与 12/24/48/96 页大小，条件变化回第 1 页，空结果给清空入口；CORE `DeviceListFlowTest` 5 项、完整 170 项（5 条件跳过）、前端 check/build、概览浏览器 83 项通过；见文末 | 名称排序依赖数据库排序规则，中文按库默认 collation；搜索只覆盖名称与设备 ID，不搜遥测/备注；未连真实 CORE/PostgreSQL/Broker/设备，生产库大数据量与索引未验证 |
-| DEVICE-LIST-03 | 壳层顶栏设备选择器服务端搜索 | 软件本地已验证：顶栏 `NSelect` 改为 `filterable remote`，默认仍显示 `GET /devices` 前 100 台；输入时 300ms 防抖调用 `GET /devices?size=50&sort=name&order=asc&q=…`，空查询恢复默认清单，结果始终含“全部设备”和当前选中项，加载/失败/无匹配各有明确状态；选中不在默认清单的设备时保留独立记录，整表刷新不会清空选择；告警钻取仍清空选择与搜索；前端 check/build、概览浏览器 83 → 101 项、事件 21 项、角色 43 项通过；见文末 | 搜索只覆盖名称/设备 ID，不提供“浏览全部设备”的分页下拉；没有设备删除接口，选中设备从服务端消失后记录会保留到重新选择；未连真实 CORE/PostgreSQL/Broker/设备，生产规模数据与实机未验收 |
-
+| DEVICE-LIST-03 | 壳层顶栏设备选择器服务端搜索 | 软件本地已验证：顶栏 `NSelect` 改为 `filterable remote`，默认仍显示 `GET /devices` 前 100 台；输入时 300ms 防抖调用 `GET /devices?size=50&sort=name&order=asc&q=…`，空查询恢复默认清单，结果始终含“全部设备”和当前选中项，加载/失败/无匹配各有明确状态；选中不在默认清单的设备时保留独立记录，整表刷新不会清空选择；告警钻取仍清空选择与搜索；前端 check/build、概览浏览器 83 → 101 项、事件 21 项、角色 43 项通过；见文末 | 搜索只覆盖名称/设备 ID，不提供“浏览全部设备”的分页下拉；设备删除由 DEVICE-DELETE-01 承接；未连真实 CORE/PostgreSQL/Broker/设备，生产规模数据与实机未验收 |
+| DEVICE-DELETE-01 | 设备删除与历史保护 | 软件本地已验证：管理员设备卡片新增「删除设备」，确认区必须输入完整设备名称；`DELETE /api/v1/devices/{id}` 对投递/遥测/配置/OTA/成长/凭据历史返回 409 `device_has_history`，对路由/来源引用返回 409 `device_referenced`，未使用设备 204 且重复删除幂等；成功后清除顶栏选择并整表刷新；见文末 | 只能清理登记错误且从未使用的设备，有历史请停用；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
@@ -1151,3 +1151,23 @@ MSG-BATCH-01 已支持对单条消息批量处理投递，但设备一多、消�
 边界：未连接真实 CORE/PostgreSQL/Broker/设备；未验证接近 500 条投递时的耗时、多管理员并发处理同一批消息，以及真实 Broker 上的批量结果；跨消息批量不能撤回设备已保存或展示的内容。
 
 推送与 CI（2026-11-18）：CORE `acc95fb` / 04 `a500899` 已推送，`git ls-remote` 核对远端分支分别指向 `acc95fb1d2334300a9e1dfa1fe74ab007e4662ab` 与 `a5008991eb39012d06cdbc6a2b2b2c68b7808f14`。CI：CORE `Docker deployment` [#44268193992](https://github.com/liuyiwuqing/nexus-core/actions/runs/44268193992) `success`；04 `Software checks` [#44268212956](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44268212956) `success`。两项 workflow 不运行本项 30 项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署或生产库验证。
+
+## DEVICE-DELETE-01 · 设备删除与历史保护
+
+产品规划要求删除设备输入设备名二次确认；此前只有停用和改名，登记错误只能永久占着设备 ID。本项补齐一个受限删除，而不是级联清库：
+
+- 管理员设备卡片新增「删除设备」；确认区说明边界，必须输入完整设备名称才启用「确认删除」。成功后关闭确认区、清除顶栏设备视图与搜索、整表刷新；失败保留输入，未知结果可在原处重试（服务端幂等）。
+- `DELETE /api/v1/devices/{id}` 与设备列表读取共用行锁。设备不存在返回 204；有投递、实时/历史遥测、配置请求、OTA 观测/部署/启动、成长观测/启动、设备凭据或凭据事件时返回 409 `device_has_history`；仍被未删除路由规则或来源 `device_ids` 引用时返回 409 `device_referenced`。成功只删除 devices 行，不级联删除任何历史。
+- 顶栏选择若指向被删除设备会立即回到「全部设备」；设备页页码、总数、匹配数与在线数由刷新后的服务端结果接管，末页最后一项删除后回退到有效页。
+- 无新增迁移、路由、消息或设备动作；删除请求沿用现有 HTTP 审计，审计与业务事务独立。
+
+验证（2026-11-18，本机 macOS/Docker）：
+
+- 新增 `DeviceDeleteFlowTest` 4 项真实 HTTP/隔离 PostgreSQL：未使用设备 204、列表中消失、重复删除与未知 ID 均 204、同 ID 可重新登记；插入投递后 409 `device_has_history` 且设备保留；路由与来源引用分别 409 `device_referenced`，解除后 204；operator/viewer 403。
+- 完整 `python3 tools/run_local.py build` 退出 0：174 项中 169 通过、5 项条件跳过、0 失败/错误；JAR 的 index 与构建产物哈希一致，DevicesPanel 新文案进入产物。
+- 04 概览浏览器 101 → 125 项：管理员可见删除入口；错误名称不能确认；删除当前选择的 `海量设备 119` 后回到全部设备且剩 119 台；服务端只收到一次 DELETE；有历史的 `海量设备 118` 返回 409、提示「只能停用」且卡片保留；取消不改变设备。角色 43 项新增 operator/viewer 不显示删除入口；事件 21 项通过。
+- 浏览器使用实际编译 Vue + 回环 RAM HTTP 夹具，不连接真实 CORE、数据库、Broker 或设备。
+
+边界：删除只适用于从未产生持久事实的设备；真实设备上报过遥测或签发过凭据后只能停用，不能借删除清历史。服务端拉取配置（RSS/天气）里的设备 ID 不在数据库引用检查内，需管理员自行移除；HTTP 审计不是不可变业务审计。未在超过 100 台设备、并发投递/删除或真实 PostgreSQL 生产库上验证锁竞争与耗时；未做真实部署或实机验收。
+
+推送与 CI（待补）

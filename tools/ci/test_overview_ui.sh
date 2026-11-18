@@ -65,7 +65,9 @@ await expect("document.querySelector('h1')?.innerText==='设备'",'the device al
 // 设备页按「启用且离线」过滤：停用样机虽同样不在线，但不属于这次告警。
 await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-card')?.innerText.includes('离线样机') && !document.querySelector('.device-card')?.innerText.includes('停用样机')",'the device drill shows only enabled offline devices');
 await expect("document.querySelector('.device-state-filter')?.innerText.includes('离线') && document.querySelector('.content .section-heading p')?.innerText.includes('显示 1 / 共 2 台')",'the device page states the state it filtered to and how many it hid');
-async function pickState(label){await js("document.querySelector('.device-state-filter .n-base-selection').click()");await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)})`,'state option '+label+' is offered');await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].find(o=>o.innerText.trim()===${JSON.stringify(label)});o.click();})()`);await expect(`document.querySelector('.device-state-filter')?.innerText.includes(${JSON.stringify(label)})`,'state filter shows '+label);}
+async function openSelect(selector){await expect(`(()=>{const s=document.querySelector('${selector} .n-base-selection');return !!s&&!s.classList.contains('n-base-selection--disabled')})()`,'select '+selector+' is enabled');if(!(await js(`document.querySelector('${selector} .n-base-selection')?.classList.contains('n-base-selection--active')`)))await js(`document.querySelector('${selector} .n-base-selection').click()`);await expect(`document.querySelector('${selector} .n-base-selection')?.classList.contains('n-base-selection--active')`,'select '+selector+' is open');}
+async function chooseVisibleOption(label){const found=await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].filter(o=>o.offsetParent!==null).filter(o=>o.innerText.trim()===${JSON.stringify(label)}).pop();if(!o)return false;o.click();return true;})()`);if(!found)throw new Error('option '+label+' is not visible');}
+async function pickState(label){for(let attempt=0;attempt<3;attempt++){await openSelect('.device-state-filter');await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)}&&o.offsetParent!==null)`,'state option '+label+' is offered');await chooseVisibleOption(label);try{await expect(`document.querySelector('.device-state-filter')?.innerText.includes(${JSON.stringify(label)})`,'state filter shows '+label);return;}catch(e){if(attempt===2)throw e;await wait(.3);}}}
 await pickState('全部');
 await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.device-state-filter')?.innerText.includes('全部')",'switching the state back to all restores every device');
 // 设备分页：26 台样本由服务端分页，页头写全表总数；外壳下拉仍读未过滤的完整清单。
@@ -85,7 +87,7 @@ if(!deviceReads.deviceRequests.some(path=>!path.includes('state=')&&!path.includ
 results.push('device reads carry state/page/size while the shell keeps the unfiltered list');
 await pickState('全部');
 // 设备搜索/排序/页大小：均由服务端处理，条件变化后回到第一页。
-async function pickFilter(selector,label){await js(`document.querySelector('${selector} .n-base-selection').click()`);await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)})`,'option '+label+' is offered');await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].find(o=>o.innerText.trim()===${JSON.stringify(label)});o.click();})()`);}
+async function pickFilter(selector,label){await openSelect(selector);await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)}&&o.offsetParent!==null)`,'option '+label+' is offered');await chooseVisibleOption(label);}
 await fillInput('.device-search input','25');
 await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-grid')?.innerText.includes('分页设备 25') && document.querySelector('.content .section-heading p')?.innerText.includes('显示 1 / 共 26 台')",'a device search is applied by the server');
 await fillInput('.device-search input','');
@@ -100,8 +102,8 @@ if(!queryReads.deviceRequests.some(path=>path.includes('sort=name')&&path.includ
 if(!queryReads.deviceRequests.some(path=>path.includes('size=12')&&path.includes('page=1')))throw new Error('device page size did not reach the server: '+JSON.stringify(queryReads.deviceRequests));
 results.push('device search, sort and page size are server-side and reset to page 1');
 // 顶栏设备选择器：输入按名称/ID 走服务端搜索，选中后进入单设备视图；搜索本身不改设备页。
-async function pickViewInput(value){await js("document.querySelector('.device-view .n-base-selection').click()");await fillInput('.device-view input',value);}
-async function pickViewOption(label){await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)})`,'device view option '+label+' is offered');await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].find(o=>o.innerText.trim()===${JSON.stringify(label)});o.click();})()`);}
+async function pickViewInput(value){await openSelect('.device-view');await fillInput('.device-view input',value);}
+async function pickViewOption(label){await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)}&&o.offsetParent!==null)`,'device view option '+label+' is offered');await chooseVisibleOption(label);}
 const pickerBase=(await fixture({})).deviceRequests.length;
 await pickViewInput('25');
 await expect("[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()==='分页设备 25') && ![...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.includes('分页设备 01'))",'the topbar search offers only matching devices');
@@ -131,6 +133,26 @@ await expect("document.querySelectorAll('.device-card').length===1 && document.q
 const crowdRefresh=(await fixture({})).deviceRequests.slice(crowdRefreshBase);
 if(!crowdRefresh.some(path=>!path.includes('q=')))throw new Error('full refresh did not reread the default device list: '+JSON.stringify(crowdRefresh));
 results.push('the selected search-only device survives the unfiltered list refresh');
+// 设备删除：只有管理员、需输入完整名称；有历史的设备 409 保留，删除当前选择后回到全部设备。
+const deleteBase=(await fixture({})).deviceDeletes.length;
+await expect("!!document.querySelector('#device-delete-dodo-crowd-119') && !document.querySelector('#device-delete-dodo-crowd-119').disabled",'an unused device offers deletion to the administrator');
+await js("document.querySelector('#device-delete-dodo-crowd-119').click()");
+await expect("document.querySelector('.device-delete-hint')?.innerText.includes('有历史请停用') && [...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='确认删除')?.disabled",'deletion explains its history boundary and waits for the typed name');
+await fillInput('#devicespanel-field-4','海量设备 118');
+await expect("[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='确认删除')?.disabled",'a wrong device name cannot confirm deletion');
+await fillInput('#devicespanel-field-4','海量设备 119');
+await expect("![...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='确认删除')?.disabled",'the exact device name unlocks confirmation');
+await tap('确认删除');
+await expect("!document.querySelector('#device-delete-dodo-crowd-119') && document.querySelector('.n-select[aria-label=设备视图]')?.innerText.includes('全部设备') && document.querySelector('.content .section-heading p')?.innerText.includes('119 台设备')",'deleting the selected device clears the shell view and the card');
+const deleteRequests=(await fixture({})).deviceDeletes.slice(deleteBase);
+if(deleteRequests.length!==1||!deleteRequests[0].endsWith('/api/v1/devices/dodo-crowd-119'))throw new Error('device deletion did not reach the server exactly once: '+JSON.stringify(deleteRequests));
+results.push('device deletion is one explicit DELETE for the confirmed device');
+await js("document.querySelector('#device-delete-dodo-crowd-118').click()");
+await fillInput('#devicespanel-field-4','海量设备 118');
+await tap('确认删除');
+await expect("document.querySelector('.content > .feedback.error')?.innerText.includes('只能停用') && !!document.querySelector('#device-delete-dodo-crowd-118')",'a device with history is refused and stays in the list');
+await tap('取消');
+await expect("!document.querySelector('.device-delete-hint') && !!document.querySelector('#device-delete-dodo-crowd-118')",'cancelling deletion leaves the device untouched');
 await fixture({mode:'alerts'});await navigate('概览');await clickWhenReady('.overview-panel .section-heading button','the overview refresh control returns after the device checks');
 await navigate('概览');
 await expect("document.querySelectorAll('.overview-alerts [data-alert-action]').length===3",'drilling leaves the overview intact on return');

@@ -50,6 +50,8 @@ CROWD_DEVICES = [
      'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None, 'telemetryAt': None}
     for index in range(120)
 ]
+# 删除样本：24 号有历史，只能停用；其它设备可删除，用于验证二次确认和壳层选择清理。
+HISTORY_DEVICES = {'dodo-many-24', 'dodo-crowd-118'}
 
 
 def alerts_for(value, thresholds):
@@ -87,6 +89,8 @@ class OverviewFixture(Fixture):
     delivery_requests = []
     trend_requests = []
     device_requests = []
+    device_deletes = []
+    deleted_devices = set()
     # 阈值配置的版本与审计：只在 PUT 时推进；history 保留全部行，读取时只给最新 20 条。
     threshold_version = 1
     threshold_updated_at = '2026-11-13T10:00:00Z'
@@ -184,11 +188,13 @@ class OverviewFixture(Fixture):
             with self.lock:
                 mode = type(self).overview_mode
                 type(self).device_requests.append(self.path)
+                deleted = set(type(self).deleted_devices)
             # 告警模式给两台"非在线"设备；分页模式给 26 台；海量模式给 120 台；其它模式沿用管理台夹具的在线设备。
             rows = (MANY_DEVICES if mode == 'many' else CROWD_DEVICES if mode == 'crowd'
                     else ALERT_DEVICES if mode == 'alerts' else None)
             if rows is None:
                 return super().do_GET()
+            rows = [row for row in rows if row['deviceId'] not in deleted]
             return self.json_response(200, self.device_list(rows))
         if path == '/api/v1/overview/thresholds/audit':
             if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
@@ -297,6 +303,23 @@ class OverviewFixture(Fixture):
                      'history': list(cls.threshold_history[:20]), 'historyTotal': len(cls.threshold_history)}
         return self.json_response(200, value)
 
+    def do_DELETE(self):
+        path = urlparse(self.path).path
+        if not path.startswith('/api/v1/devices/'):
+            return self.json_response(404, {'error': 'not_found'})
+        if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
+            return self.json_response(401, {'error': 'unauthorized'})
+        device_id = path.rsplit('/', 1)[-1]
+        with self.lock:
+            cls = type(self)
+            cls.device_deletes.append(self.path)
+            if device_id in HISTORY_DEVICES:
+                return self.json_response(409, {'error': 'device_has_history'})
+            # 不存在的设备也按幂等成功处理，与 CORE 契约一致。
+            cls.deleted_devices.add(device_id)
+        self.send_response(204)
+        self.end_headers()
+
     def do_POST(self):
         if urlparse(self.path).path != '/__qa/overview':
             return super().do_POST()
@@ -322,9 +345,12 @@ class OverviewFixture(Fixture):
                                           'backlogPending': 100, 'onlineMin': 1, 'recordedAt': stamp}
                                          for i in range(count, 0, -1)]
                 cls.threshold_version = max(count, 1)
+            if 'deletedDevices' in value:
+                cls.deleted_devices = set(value['deletedDevices'])
             return self.json_response(200, {'requests': cls.overview_requests,
                                             'deliveryRequests': list(cls.delivery_requests),
                                             'deviceRequests': list(cls.device_requests),
+                                            'deviceDeletes': list(cls.device_deletes),
                                             'trendRequests': list(cls.trend_requests),
                                             'auditRequests': list(cls.audit_requests),
                                             'thresholdVersion': cls.threshold_version,
