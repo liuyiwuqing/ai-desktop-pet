@@ -957,3 +957,5 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 过程中修掉一处自己引入的测试脆弱性：钻取检查原本用单发 `tap()` 点按钮，切页签会重挂面板，按钮要等快照回来才存在，`查看设备` 偶发「Button unavailable」。改成先 `expect` 到按钮可点再点，与 REG-01 修 `test_automation_conditions_ui.sh` 的做法一致；不是放宽断言。
 
 边界：原因码是代码写死的集合，新增原因需要同步前端文案与下拉；未连接真实 CORE/Broker/设备，「筛选真的生效」由夹具的状态/原因双过滤加请求参数证明；未对生产库或大数据量验证；概览的原因折行只覆盖今日，跨天分布要看趋势（趋势目前不按原因分桶）。
+
+推送与 CI（2026-11-18）：CORE `bfb56a6`（13 个文件）与 04 `58903f1`（5 个文件）分别提交并推送，两仓改动按契约配对记录在案。CI 结果：CORE `Docker deployment` [#44231867458](https://github.com/liuyiwuqing/nexus-core/actions/runs/44231867458) `success`（含真实隔离 Compose 部署与仅镜像初始化复验）；04 `Software checks` [#44231878359](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44231878359) `success`（host/protocol/DSP/LVGL 检查）。这两条是远程 CI 的结果，仍不等于 ACC-01 的真实部署与 ACC-02 的真机验收——本项没有上过真机，也没有连过生产库。
