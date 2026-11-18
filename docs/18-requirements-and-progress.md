@@ -814,3 +814,5 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 - 回归：`test_list_filters_ui.sh` 44 项、`test_message_compose_ui.sh` 33 项仍全部通过（消息详情多了这个折叠区，两个脚本的既有断言未受影响）。
 
 边界：未连接真实 Broker、未对真实设备撤销或重试、未迁移生产库；设备已保存或展示的内容不会因为撤销而消失；批量只作用于当前消息，没有跨消息批量；接近 500 条时的耗时未测。本机 `rg` 仍用临时 shim 运行浏览器脚本，未提交。
+
+推送与 CI（2026-11-18）：CORE `00904d3953d77fe57e9fb85717002479d5cdfe6a` 已推送，`git ls-remote` 核对 `origin/codex/core-baseline` 为该提交（首次 HTTPS 推送报 `SSL_ERROR_SYSCALL`，同仓库 04 的 SSH 推送正常；重试后成功，未改远程配置）；04 `ff33c16`（夹具与新脚本）随文档提交一并推送，`git ls-remote` 核对 `origin/main` 为 `c8fb7023de2789edbac397499a93c7df22e1e8f2`。远程 [CORE Docker deployment 44218659143](https://github.com/liuyiwuqing/nexus-core/actions/runs/44218659143) 的 docker-compose job 全部步骤 success（2 分 22 秒）；[04 Software checks 44218634486](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44218634486) 八个 job 全部 success。两项 CI 只覆盖容器构建与固件预设，不运行本项新增的浏览器脚本，也不替代真实 Broker 与设备验收。
