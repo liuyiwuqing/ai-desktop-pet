@@ -1085,7 +1085,7 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 
 边界：设备页不提供按名称搜索、自定义排序或每页条数选择（搜索、排序与页大小已由 DEVICE-LIST-02 承接）；壳层设备下拉仍受 100 台上限；计数与筛选依赖应用进程的 `now()` 与数据库时间一致；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库大数据量验证。
 
-推送与 CI（2026-11-18）：CORE `a2ceebd` / 04 `2cd60b0` 已推送，`git ls-remote` 核对远端分支分别指向 `a2ceebde38eef9fd741d90d5eb8392b34d6381cc` 与 `2cd60b05ece035cb779c9873e27ac58e0ff72ac1`。CI：CORE `Docker deployment` [#44265240571](https://github.com/liuyiwuqing/nexus-core/actions/runs/44265240571) `success`；04 `Software checks` [#44265253462](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44265253462) `success`。两项 workflow 不运行本项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署或生产库验证。
+推送与 CI（2026-11-18）：功能提交 CORE `e4ebacd` / 04 `a546a9a` 已推送，`git ls-remote` 核对远端分支分别指向 `e4ebacd3f0a05c216e3a3898afad7205f71e7b75` 与 `a546a9a6fb86dd18946fcde537584a1474e1578d`。CI：CORE `Docker deployment` [#44324036213](https://github.com/liuyiwuqing/nexus-core/actions/runs/44324036213) `success`（docker-compose 2m8s，源码构建、初始化镜像、隔离 Compose 与镜像/1Panel 验证全部通过）；04 `Software checks` [#44324023217](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44324023217) 八个 job 全部成功。本页台账更新另行提交。两个 workflow 不运行本项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署或生产库验证。
 
 ## DEVICE-LIST-02 · 设备名称搜索、排序与每页条数
 
