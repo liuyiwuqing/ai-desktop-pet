@@ -69,6 +69,7 @@ class OverviewFixture(Fixture):
     trend_mode = 'success'
     thresholds = dict(THRESHOLDS)
     delivery_requests = []
+    trend_requests = []
     # 阈值配置的版本与审计：只在 PUT 时推进，让界面的"当前 vN / 已记录 N 次变更"有真实来源。
     threshold_version = 1
     threshold_updated_at = '2026-11-13T10:00:00Z'
@@ -79,22 +80,29 @@ class OverviewFixture(Fixture):
         query = parse_qs(urlparse(self.path).query)
         hours = int(query.get('hours', ['24'])[0])
         bucket = query.get('bucket', ['1h'])[0]
+        reason = query.get('reason', [''])[0]
         seconds = BUCKETS.get(bucket, 3600)
         total = max(1, hours * 3600 // seconds)
         last = AS_OF - timedelta(seconds=AS_OF.timestamp() % seconds)
         first = last - timedelta(seconds=seconds * (total - 1))
         stamp = '%Y-%m-%dT%H:%M:%SZ'
         points = []
+        empty = mode == 'empty'
         for index in range(total):
-            empty = mode == 'empty'
             messages = 0 if empty else 2 + index % 4
+            # 同一桶里两类原因各一次；reason 只收窄失败列，折行仍保留整个窗口。
+            failures = 0 if empty or index != total - 3 else (1 if reason in ('ack_timeout', 'busy') else 0)
+            if not reason and not empty and index == total - 3:
+                failures = 2
             points.append({'at': (first + timedelta(seconds=seconds * index)).strftime(stamp),
                            'messages': messages, 'deliveries': 0 if empty else messages + 1,
-                           'failures': 0 if empty else (1 if index == total - 3 else 0),
-                           'partial': index == total - 1})
+                           'failures': failures, 'partial': index == total - 1})
         totals = {key: sum(point[key] for point in points) for key in ('messages', 'deliveries', 'failures')}
+        totals['allFailures'] = 0 if empty else 2
+        reasons = [] if empty else [{'code': 'ack_timeout', 'count': 1}, {'code': 'busy', 'count': 1}]
         return {'asOf': AS_OF.strftime(stamp), 'from': points[0]['at'], 'to': AS_OF.strftime(stamp),
-                'hours': hours, 'bucket': bucket, 'bucketSeconds': seconds, 'points': points, 'totals': totals}
+                'hours': hours, 'bucket': bucket, 'bucketSeconds': seconds, 'reason': reason or None,
+                'failureReasons': reasons, 'points': points, 'totals': totals}
 
     def do_GET(self):
         path = urlparse(self.path).path
@@ -139,7 +147,10 @@ class OverviewFixture(Fixture):
         if urlparse(self.path).path == '/api/v1/overview/trend':
             if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
                 return self.json_response(401, {'error': 'unauthorized'})
-            mode = type(self).trend_mode
+            with self.lock:
+                cls = type(self)
+                mode = cls.trend_mode
+                cls.trend_requests.append(self.path)
             if mode in ('error', 'unauthorized'):
                 return self.json_response(401 if mode == 'unauthorized' else 503,
                                           {'error': 'unauthorized' if mode == 'unauthorized' else 'unavailable'})
@@ -227,6 +238,7 @@ class OverviewFixture(Fixture):
                 cls.overview_delay = min(max(float(value['delay']), 0), 2)
             return self.json_response(200, {'requests': cls.overview_requests,
                                             'deliveryRequests': list(cls.delivery_requests),
+                                            'trendRequests': list(cls.trend_requests),
                                             'thresholdVersion': cls.threshold_version,
                                             'thresholdUpdates': list(cls.threshold_updates)})
 

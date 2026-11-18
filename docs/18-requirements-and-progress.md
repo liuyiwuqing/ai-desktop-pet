@@ -105,6 +105,7 @@
 | DELIVERY-FAILURE-REASONS-01 | 概览失败原因归并与二级钻取 | 软件本地已验证：`GET /api/v1/overview` 新增 `failureReasons`（按 `last_error` 归并，合计由同一 CTE 求和得出 `today.failedDeliveries`）；`GET /deliveries`、`/deliveries/export` 新增 `lastError` 筛选（`[a-z_]{1,32}`，`unknown` 落回 `IS NULL`）；概览每条原因可「只看这类」跳到 `status=failed` + `lastError`；CORE 156 项 0 失败/5 条件跳过（新增 2 项）、前端 check/build、概览 51 项浏览器检查（新增 11 项）、筛选 44 项与主题 68 项回归通过；源码指纹已核对更新；见 [CORE 契约](../../nexus-core/docs/console-overview.md#失败原因--delivery-failure-reasons-01) | 原因码是代码写死的集合，新增原因要同步前端文案；未连真实 CORE/Broker/设备，未对生产库大数据量验证；推送与 CI 见文末 |
 | DEVICE-FILTER-01 | 设备页状态筛选与离线告警钻取 | 软件本地已验证：`devices_online` 目标改为 `{"tab":"devices","status":"offline"}`；设备页新增「全部/在线/离线/已停用」筛选，离线=`enabled && !online`（与告警同口径），停用单列；筛选在已读取的 `GET /devices` 结果内完成，不新增接口参数；命中 0 台给空态与「查看全部设备」；钻取前清掉壳层单设备选择，壳层另选设备时回到「全部」；CORE `OverviewAlertsTest` 7 项、`ConsoleOverviewFlowTest` 7 项（含 `devices:offline` 断言）、前端 check/build、概览 55 项浏览器检查（新增 4 项）、设备 73 项与主题 68 项回归通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警钻取--alert-drill-01) | 筛选只作用于 `GET /devices` 已返回的前 100 台，超量库需先分页；未连真实 CORE/PostgreSQL/Broker/设备；阈值仍不可配置；推送与 CI 见文末 |
 | ALERT-CONFIG-01 | 概览告警阈值可配置与变更审计 | 软件本地已验证：V26 新增 `alert_thresholds` 单行表（失败率/样本下限/积压/在线下限，默认 0.10/20/100/1）与 `alert_threshold_audit`；`GET/PUT /api/v1/overview/thresholds`（所有认证角色可读、仅管理员可写，`version` 乐观并发冲突 409、越界 400、更新与审计同事务）；概览计数与阈值由同一 SQL 快照读出；管理台概览「调整阈值」表单（失败率按百分比输入，400/409 就地提示）；CORE 158 项 0 失败/5 条件跳过（新增 1 项纯函数 + 1 项 HTTP）、前端 check/build、概览 59 项浏览器检查（新增 4 项）、管理台 73 项与主题 68 项回归通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#阈值配置--alert-config-01) | 阈值是全局单行，不能按设备/来源分组；审计接口只回最近 20 条（库内保留全部）；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
+| TREND-REASON-01 | 趋势失败原因折行与按原因收窄 | 软件本地已验证：`GET /api/v1/overview/trend` 新增可选 `reason`（去空白后 1–64 字符，空/超长 400，未知原因返回空序列）与响应 `reason`、`failureReasons`、`totals.allFailures`；折行始终覆盖整个窗口（按数量降序、同量按码升序），`reason` 只收窄 `points[].failures` 与 `totals.failures`；概览趋势在失败图下显示原因计数，点选/「全部原因」切换并保留窗口总数；CORE 159 项 0 失败/5 条件跳过（新增 1 项）、前端 check/build、概览 65 项浏览器检查（新增 6 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#历史趋势--overview-trend-01) | 原因码来自投递历史 `last_error`，不做固定集合校验；折行合计与 `allFailures` 同源，但 `totals.failures` 会被收窄；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
@@ -1006,3 +1007,19 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 边界：阈值是全局单行，不能按设备/来源分组；审计接口只回最近 20 条，更早记录仍在库中但没有读取入口；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库执行迁移；本项没有开启清理策略或发送真实消息。
 
 推送与 CI（2026-11-18）：CORE `98f7993`（11 个文件）与 04 `6dbc094`（4 个文件）分别提交并推送，`git ls-remote` 核对远端分支均指向该提交。CI：CORE `Docker deployment` [#44246903345](https://github.com/liuyiwuqing/nexus-core/actions/runs/44246903345) `success`（含隔离 Compose 部署与仅镜像初始化复验）；04 `Software checks` [#44246897596](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44246897596) `success`（八个 job 全绿）。远程 CI 不等于真实部署或实机验收；本项仍未连接真实 CORE/PostgreSQL/Broker/设备。
+
+### TREND-REASON-01 · 趋势失败原因折行与按原因收窄（2026-11-18）
+
+趋势此前只有一条失败事件序列，能看出某天失败变多，却看不出是"确认超时"还是"设备忙"；今日原因折行只覆盖 UTC 今日，跨天分布还要回去逐条筛投递列表。本项把原因折行接到趋势窗口：
+
+- `GET /api/v1/overview/trend` 新增可选 `reason`。去空白后必须为 1–64 字符，空值或超长返回 400 `invalid_request`；未知原因不是错误，只得到 0 条失败序列，便于页面对已清理/旧原因显式呈现空结果。
+- 响应新增 `reason`（未筛选为 `null`）、`failureReasons`（`[{code,count}]`）与 `totals.allFailures`。折行按 `coalesce(last_error,'unknown')` 归并，使用与失败序列同一批 `delivery_history` 事件（`status='failed'` 且 `kind<>'baseline'`），按数量降序、同量按码升序；`allFailures` 由折行直接求和，两个数字同源。
+- 折行始终覆盖整个窗口，不随 `reason` 收窄；`reason` 只收窄 `points[].failures` 与 `totals.failures`。这样页面切换原因时不必额外请求一次"全量分布"，也不会出现两个数字各自过期。
+- 概览趋势在失败图下显示各原因的计数与合计；点选原因只改失败图与摘要（"仅设备确认超时；窗口共 2 次"），再点同一原因或「全部原因」恢复。所选原因在范围切换时保留；若新窗口没有该原因，显示"该原因在窗口内没有失败事件"并保留清除入口。
+
+验证（2026-11-18，本机 macOS）：
+- CORE `python3 tools/run_local.py build`：159 项 0 失败/5 条件跳过，Flyway 至 V26。新增 `ConsoleOverviewFlowTest.trendSplitsFailureEventsByReasonAndNarrowsTheSeries`：三类失败（含 `last_error=NULL` 归入 `unknown`）的折行排序与合计、`busy` 收窄后逐桶合计为 1、未知原因 0 条但折行/`messages` 不变、空/空白/65 字符原因 400；空窗口测试补 `failureReasons=[]`、`allFailures=0` 与 `reason=null`。
+- 前端 `npm --prefix frontend run check` 与 `run build` 通过（由浏览器脚本先执行）。
+- 概览浏览器检查 59 → 65 项：原因行 2 项及计数/合计、点选后 `aria-pressed` 与失败图说明、摘要保留窗口总数、请求实际带 `reason=ack_timeout`、筛选后仍保留完整原因列表、清空后请求不再带 `reason=`、390px 原因行不溢出。
+
+边界：原因码不做固定集合校验，新增原因仍要同步前端中文文案；折行只覆盖保留策略尚未清理的投递历史，清理后窗口分布会随之减少；未连接真实 CORE/PostgreSQL/Broker/设备，未对生产库大数据量验证。
