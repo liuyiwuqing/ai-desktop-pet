@@ -82,6 +82,7 @@
 | CONSOLE-13-B | 管理员正文导出 | CORE `d07bce8` / 04 `73d9f1e` 均已推送并核对远端；管理员显式确认、已应用条件与最近七天未清正文交集、1000 行上限和 CSV 公式/引号保护；真实 HTTP 新增 1/元数据 6 项、实际 Vue 正文 15/原元数据 44 检查通过，完整 CORE 105 通过/5 跳过、路径变体/1000 条最终 verify 通过；见 [正文导出契约](../../nexus-core/docs/content-export.md) | 逐仓提交；只导出隔离测试数据，没有读取生产消息 |
 | CONSOLE-09-C | 消息条件与限定动作组合 | CORE `f39ecec` / 04 `343e23b` 均已推送并核对远端；来源/类型/关键词/优先级 AND、新消息固定提醒、公开分析原授权保护、自动提醒回环排除；HTTP/隔离库新增 3 项与原编辑/创建共 17 项 verify 通过，实际 Vue 新增 17/原编辑 99/删除 52 检查通过；见 [CORE 契约](../../nexus-core/docs/automation-conditions.md) | 同步契约/页面/专项；不开放任意动作，真实规则/消息与生产库未操作 |
 | DEVICE-CRED-01 | 设备 MQTT 凭据台账与轮换 | 软件本地已验证：V25 台账（只存 SHA-256 指纹、一次性密钥、宽限期、撤销）、管理员限定签发/轮换/撤销、接入引导按设备显示台账状态、设备详情新增凭据区块；CORE 139 项 0 失败/5 条件跳过、`DeviceCredentialFlowTest` 3 项、前端 check/build、设备页 73 项浏览器检查（新增 7 项）通过；见 [契约](../../nexus-core/docs/device-credentials.md) | CORE 不写 Broker（配置为只读绑定），应用步骤见 [1Panel 说明](../deployment/1panel/README.md#设备-mqtt-凭据device-cred-01)；真实 Broker/设备/生产库未验收；推送与 CI 见文末 |
+| OVERVIEW-TREND-01 | 概览收件/投递/失败历史趋势 | 软件本地已验证：`GET /api/v1/overview/trend`（`15m`/`1h`/`6h`/`1d` 固定桶、`date_bin` 固定原点对齐、1–168 小时、最多 400 点、末桶标 `partial`）、收件/投递/失败事件三条序列、概览页 6h/24h/7d 与独立刷新；CORE 141 项 0 失败/5 条件跳过（新增 2 项）、前端 check/build、概览页 24 项浏览器检查（新增 7 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#历史趋势--overview-trend-01) | 趋势只覆盖仍保留的记录，失败按投递历史事件计数而非当前失败回看；仍无告警阈值、推送与时区选项；未对生产库/大数据量验证；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
@@ -766,3 +767,24 @@ CORE `V25__device_credentials.sql` 新增 `device_credentials`（`device_id` 主
 边界：未连接真实 Broker、未对真实设备写入新密钥、未迁移生产库、未轮换任何真实凭据；宽限期结束不跑后台任务清理指纹，只在读取时判定状态；台账无法证明 Broker 已应用或设备已切换。
 
 推送与 CI（2026-11-18）：CORE `1d670e2e37850bcd5937ef78b595a34bcb5d329e` 已推送，`git ls-remote` 核对 `origin/codex/core-baseline` 为该提交；04 `86e68523f5391f451c0caf2380b8850d8de104fd` 已推送并核对 `origin/main`。远程 [CORE Docker deployment 44128785484](https://github.com/liuyiwuqing/nexus-core/actions/runs/44128785484) 的 docker-compose job 全部步骤 success（初始化 CLI、源码镜像与无源码初始化镜像构建、真实隔离 Compose、1Panel 编排、报告归档）；[04 Software checks 44128860781](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44128860781) 八个 job 全部 success。两项 CI 只覆盖容器构建与固件预设，不替代真实 Broker 应用、设备重连与生产迁移验收。
+
+## OVERVIEW-TREND-01 · 概览收件/投递/失败历史趋势（2026-11-18）
+
+概览页此前只有“此刻”和“UTC 今日”两组数字：能知道今天收了多少、当前失败率多少，但看不出流量是在涨还是在落，也看不出失败是持续还是刚发生。本项补上趋势视图，并把“失败”的统计口径写进契约，避免以后被当成“当前失败记录的回看”。
+
+CORE 新增 `GET /api/v1/overview/trend?hours=&bucket=`，与快照接口分开。快照每 5 秒轮询一次，趋势只在切换范围或点“刷新趋势”时读取——把长窗口挂到轮询上，等于每 5 秒重扫一次保留表。参数有界：`hours` 1–168，`bucket` 取 `15m`/`1h`/`6h`/`1d`，`hours×3600` 必须能被桶秒整除，桶数上限 400，越界一律 400 `invalid_request`。返回 `asOf/from/to/hours/bucket/bucketSeconds/totals` 和固定长度的 `points[]`，空窗口也返回完整网格，页面据此区分“没有数据”和“没有窗口”。
+
+分桶用 PostgreSQL `date_bin(?::interval, ts, '2000-01-01T00:00:00Z'::timestamptz)`，固定原点。最初的实现用了 `date_trunc`，真实请求直接 500：`unit "1h" not recognized for type timestamp without time zone`——`date_trunc` 只认固定单位，做不了 15 分钟和 6 小时。固定原点还保证同一个桶尺寸在不同窗口间对齐，切范围不会让柱子左右漂移。
+
+三个序列：`messages`/`deliveries` 与今日统计同源（按 `received_at` 归桶、排除 `metadata.test=true`、来源时间不移动归日、未来收件不计）；`failures` 取 `delivery_history` 中 `status='failed'` 且 `kind<>'baseline'` 的记录按 `recorded_at` 归桶。**最后一桶是当前未结束的桶**，标 `partial=true`，页面有明确文案，不假装完整。`failures` 是“进入失败的次数”，不是“当前失败按收件桶回看”，迁移前的 baseline 也不算失败事件，因此窗口早于该表建立时无法还原。
+
+页面 `OverviewTrend.vue` 提供 6h/24h/7d 三档和独立刷新，收件与失败各一张 SVG 柱图（失败图单独标题与 caption，空桶淡化而不是消失），每根柱子带 `<title>` 提示。它被放在 `v-else-if="snapshot"` 之外、以 `v-if="!error"` 挂载：快照加载时会把 `snapshot` 置空，若挂在分支内，每 5 秒轮询都会卸载重建趋势组件，导致重复读取和轮询断言不稳定。
+
+验证（2026-11-18，本机 macOS/Docker 29.8.2）：
+- `mvn -Dtest=ConsoleOverviewFlowTest test`：真实 HTTP + 隔离 PostgreSQL，新增 2 项。`trendBuildsFixedBucketsAndCountsFailureEvents` 覆盖 6h/1h 得 6 桶、总量 3/3/2、3 小时前的消息落在 `points[2]`、仅末桶 `partial`、失败落在最近两桶；`trendRejectsUnboundedWindowsAndKeepsAGridWhenEmpty` 覆盖 `hours=0`、`bucket=7m`、`168h`+`15m` 返回 400、未认证 401、空数据仍返回 24 桶。
+- `mvn verify`：141 项，0 失败/0 错误，5 项条件跳过；此前基线 139 项。
+- 前端 `npm run check`（74 个 token 无散落 hex）与 `npm run build` 通过。
+- 04 `tools/ci/test_overview_ui.sh`：24 项全部通过，其中 7 项为本项新增（默认 24 根小时柱、只有末桶标 partial 且 `dataset.index='23'`、失败独立序列与 caption、7 天切 6 小时桶 28 根、空趋势显式文案、读取失败隐藏旧图、失败后恢复），390 px 断言同时覆盖趋势图右边界。
+- 夹具 `overview_ui_fixture.py` 新增 `trendMode`（normal/empty/error）与固定 `asOf`，使桶数可确定断言；仍只用实际编译的 Vue 与回环 RAM HTTP，没有数据库、Broker 或设备。
+
+边界：未对生产库或大数据量验证分桶耗时；趋势只覆盖保留策略尚未清理的记录，清理后对应桶会变空，不是永久累计；仍没有告警阈值、推送和时区选项。本机 `rg` 缺失的处理与 DEVICE-CRED-01 相同（临时 `grep -qE` shim，未提交）。
