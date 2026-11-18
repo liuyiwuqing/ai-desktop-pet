@@ -18,9 +18,15 @@ DELIVERY_ROWS = [
      'title': '等待投递样本', 'status': 'pending', 'attempts': 0, 'canCancel': True, 'lastError': None,
      'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
     {'eventId': 'drill-failed', 'messageId': 'drill-message-failed', 'deviceId': 'dodo-ui-fixture',
-     'title': '失败投递样本', 'status': 'failed', 'attempts': 3, 'canCancel': False, 'lastError': 'mqtt_timeout',
+     'title': '失败投递样本', 'status': 'failed', 'attempts': 3, 'canCancel': False, 'lastError': 'ack_timeout',
      'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
+    {'eventId': 'drill-broker', 'messageId': 'drill-message-broker', 'deviceId': 'dodo-ui-fixture',
+     'title': 'Broker 失败样本', 'status': 'failed', 'attempts': 2, 'canCancel': False,
+     'lastError': 'broker_unavailable', 'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
 ]
+# 今日失败原因的折行；计数字面量与各模式的 today.failedDeliveries 对齐。
+FAILURE_REASONS = {'success': [('ack_timeout', 2), ('broker_unavailable', 1)],
+                   'alerts': [('ack_timeout', 6), ('broker_unavailable', 3)]}
 
 
 def alerts_for(value, thresholds):
@@ -86,9 +92,11 @@ class OverviewFixture(Fixture):
                 return self.json_response(401, {'error': 'unauthorized'})
             query = parse_qs(urlparse(self.path).query)
             status = query.get('status', [''])[0]
+            reason = query.get('lastError', [''])[0]
             page = int(query.get('page', ['1'])[0])
             size = int(query.get('size', ['30'])[0])
-            rows = [row for row in DELIVERY_ROWS if not status or row['status'] == status]
+            rows = [row for row in DELIVERY_ROWS
+                    if (not status or row['status'] == status) and (not reason or row['lastError'] == reason)]
             with self.lock:
                 type(self).delivery_requests.append(self.path)
             return self.json_response(200, {'items': rows[(page - 1) * size:page * size],
@@ -136,6 +144,9 @@ class OverviewFixture(Fixture):
             value['failedDeliveries'] = 9
         value['thresholds'] = thresholds
         value['alerts'] = alerts_for(value, thresholds)
+        # 折行合计必须与 today.failedDeliveries 相等：夹具也不允许两个数字各说各话。
+        reasons = [] if mode == 'empty' else FAILURE_REASONS['alerts' if mode == 'alerts' else 'success']
+        value['failureReasons'] = [{'code': code, 'count': n} for code, n in reasons]
         try:
             self.json_response(200, value)
         except (BrokenPipeError, ConnectionResetError):

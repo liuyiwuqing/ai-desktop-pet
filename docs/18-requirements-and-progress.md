@@ -102,6 +102,7 @@
 | REG-01 | 全量软件回归与文档一致性核对 | 本轮不加功能：CORE `mvn verify` 145 项 0 失败/5 条件跳过、24 个管理台浏览器脚本共 1131 项检查（20 个首跑通过、2 个单跑通过、2 个真缺陷修复后通过）、契约与交付类检查通过；修掉 1 处过期选择器（`.management-record` 被断线与凭据区块抢先匹配）与 1 处 390px 竞态；`docs/18` 补 15 行缺失台账、CORE README 补 3 条接口与 3 段说明；114 条相对链接、149 个提交哈希可解析；见本节 | `test_events_ui.sh`/`test_operations_ui.sh` 连跑不稳定（单跑通过）；`test_server_release.py` 4 项受沙箱 mkdir 代理限制、同提交 CI 通过；未烧录、未连真实设备、无目标服务器与生产库操作；推送与 CI 见文末 |
 | OVERVIEW-ALERT-01 | 概览告警阈值与站内提示 | 软件本地已验证：`GET /api/v1/overview` 新增 `alerts`（`mqtt_connection`/`devices_online`/`delivery_backlog`/`delivery_failure_rate`，各带 `threshold`/`comparison`/`unit`）与 `thresholds`；阈值为代码常量（失败率 ≥10% 且样本 ≥20 条、`pending` 积压 ≥100、启用设备在线 <1），失败率条形改由服务端阈值染色；CORE 153 项 0 失败/5 条件跳过（新增 2 项 HTTP + 6 项纯函数）、前端 check/build、概览页 32 项浏览器检查（新增 8 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警阈值--overview-alert-01) | 告警是读时派生状态：不落库、不写审计、不推送、没有持续时间；阈值不可配置（改阈值需改代码发版）；真实 Broker 断开、生产库与实机未验收；推送与 CI 见文末 |
 | ALERT-DRILL-01 | 概览告警钻取到已筛选列表 | 软件本地已验证：`alerts[].target{tab,status}` 由服务端下发（积压→投递 `status=pending`、失败率→`failed`、无在线设备→设备页、传输不可用为 `null` 且不给按钮）；跳转前清空旧搜索、状态筛选取代叠加，先备条件再切页签只读一次；CORE 154 项 0 失败/5 条件跳过（新增 1 项纯函数）、前端 check/build、概览 40 项浏览器检查（新增 8 项，含夹具核对请求真带 `status`）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警钻取--alert-drill-01) | 只跳到现存筛选：设备页没有离线筛选，故只打开页面而不筛；投递页只能按状态筛；未连真实 CORE/Broker/设备；推送与 CI 见文末 |
+| DELIVERY-FAILURE-REASONS-01 | 概览失败原因归并与二级钻取 | 软件本地已验证：`GET /api/v1/overview` 新增 `failureReasons`（按 `last_error` 归并，合计由同一 CTE 求和得出 `today.failedDeliveries`）；`GET /deliveries`、`/deliveries/export` 新增 `lastError` 筛选（`[a-z_]{1,32}`，`unknown` 落回 `IS NULL`）；概览每条原因可「只看这类」跳到 `status=failed` + `lastError`；CORE 156 项 0 失败/5 条件跳过（新增 2 项）、前端 check/build、概览 51 项浏览器检查（新增 11 项）、筛选 44 项与主题 68 项回归通过；源码指纹已核对更新；见 [CORE 契约](../../nexus-core/docs/console-overview.md#失败原因--delivery-failure-reasons-01) | 原因码是代码写死的集合，新增原因要同步前端文案；未连真实 CORE/Broker/设备，未对生产库大数据量验证；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
@@ -926,6 +927,33 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 - 概览浏览器检查 32 → 40 项：三条告警各自带按钮且文案对应（查看等待投递/查看失败投递/查看设备）、点击后落到投递页、表格里只剩对应状态的那一行（另一行确实不在）、**夹具记录到的请求真的带 `status=pending`**（只换页签不筛选会让这条红）、回到概览后告警与按钮完好、传输告警不渲染按钮、390px 下按钮不溢出。
 - 回归：`test_console_theme_ui.sh` 68 项仍通过（它也用同一个夹具并访问概览页，含"每个按钮都是 Naive 按钮、高度/圆角统一"与 CSP 零违规）。
 
-边界：钻取只到现存筛选——投递页只能按状态筛，不能按"重试了几次/失败原因"筛；设备页只是打开，不做离线筛选；未连接真实 CORE/Broker/设备，夹具里"筛选真的生效"是由状态过滤 + 请求参数两条一起证明的，不是真实数据库的查询结果。
+边界：钻取只到现存筛选——投递页能按状态/设备/失败原因/收件窗口筛，不能按重试次数或单条时间线；设备页只是打开，不做离线筛选；未连接真实 CORE/Broker/设备，夹具里"筛选真的生效"是由状态过滤 + 请求参数两条一起证明的，不是真实数据库的查询结果。
 
 推送与 CI（2026-11-18）：CORE `b550d727d9eef61cf6c6de63b85b87a573d3fd57` 已推送，`git ls-remote` 核对 `origin/codex/core-baseline` 为该提交；远程 [CORE Docker deployment 44229122971](https://github.com/liuyiwuqing/nexus-core/actions/runs/44229122971) 的 docker-compose job 全部步骤 success。04 `5c83c2f`（夹具与页面检查）已推送，`git ls-remote` 核对 `origin/main` 为 `5c83c2f6dc19cdf6106d97fd244259166142f466`；[04 Software checks 44229150498](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44229150498) 八个 job 全部 success。两项 CI 只覆盖容器构建与固件预设，不执行本项新增的浏览器检查；本段随后的台账提交只改 `docs/`，不在 04 workflow 的 `paths` 内，不会再产生 run。
+
+## DELIVERY-FAILURE-REASONS-01 · 概览失败原因归并与二级钻取（2026-11-18）
+
+上一项把告警钻到「失败投递」，但到了列表还是只能说「这些都失败了」。真正要回答的下一句是「为什么」。`deliveries.last_error` 一直存在、页面也在展示，但从没被归并过，也没法筛选。
+
+**归并口径**：`failureReasons[{code,count}]` 是**今日**失败投递按 `last_error` 的分组，按 `count` 降序、同数量按 `code` 升序。关键约束是它与 `today.failedDeliveries` 同源——SQL 里把今日失败数改成 `sum(failed_today.n)`，也就是「今日失败数由这个折行决定」，两个数字在构造上不可能对不上。测试断言的是两者相等，而不是各写一遍再比。
+
+`code` 是代码里写死的固定字符串集合（`ack_timeout`、`broker_unavailable`、`busy`、`storage_error`、`time_unavailable`、`expired`、`invalid`、`cancelled_by_admin`），因此归并结果天生有界，不做截断——一旦截断，「合计 N 条」就会和折行对不上，而这正是这个功能要解决的问题。
+
+**一个容易漏的边界**：历史行可能没有 `last_error`（NULL）。归并时显示为 `unknown`，但如果列表侧只做 `last_error='unknown'` 的等值匹配，那么「1 条未记录原因」点进去会是空的——计数说有、列表说没有。所以 `lastError=unknown` 在 `ConsoleListQuery` 里落回 `d.last_error IS NULL`，并且这条专门有测试：构造一条 NULL 原因的失败投递，断言概览里出现 `unknown`、列表按 `unknown` 能筛出它。
+
+**列表与导出**：`GET /deliveries` 与 `/deliveries/export` 共用 `ConsoleListQuery`，所以新筛选自动同时作用于列表、总数和元数据导出——不会出现「列表 1 条、导出 50 条」。`lastError` 不要求同时给 `status`：原因码也出现在 `sent`（`broker_unavailable`）和 `cancelled`（`cancelled_by_admin`）上，硬绑状态会漏掉这些行。
+
+**页面**：概览「投递状态」卡片下方列出今日失败原因（中文名 + 条数 + 「只看这类」）。原因下拉放在投递页的状态筛选旁边，**只在状态=投递失败时出现**；切换状态会清掉原因，否则它就成了一个看不见的筛选条件。清空筛选同时清掉状态与原因。
+
+验证（2026-11-18，本机 macOS/Docker 29.8.2）：
+- `mvn verify`：156 项，0 失败/0 错误，5 项条件跳过；此前基线 154。
+- `ConsoleOverviewFlowTest` 7 项：新增折行合计等于今日失败数、排序稳定、测试消息与昨日失败被排除。
+- `ConsoleListFilterFlowTest` 4 项：新增按原因收窄、未知原因返回空、`unknown` 落回 NULL、导出与列表筛同一批；既有非法参数用例补了三个原因变体（大写、空值、注入片段），确认它们同样 400。
+- 前端 `npm run check`（74 token 无散落 hex）与 `npm run build` 通过。
+- 概览浏览器检查 40 → 51 项；新增：原因有中文名且折行合计等于今日失败数、原因行可点、点后只看到这一类失败、**请求同时带 `status=failed` 与 `lastError=ack_timeout`**、投递页显示它应用的失败原因、清空筛选后原因下拉消失且请求不再带任何筛选。
+- 回归：`test_list_filters_ui.sh` 44 项（投递页筛选区新增了一个条件字段）、`test_console_theme_ui.sh` 68 项（概览页新增的「只看这类」也纳入按钮高度/圆角统一检查与 CSP 零违规）全部通过。
+- 源码指纹：`DeliveryService.java` 与 `ConsoleListQuery.java` 在契约清单里，签名与谓词变化导致指纹失效。核对结论是**不改设备协议**——这两处是管理台列表/导出的 SQL 谓词，nexus-v1 的消息信封、持久化与 ACK 都没有变化，因此只更新两个哈希、不升协议版本，重跑 `test_nexus_contract.py` 得 `PASS`。
+
+过程中修掉一处自己引入的测试脆弱性：钻取检查原本用单发 `tap()` 点按钮，切页签会重挂面板，按钮要等快照回来才存在，`查看设备` 偶发「Button unavailable」。改成先 `expect` 到按钮可点再点，与 REG-01 修 `test_automation_conditions_ui.sh` 的做法一致；不是放宽断言。
+
+边界：原因码是代码写死的集合，新增原因需要同步前端文案与下拉；未连接真实 CORE/Broker/设备，「筛选真的生效」由夹具的状态/原因双过滤加请求参数证明；未对生产库或大数据量验证；概览的原因折行只覆盖今日，跨天分布要看趋势（趋势目前不按原因分桶）。

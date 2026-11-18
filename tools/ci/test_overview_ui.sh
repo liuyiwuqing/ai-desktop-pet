@@ -40,27 +40,47 @@ await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]
 // 告警阈值：安静快照不造告警，但要把服务端阈值说出来；样本不足时条形不染色。
 await expect("!document.querySelector('.overview-alerts') && document.querySelector('.overview-panel')?.innerText.includes('告警阈值：今日失败率 ≥ 10.0%') && document.querySelector('.overview-panel')?.innerText.includes('积压 ≥ 100 条')",'a quiet snapshot states the server thresholds without inventing alerts');
 await expect("!!document.querySelector('.health-bar') && !document.querySelector('.health-bar').classList.contains('health-bar--warn')",'12 deliveries of sample stay below the judgement sample');
+// 今日失败原因：名字要看得懂，计数折行要正好等于今日失败数。
+await expect("document.querySelectorAll('.overview-reason-list li').length===2 && document.querySelector('[data-reason=ack_timeout]')?.innerText.includes('设备确认超时') && document.querySelector('[data-reason=ack_timeout]')?.innerText.includes('2 条') && [...document.querySelectorAll('.overview-reason-count')].reduce((sum,node)=>sum+parseInt(node.innerText,10),0)===3",'failure reasons are named and their counts add up to today\'s failures');
 await fixture({mode:'alerts'});await tap('刷新概览');
 await expect("document.querySelectorAll('.overview-alerts .overview-alert').length===3 && document.querySelector('.overview-alerts [data-alert=devices_online]')?.innerText.includes('低于告警阈值 1 台') && document.querySelector('.overview-alerts [data-alert=delivery_backlog]')?.innerText.includes('120 条') && document.querySelector('.overview-alerts [data-alert=delivery_failure_rate]')?.innerText.includes('22.5%')",'each breached metric becomes its own alert with the threshold it crossed');
 await expect("document.querySelector('.health-bar')?.classList.contains('health-bar--warn')",'a failure rate above the threshold colours the bar');
 // 告警钻取：目标由服务端给出，页面把筛选带过去，而不是只换页签。
 await expect("document.querySelectorAll('.overview-alerts [data-alert-action]').length===3 && document.querySelector('[data-alert-action=delivery_backlog]')?.innerText==='查看等待投递' && document.querySelector('[data-alert-action=devices_online]')?.innerText==='查看设备'",'each actionable alert offers the filter the server points it at');
+// 切页签会重挂面板，按钮要等快照回来才存在；单发 click 会撞上正在加载的窗口。
+async function clickWhenReady(selector,label){await expect(`(()=>{const b=document.querySelector(${JSON.stringify(selector)});return !!b&&!b.disabled;})()`,label);await js(`document.querySelector(${JSON.stringify(selector)}).click()`);}
 const drillBase=(await fixture({})).deliveryRequests.length;
-await tap('查看等待投递');
+await clickWhenReady('[data-alert-action=delivery_backlog]','the backlog alert is clickable');
 await expect("document.querySelector('h1')?.innerText==='投递'",'the backlog alert opens the delivery page');
 await expect("document.querySelector('.table-shell tbody')?.innerText.includes('等待投递样本') && !document.querySelector('.table-shell tbody')?.innerText.includes('失败投递样本')",'the drill lands on a filtered list instead of the whole table');
 const drillRequests=(await fixture({})).deliveryRequests.slice(drillBase);
 if(!drillRequests.length||!drillRequests.every(path=>path.includes('status=pending')))throw new Error('drill did not carry status=pending: '+JSON.stringify(drillRequests));
 results.push('the filtered read really carried status=pending');
 await navigate('概览');
-await expect("document.querySelector('[data-alert-action=delivery_failure_rate]')",'returning to overview shows the alerts again');
-await tap('查看失败投递');
+await clickWhenReady('[data-alert-action=delivery_failure_rate]','returning to overview offers the failure alert again');
 await expect("document.querySelector('h1')?.innerText==='投递' && document.querySelector('.table-shell tbody')?.innerText.includes('失败投递样本') && !document.querySelector('.table-shell tbody')?.innerText.includes('等待投递样本')",'the failure-rate alert filters to failed deliveries');
 await navigate('概览');
-await tap('查看设备');
+await clickWhenReady('[data-alert-action=devices_online]','the device alert is clickable');
 await expect("document.querySelector('h1')?.innerText==='设备'",'the device alert opens the device page');
 await navigate('概览');
 await expect("document.querySelectorAll('.overview-alerts [data-alert-action]').length===3",'drilling leaves the overview intact on return');
+// 二级钻取：从失败原因再收敛到"只有这类失败"。
+const reasonBase=(await fixture({})).deliveryRequests.length;
+await clickWhenReady('[data-reason=ack_timeout] button','the reason row is clickable');
+await expect("document.querySelector('h1')?.innerText==='投递'",'a failure reason opens the delivery page too');
+await expect("document.querySelector('.table-shell tbody')?.innerText.includes('失败投递样本') && !document.querySelector('.table-shell tbody')?.innerText.includes('Broker 失败样本')",'the reason drill narrows to that reason instead of every failure');
+const reasonRequests=(await fixture({})).deliveryRequests.slice(reasonBase);
+if(!reasonRequests.length||!reasonRequests.some(path=>path.includes('status=failed')&&path.includes('lastError=ack_timeout')))throw new Error('reason drill did not carry status+lastError: '+JSON.stringify(reasonRequests));
+results.push('the reason read carried both status=failed and lastError');
+await expect("document.querySelector('[aria-label=失败原因]')?.innerText.includes('设备确认超时')",'the delivery page shows the reason filter it applied');
+const clearBase=(await fixture({})).deliveryRequests.length;
+await expect("(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='清空筛选');return !!b&&!b.disabled;})()",'the clear control is available after a drill');
+await tap('清空筛选');
+await expect("!document.querySelector('[aria-label=失败原因]') && document.querySelector('.table-shell tbody')?.innerText.includes('等待投递样本')",'clearing the filter drops the reason control and restores the unfiltered list');
+const cleared=(await fixture({})).deliveryRequests.slice(clearBase);
+if(!cleared.length||cleared.some(path=>path.includes('lastError=')||path.includes('status=')))throw new Error('clearing left a filter behind: '+JSON.stringify(cleared));
+results.push('clearing removes both status and lastError from the read');
+await navigate('概览');
 await fixture({mode:'alerts',thresholds:{failureRate:0.3}});await tap('刷新概览');
 await expect("document.querySelectorAll('.overview-alerts .overview-alert').length===2 && !document.querySelector('.overview-alerts [data-alert=delivery_failure_rate]') && document.querySelector('.overview-panel')?.innerText.includes('≥ 30.0%')",'the console follows the server threshold instead of a local constant');
 await expect("!!document.querySelector('.health-bar') && !document.querySelector('.health-bar').classList.contains('health-bar--warn')",'raising the threshold stops colouring the same 22.5% rate');
@@ -93,7 +113,7 @@ for(let i=0;i<65;i++){if((await fixture({})).requests>before)break;await wait(0.
 if((await fixture({})).requests<=before)throw new Error('Visible overview did not poll');results.push('visible overview polls');
 await fixture({mode:'alerts'});await tap('刷新概览');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.overview-panel dl>div')].every(e=>e.getBoundingClientRect().right<=390) && [...document.querySelectorAll('.overview-alerts .overview-alert')].length===3 && [...document.querySelectorAll('.overview-alerts .overview-alert, .overview-alerts [data-alert-action]')].every(e=>e.getBoundingClientRect().right<=390) && document.querySelector('.overview-trend-chart')?.getBoundingClientRect().right<=390",'overview, its alert actions and its trend fit 390 CSS pixels');
+await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.overview-panel dl>div')].every(e=>e.getBoundingClientRect().right<=390) && [...document.querySelectorAll('.overview-alerts .overview-alert')].length===3 && [...document.querySelectorAll('.overview-alerts .overview-alert, .overview-alerts [data-alert-action], .overview-reason-list li, .overview-reason-list button')].every(e=>e.getBoundingClientRect().right<=390) && document.querySelectorAll('.overview-reason-list li').length===2 && document.querySelector('.overview-trend-chart')?.getBoundingClientRect().right<=390",'overview, its alert actions, reason rows and trend fit 390 CSS pixels');
 cliLog({mobileScreenshot:await captureScreenshot()});
 await cdp('Emulation.clearDeviceMetricsOverride');
 await fixture({mode:'success'});await tap('刷新概览');
