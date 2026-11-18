@@ -1170,4 +1170,4 @@ MSG-BATCH-01 已支持对单条消息批量处理投递，但设备一多、消�
 
 边界：删除只适用于从未产生持久事实的设备；真实设备上报过遥测或签发过凭据后只能停用，不能借删除清历史。服务端拉取配置（RSS/天气）里的设备 ID 不在数据库引用检查内，需管理员自行移除；HTTP 审计不是不可变业务审计。未在超过 100 台设备、并发投递/删除或真实 PostgreSQL 生产库上验证锁竞争与耗时；未做真实部署或实机验收。
 
-推送与 CI（待补）
+推送与 CI（2026-11-18）：CORE `4b08564` / 04 `c627b01` 已推送，`git ls-remote` 核对远端分支分别指向 `4b08564a738fe69af650e348ad86987b45f5f09d` 与 `c627b0196c7055d6007286dc445892b9837e238d`。CI：CORE `Docker deployment` [#44340453095](https://github.com/liuyiwuqing/nexus-core/actions/runs/44340453095) `success`；04 `Software checks` [#44340460769](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44340460769) 八个 job 全部 `success`。两项 workflow 不运行本项 4 项 `DeviceDeleteFlowTest`、完整 Maven 套件与 125 项浏览器专项，这些仍为本地证据；远程 CI 不等于真实部署或生产库验证。
