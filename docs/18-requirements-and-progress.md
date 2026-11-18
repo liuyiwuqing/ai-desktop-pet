@@ -1,6 +1,6 @@
 # 18 · 当前需求、任务台账与交付约定
 
-更新：2026-11-16。本页是后续工作的状态入口；各模块设计仍在 01–06，产品验收标准仍在 [07](07-roadmap-acceptance.md)。历史交付记录 09–17 保留当时证据，不覆盖本页的当前判断。
+更新：2026-11-18。本页是后续工作的状态入口；各模块设计仍在 01–06，产品验收标准仍在 [07](07-roadmap-acceptance.md)。历史交付记录 09–17 保留当时证据，不覆盖本页的当前判断。
 
 ## 需求与范围
 
@@ -981,4 +981,4 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 
 边界：筛选只发生在 `GET /devices` 已返回的前 100 台内，库中设备超过 100 台时需要先做服务端分页/搜索，否则按状态找设备仍可能漏；这是本项刻意不扩接口的代价，已记在台账。未连接真实 CORE/PostgreSQL/Broker/设备；未在超量设备库验证。
 
-推送与 CI：提交推送后补记。
+推送与 CI（2026-11-18）：CORE `a13903b`（7 个文件）与 04 `26e19f7`（4 个文件）分别提交并推送，`git ls-remote` 核对远端分支均指向该提交。CI：CORE `Docker deployment` [#44244210429](https://github.com/liuyiwuqing/nexus-core/actions/runs/44244210429) `success`（含隔离 Compose 部署复验）；04 `Software checks` [#44244216523](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44244216523) `success`（八个 job 全绿）。远程 CI 不等于真实部署或实机验收；本项仍未连接真实 CORE/PostgreSQL/Broker/设备。
