@@ -1061,4 +1061,4 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 
 边界：只验证了无夏令时的 `Asia/Shanghai`，DST 日界依赖 PostgreSQL `AT TIME ZONE`，未单独演练；切换配置会让“今日”瞬间跨日，且没有配置变更审计；趋势、导出窗口与设备在线口径不变。
 
-推送与 CI：待本项提交后补记。
+推送与 CI（2026-11-18）：CORE `31fa7b6` / 04 `4b15304` 已推送，`git ls-remote` 核对远端分支均指向该提交。CI：CORE `Docker deployment` [#44256189285](https://github.com/liuyiwuqing/nexus-core/actions/runs/44256189285) `success`（docker-compose）；04 `Software checks` [#44256189987](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44256189987) `success`（八个 job 全绿，含五种固件预设、full 主机/协议/DSP/LVGL 与 server-delivery-tools）。两项 workflow 不运行本项 68 项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署、真实时区切换或实机验收。
