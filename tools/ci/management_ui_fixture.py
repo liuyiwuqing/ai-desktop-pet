@@ -30,7 +30,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
         'otaMode':'disabled','otaRequests':[],'otaSubmissions':[],'otaDrop':False,'otaBoot':'1'*32,'otaLastError':'','growthMode':'disabled',
         'messageSubmissions':[],'manualMessages':[],'messageNext':'success','deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success',
         'telemetryRequests':[],'disconnectRequests':[],'listMode':False,'listMessages':[],'listDeliveries':[],'listRequests':[],'listError':'','listDelay':0,
-        'credentialMode':'active','credentialRevision':1,'credentialSecret':'','credentialSubmissions':[]}
+        'credentialMode':'active','credentialRevision':1,'credentialSecret':'','credentialSubmissions':[],
+        'batchMode':'normal','batchRequests':[],'batchCancelled':False,'batchRetried':False}
     def log_message(self,*args):pass
     def json_response(self,status,value):
         payload=json.dumps(value,ensure_ascii=False).encode()
@@ -162,6 +163,38 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     'revokedAt':stamp if mode=='revoked' else None,'previousActive':mode=='rotating'}
             else:return self.json_response(404,{'error':'not_found'})
             self.json_response(200,value)
+    def batch_response(self,message_id,action,query,state):
+        """Per-message bulk cancel/retry: dry run explains every skip, apply needs the confirm token."""
+        dry=query.get('dryRun',['false'])[0]=='true'
+        confirm=query.get('confirm',[''])[0]
+        state['batchRequests'].append({'action':action,'dryRun':dry,'confirm':confirm})
+        if state['batchMode']=='fail':return self.json_response(503,{'error':'service_unavailable'})
+        expected='CANCEL_MESSAGE_DELIVERIES' if action=='cancel' else 'RETRY_MESSAGE_DELIVERIES'
+        if not dry and confirm!=expected:return self.json_response(400,{'error':'delivery_batch_confirmation_required'})
+        empty=state['batchMode']=='empty'
+        if action=='cancel':
+            skipped=[] if empty else [
+                {'eventId':'batch-attempted','deviceId':'dodo-attempted','status':'pending','attempts':1,'reason':'attempted'},
+                {'eventId':'batch-failed','deviceId':'dodo-failed','status':'failed','attempts':1,'reason':'not_pending'}]
+            candidates=[] if empty or state['batchCancelled'] else ['batch-ok-1','batch-ok-2']
+        else:
+            skipped=[] if empty else [
+                {'eventId':'batch-pending','deviceId':'dodo-pending','status':'pending','attempts':0,'reason':'not_failed'},
+                {'eventId':'batch-attempted','deviceId':'dodo-attempted','status':'pending','attempts':1,'reason':'not_failed'},
+                {'eventId':'batch-failed','deviceId':'dodo-failed','status':'failed','attempts':1,'reason':'not_failed'}]
+            candidates=[] if empty or state['batchRetried'] else ['batch-ok-3']
+        applied=0
+        if not dry:
+            applied=len(candidates)
+            if action=='cancel':state['batchCancelled']=True
+            else:state['batchRetried']=True
+            candidates=[]
+        stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+        return self.json_response(200,{'messageId':message_id,'action':action,'dryRun':dry,'applied':applied,
+            'counts':{'deliveries':0 if empty else 4,'candidates':len(candidates),'skipped':len(skipped),'remaining':len(candidates)},
+            'candidates':[{'eventId':event,'deviceId':'dodo-'+event,'status':'pending','attempts':0} for event in candidates],
+            'skipped':skipped,'asOf':stamp})
+
     def do_POST(self):
         if urlparse(self.path).path == "/api/v1/session":
             if self.headers.get("Authorization") != "Bearer " + TOKEN:
@@ -180,7 +213,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     state.update(mode='empty',config=copy.deepcopy(CONFIG),revision=1,requests=[],submissions=[],dropNext=False,
                         deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',telemetryRequests=[],disconnectRequests=[],growthMode='disabled',
                         listMode=False,listMessages=[],listDeliveries=[],listRequests=[],listError='',listDelay=0,
-                        credentialMode='active',credentialRevision=1,credentialSecret='',credentialSubmissions=[])
+                        credentialMode='active',credentialRevision=1,credentialSecret='',credentialSubmissions=[],
+                        batchMode='normal',batchRequests=[],batchCancelled=False,batchRetried=False)
                 if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success')
                 if value.get('listReset'):
                     stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
@@ -208,6 +242,9 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if 'credentialMode' in value:
                     state['credentialMode']=value['credentialMode']
                     if value['credentialMode']=='none':state['credentialRevision']=0;state['credentialSecret']=''
+                if 'batchMode' in value:
+                    state['batchMode']=value['batchMode']
+                    if value['batchMode']!='normal':state.update(batchCancelled=False,batchRetried=False)
                 if 'deviceName' in value:state['deviceName']=value['deviceName']
                 if value.get('dropRenameNext'):state['dropRenameNext']=True
                 if 'renameReadDelay' in value:state['renameReadDelay']=min(max(float(value['renameReadDelay']),0),2)
@@ -226,6 +263,10 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 for row in state['listDeliveries']:
                     if row['eventId']==path.split('/')[-2]:row['status']='pending';row['lastError']=None
                 self.send_response(204);self.end_headers();return
+            if path.startswith('/api/v1/messages/') and '/deliveries/' in path:
+                action=path.rsplit('/',1)[-1]
+                if action not in ('cancel','retry'):return self.json_response(404,{'error':'not_found'})
+                return self.batch_response(path.split('/')[4],action,parse_qs(urlparse(self.path).query),state)
             if path=='/api/v1/messages':
                 state['messageSubmissions'].append(value)
                 outcome=state['messageNext'];state['messageNext']='success'
