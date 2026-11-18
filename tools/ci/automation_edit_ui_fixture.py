@@ -3,12 +3,11 @@
 import argparse
 import copy
 import functools
-import http.server
 import json
 import time
 from urllib.parse import urlparse
 from operations_ui_fixture import OperationsFixture
-from management_ui_fixture import TOKEN
+from management_ui_fixture import FixtureServer, TOKEN
 
 DAILY_ID = '11111111-1111-4111-8111-111111111111'
 ACTIVE_ID = '22222222-2222-4222-8222-222222222222'
@@ -103,6 +102,6 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=int, default=18813)
     args = parser.parse_args()
     AutomationEditFixture.reset()
-    with http.server.ThreadingHTTPServer(('127.0.0.1', args.port), functools.partial(AutomationEditFixture, directory=args.frontend)) as server:
+    with FixtureServer(('127.0.0.1', args.port), functools.partial(AutomationEditFixture, directory=args.frontend)) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()

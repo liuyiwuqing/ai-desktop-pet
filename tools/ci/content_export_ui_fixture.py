@@ -2,10 +2,10 @@
 """Explicit content export against RAM-only rows, with real browser downloads."""
 import argparse
 import functools
-import http.server
 import time
 from urllib.parse import urlparse
 from metadata_export_ui_fixture import MetadataFixture
+from management_ui_fixture import FixtureServer
 
 
 class ContentFixture(MetadataFixture):
@@ -33,6 +33,6 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--frontend', required=True)
     args = p.parse_args()
-    with http.server.ThreadingHTTPServer(('127.0.0.1', 18820), functools.partial(ContentFixture, directory=args.frontend)) as server:
+    with FixtureServer(('127.0.0.1', 18820), functools.partial(ContentFixture, directory=args.frontend)) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()

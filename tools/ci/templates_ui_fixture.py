@@ -3,10 +3,10 @@
 import argparse
 import copy
 import functools
-import http.server
 import json
 from urllib.parse import urlparse
 from roles_ui_fixture import RolesFixture
+from management_ui_fixture import FixtureServer
 
 
 class TemplatesFixture(RolesFixture):
@@ -73,6 +73,6 @@ if __name__ == '__main__':
     p.add_argument('--frontend', required=True)
     args = p.parse_args()
     TemplatesFixture.reset()
-    with http.server.ThreadingHTTPServer(('127.0.0.1', 18818), functools.partial(TemplatesFixture, directory=args.frontend)) as server:
+    with FixtureServer(('127.0.0.1', 18818), functools.partial(TemplatesFixture, directory=args.frontend)) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()

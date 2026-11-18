@@ -2,12 +2,11 @@
 """Actual Vue against RAM-only deletion/preview boundaries, without real actions."""
 import argparse
 import functools
-import http.server
 import json
 import time
 from urllib.parse import parse_qs, urlparse
 from automation_edit_ui_fixture import AutomationEditFixture
-from management_ui_fixture import TOKEN
+from management_ui_fixture import FixtureServer, TOKEN
 
 
 class LifecycleFixture(AutomationEditFixture):
@@ -84,6 +83,6 @@ if __name__ == '__main__':
     parser.add_argument('--frontend', required=True)
     args = parser.parse_args()
     LifecycleFixture.reset()
-    with http.server.ThreadingHTTPServer(('127.0.0.1', 18814), functools.partial(LifecycleFixture, directory=args.frontend)) as server:
+    with FixtureServer(('127.0.0.1', 18814), functools.partial(LifecycleFixture, directory=args.frontend)) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()

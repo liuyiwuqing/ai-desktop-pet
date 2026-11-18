@@ -4,14 +4,13 @@ import argparse
 import copy
 import csv
 import functools
-import http.server
 import io
 import json
 import threading
 import time
 from datetime import datetime
 from urllib.parse import parse_qs, urlparse
-from management_ui_fixture import Fixture, TOKEN, CONTROL
+from management_ui_fixture import Fixture, FixtureServer, TOKEN, CONTROL
 
 
 def initial():
@@ -87,5 +86,5 @@ class MetadataFixture(Fixture):
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--frontend',required=True);parser.add_argument('--port',type=int,default=18812)
     args=parser.parse_args()
-    server=http.server.ThreadingHTTPServer(('127.0.0.1',args.port),functools.partial(MetadataFixture,directory=args.frontend))
+    server=FixtureServer(('127.0.0.1',args.port),functools.partial(MetadataFixture,directory=args.frontend))
     print('UI boundary fixture ready',flush=True);server.serve_forever()

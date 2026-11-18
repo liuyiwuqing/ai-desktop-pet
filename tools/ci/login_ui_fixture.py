@@ -3,7 +3,6 @@
 import argparse
 from datetime import datetime, timezone
 import functools
-import http.server
 import json
 import secrets
 import socket
@@ -11,7 +10,7 @@ import time
 from http.cookies import SimpleCookie
 from urllib.parse import urlparse
 from roles_ui_fixture import RolesFixture
-from management_ui_fixture import TOKEN, CONTROL
+from management_ui_fixture import FixtureServer, TOKEN, CONTROL
 
 
 class LoginFixture(RolesFixture):
@@ -181,8 +180,6 @@ if __name__ == '__main__':
     parser.add_argument('--frontend', required=True)
     args = parser.parse_args()
     LoginFixture.reset()
-    class Server(http.server.ThreadingHTTPServer):
-        request_queue_size = 64
-    with Server(('127.0.0.1', 18828), functools.partial(LoginFixture, directory=args.frontend)) as server:
+    with FixtureServer(('127.0.0.1', 18828), functools.partial(LoginFixture, directory=args.frontend)) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()

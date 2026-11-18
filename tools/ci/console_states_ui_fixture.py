@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Actual Vue presentation states with loopback RAM reads; never a live CORE."""
 import argparse
-import http.server
 import json
 from pathlib import Path
 import time
 from urllib.parse import urlparse
 
-from management_ui_fixture import CONTROL, TOKEN
+from management_ui_fixture import CONTROL, TOKEN, FixtureServer
 from overview_ui_fixture import OverviewFixture
 
 
@@ -76,7 +75,7 @@ def main():
     if not (root / 'index.html').is_file():
         parser.error('build the actual CORE frontend first')
     handler = lambda *a, **kw: StatesFixture(*a, directory=str(root), **kw)
-    with http.server.ThreadingHTTPServer(('127.0.0.1', args.port), handler) as server:
+    with FixtureServer(('127.0.0.1', args.port), handler) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()
 

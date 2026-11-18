@@ -24,6 +24,18 @@ CONFIG={'schemaVersion':1,'timezone':'Asia/Shanghai','language':'zh-CN','volume'
     'dnd':{'enabled':False,'manual':False,'startMinute':1320,'endMinute':480,'allowCritical':True},
     'message':{'queueDepth':8,'durationMs':8000}}
 
+class FixtureServer(http.server.ThreadingHTTPServer):
+    """Loopback fixture server sized for a console full refresh.
+
+    A full refresh opens many connections at once; the stdlib default listen
+    backlog of 5 intermittently refuses one of them and the browser reports a
+    bare TypeError: Failed to fetch. Handler threads are daemons so a stopped
+    fixture cannot hang on a lingering keep-alive connection.
+    """
+    request_queue_size = 128
+    daemon_threads = True
+
+
 class Fixture(http.server.SimpleHTTPRequestHandler):
     lock=threading.Lock()
     state={'mode':'empty','config':copy.deepcopy(CONFIG),'revision':1,'requests':[],'submissions':[],'dropNext':False,
@@ -415,6 +427,6 @@ def main():
     Fixture.state['otaManifestPath']=os.environ.get('PET_OTA_UI_MANIFEST','')
     if not (root/'index.html').is_file():parser.error('build the actual CORE frontend first')
     handler=lambda *a,**kw:Fixture(*a,directory=str(root),**kw)
-    with http.server.ThreadingHTTPServer(('127.0.0.1',args.port),handler) as server:
+    with FixtureServer(('127.0.0.1',args.port),handler) as server:
         print('UI boundary fixture ready',flush=True);server.serve_forever()
 if __name__=='__main__':main()

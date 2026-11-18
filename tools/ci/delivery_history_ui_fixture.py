@@ -2,13 +2,12 @@
 """Loopback RAM-only delivery history/cancel fixture for the actual Vue build."""
 import argparse
 import copy
-import http.server
 import json
 from pathlib import Path
 import socket
 import time
 from urllib.parse import parse_qs, urlparse
-from management_ui_fixture import CONTROL, TOKEN, Fixture
+from management_ui_fixture import CONTROL, TOKEN, Fixture, FixtureServer
 
 
 class DeliveryFixture(Fixture):
@@ -138,7 +137,7 @@ def main():
         parser.error('build the actual CORE frontend first')
     DeliveryFixture.reset()
     handler = lambda *a, **kw: DeliveryFixture(*a, directory=str(root), **kw)
-    with http.server.ThreadingHTTPServer(('127.0.0.1', args.port), handler) as server:
+    with FixtureServer(('127.0.0.1', args.port), handler) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()
 

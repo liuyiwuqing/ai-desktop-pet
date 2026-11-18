@@ -3,12 +3,11 @@
 import argparse
 import copy
 import functools
-import http.server
 import json
 import time
 from urllib.parse import urlparse
 from roles_ui_fixture import RolesFixture
-from management_ui_fixture import TOKEN
+from management_ui_fixture import FixtureServer, TOKEN
 
 
 class EventsFixture(RolesFixture):
@@ -71,6 +70,6 @@ if __name__ == '__main__':
     p.add_argument('--frontend', required=True)
     args = p.parse_args()
     EventsFixture.reset()
-    with http.server.ThreadingHTTPServer(('127.0.0.1', 18819), functools.partial(EventsFixture, directory=args.frontend)) as server:
+    with FixtureServer(('127.0.0.1', 18819), functools.partial(EventsFixture, directory=args.frontend)) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()

@@ -3,12 +3,11 @@
 import argparse
 import copy
 import functools
-import http.server
 import json
 import time
 from urllib.parse import urlparse
 from operations_ui_fixture import OperationsFixture
-from management_ui_fixture import TOKEN
+from management_ui_fixture import FixtureServer, TOKEN
 
 
 class RoutingFixture(OperationsFixture):
@@ -94,6 +93,6 @@ if __name__ == '__main__':
     parser.add_argument('--frontend', required=True)
     args = parser.parse_args()
     RoutingFixture.reset()
-    with http.server.ThreadingHTTPServer(('127.0.0.1', 18815), functools.partial(RoutingFixture, directory=args.frontend)) as server:
+    with FixtureServer(('127.0.0.1', 18815), functools.partial(RoutingFixture, directory=args.frontend)) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()

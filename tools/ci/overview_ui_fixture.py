@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Actual Vue with a loopback RAM-only overview boundary, not a CORE integration."""
 import argparse
-import http.server
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 import time
-from management_ui_fixture import CONTROL, TOKEN, Fixture
+from management_ui_fixture import CONTROL, TOKEN, Fixture, FixtureServer
 
 BUCKETS = {'15m': 900, '1h': 3600, '6h': 21600, '1d': 86400}
 AS_OF = datetime(2026, 11, 13, 10, 0, tzinfo=timezone.utc)
@@ -366,7 +365,7 @@ def main():
     if not (root / 'index.html').is_file():
         parser.error('build the actual CORE frontend first')
     handler = lambda *a, **kw: OverviewFixture(*a, directory=str(root), **kw)
-    with http.server.ThreadingHTTPServer(('127.0.0.1', args.port), handler) as server:
+    with FixtureServer(('127.0.0.1', args.port), handler) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()
 

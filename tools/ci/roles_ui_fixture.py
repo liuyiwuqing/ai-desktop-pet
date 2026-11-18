@@ -2,12 +2,11 @@
 """Actual Vue role presentation against RAM-only access and audit APIs."""
 import argparse
 import functools
-import http.server
 import json
 import socket
 from urllib.parse import urlparse
 from sources_ui_fixture import SourcesFixture
-from management_ui_fixture import TOKEN
+from management_ui_fixture import FixtureServer, TOKEN
 
 
 class RolesFixture(SourcesFixture):
@@ -59,6 +58,6 @@ if __name__ == '__main__':
     p.add_argument('--frontend', required=True)
     args = p.parse_args()
     RolesFixture.reset()
-    with http.server.ThreadingHTTPServer(('127.0.0.1', 18817), functools.partial(RolesFixture, directory=args.frontend)) as server:
+    with FixtureServer(('127.0.0.1', 18817), functools.partial(RolesFixture, directory=args.frontend)) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()

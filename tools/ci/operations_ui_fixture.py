@@ -2,14 +2,13 @@
 """Loopback RAM boundary for actual console tool/automation fault regression."""
 import argparse
 import copy
-import http.server
 import json
 from pathlib import Path
 import socket
 import time
 import uuid
 from urllib.parse import urlparse
-from management_ui_fixture import CONTROL, TOKEN, Fixture
+from management_ui_fixture import CONTROL, TOKEN, Fixture, FixtureServer
 
 STAMP = '2026-11-13T10:00:00Z'
 TOOLS = [{'id': 'system.info', 'title': '系统信息', 'risk': 'read_only', 'argument': ''},
@@ -176,7 +175,7 @@ def main():
         parser.error('build actual CORE frontend first')
     OperationsFixture.reset()
     handler = lambda *a, **kw: OperationsFixture(*a, directory=str(root), **kw)
-    with http.server.ThreadingHTTPServer(('127.0.0.1', args.port), handler) as server:
+    with FixtureServer(('127.0.0.1', args.port), handler) as server:
         print('UI boundary fixture ready', flush=True)
         server.serve_forever()
 
