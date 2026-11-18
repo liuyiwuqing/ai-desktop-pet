@@ -11,6 +11,30 @@ from management_ui_fixture import CONTROL, TOKEN, Fixture
 
 BUCKETS = {'15m': 900, '1h': 3600, '6h': 21600, '1d': 86400}
 AS_OF = datetime(2026, 11, 13, 10, 0, tzinfo=timezone.utc)
+THRESHOLDS = {'failureRate': 0.1, 'failureRateMinSample': 20, 'backlogPending': 100, 'onlineMin': 1}
+
+
+def alerts_for(value, thresholds):
+    """Mirror the documented alert contract; the real rule is pinned by the CORE tests."""
+    devices, today, backlog = value['devices'], value['today'], value['backlog']
+    alerts = []
+    if value['mqtt'] != 'ready':
+        alerts.append({'code': 'mqtt_connection', 'level': 'error', 'value': 0,
+                       'threshold': 1, 'comparison': 'lt', 'unit': 'state'})
+    enabled = devices['total'] - devices['disabled']
+    online_enabled = devices['online'] if devices['online'] else 0
+    if enabled > 0 and online_enabled < thresholds['onlineMin']:
+        alerts.append({'code': 'devices_online', 'level': 'warn', 'value': online_enabled,
+                       'threshold': thresholds['onlineMin'], 'comparison': 'lt', 'unit': 'count'})
+    if backlog['pending'] >= thresholds['backlogPending']:
+        alerts.append({'code': 'delivery_backlog', 'level': 'warn', 'value': backlog['pending'],
+                       'threshold': thresholds['backlogPending'], 'comparison': 'gte', 'unit': 'count'})
+    if today['deliveries'] >= thresholds['failureRateMinSample']:
+        rate = today['failedDeliveries'] / today['deliveries']
+        if rate >= thresholds['failureRate']:
+            alerts.append({'code': 'delivery_failure_rate', 'level': 'warn', 'value': rate,
+                           'threshold': thresholds['failureRate'], 'comparison': 'gte', 'unit': 'ratio'})
+    return alerts
 
 
 class OverviewFixture(Fixture):
@@ -18,6 +42,7 @@ class OverviewFixture(Fixture):
     overview_delay = 0
     overview_requests = 0
     trend_mode = 'success'
+    thresholds = dict(THRESHOLDS)
 
     def trend(self, mode):
         query = parse_qs(urlparse(self.path).query)
@@ -61,7 +86,7 @@ class OverviewFixture(Fixture):
         with self.lock:
             cls = type(self)
             cls.overview_requests += 1
-            mode, delay = cls.overview_mode, cls.overview_delay
+            mode, delay, thresholds = cls.overview_mode, cls.overview_delay, dict(cls.thresholds)
         time.sleep(delay)
         if mode in ('error', 'unauthorized'):
             return self.json_response(401 if mode == 'unauthorized' else 503, {'error': 'unauthorized' if mode == 'unauthorized' else 'unavailable'})
@@ -76,6 +101,14 @@ class OverviewFixture(Fixture):
             value['failedDeliveries'] = 0
         if mode == 'mqtt_down':
             value['mqtt'] = 'unavailable'
+        if mode == 'alerts':
+            # 三处同时越线：无在线设备、积压 120、失败率 9/40=22.5%。
+            value['devices'] = {'total': 5, 'online': 0, 'offline': 5, 'disabled': 1}
+            value['today'] = {'messages': 40, 'deliveries': 40, 'failedDeliveries': 9, 'deliveryFailureRate': 0.225}
+            value['backlog'] = {'pending': 120, 'sent': 2}
+            value['failedDeliveries'] = 9
+        value['thresholds'] = thresholds
+        value['alerts'] = alerts_for(value, thresholds)
         try:
             self.json_response(200, value)
         except (BrokenPipeError, ConnectionResetError):
@@ -93,6 +126,8 @@ class OverviewFixture(Fixture):
                 cls.overview_mode = value['mode']
             if 'trendMode' in value:
                 cls.trend_mode = value['trendMode']
+            if 'thresholds' in value:
+                cls.thresholds = {**THRESHOLDS, **value['thresholds']}
             if 'delay' in value:
                 cls.overview_delay = min(max(float(value['delay']), 0), 2)
             return self.json_response(200, {'requests': cls.overview_requests})

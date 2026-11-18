@@ -37,6 +37,17 @@ await navigate('概览');
 await expect("document.querySelector('h1')?.innerText==='运行概览' && document.querySelector('.overview-panel')?.innerText.includes('25.0%')",'overview loads its own authenticated HTTP snapshot');
 await expect("document.querySelector('.overview-panel')?.innerText.includes('2026-11-13 · UTC') && document.querySelector('[data-metric=online] dd')?.childNodes[0]?.textContent.trim()==='2' && document.querySelector('[data-metric=offline] dd')?.childNodes[0]?.textContent.trim()==='3'",'UTC day and device counts are explicit');
 await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='7' && document.querySelector('[data-metric=backlog] dd')?.childNodes[0]?.textContent.trim()==='6' && document.querySelector('.overview-panel')?.innerText.includes('停用 1 台')",'message, backlog and overlapping disabled counts are distinct');
+// 告警阈值：安静快照不造告警，但要把服务端阈值说出来；样本不足时条形不染色。
+await expect("!document.querySelector('.overview-alerts') && document.querySelector('.overview-panel')?.innerText.includes('告警阈值：今日失败率 ≥ 10.0%') && document.querySelector('.overview-panel')?.innerText.includes('积压 ≥ 100 条')",'a quiet snapshot states the server thresholds without inventing alerts');
+await expect("!!document.querySelector('.health-bar') && !document.querySelector('.health-bar').classList.contains('health-bar--warn')",'12 deliveries of sample stay below the judgement sample');
+await fixture({mode:'alerts'});await tap('刷新概览');
+await expect("document.querySelectorAll('.overview-alerts .overview-alert').length===3 && document.querySelector('.overview-alerts [data-alert=devices_online]')?.innerText.includes('低于告警阈值 1 台') && document.querySelector('.overview-alerts [data-alert=delivery_backlog]')?.innerText.includes('120 条') && document.querySelector('.overview-alerts [data-alert=delivery_failure_rate]')?.innerText.includes('22.5%')",'each breached metric becomes its own alert with the threshold it crossed');
+await expect("document.querySelector('.health-bar')?.classList.contains('health-bar--warn')",'a failure rate above the threshold colours the bar');
+await fixture({mode:'alerts',thresholds:{failureRate:0.3}});await tap('刷新概览');
+await expect("document.querySelectorAll('.overview-alerts .overview-alert').length===2 && !document.querySelector('.overview-alerts [data-alert=delivery_failure_rate]') && document.querySelector('.overview-panel')?.innerText.includes('≥ 30.0%')",'the console follows the server threshold instead of a local constant');
+await expect("!!document.querySelector('.health-bar') && !document.querySelector('.health-bar').classList.contains('health-bar--warn')",'raising the threshold stops colouring the same 22.5% rate');
+await fixture({mode:'success',thresholds:{failureRate:0.1}});await tap('刷新概览');
+await expect("!document.querySelector('.overview-alerts') && document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='7'",'the alert list disappears once the breach is cleared');
 // 运行趋势：24 桶、最后一桶未结束、失败单独成图；范围切换与空/失败/恢复。
 await expect("document.querySelector('.overview-trend-summary')?.innerText.includes('窗口内收件') && document.querySelectorAll('.overview-trend-chart--messages .overview-trend-bar').length===24",'trend draws one bar per hour in the default 24-hour range');
 await expect("document.querySelectorAll('.overview-trend-chart--messages .overview-trend-bar.is-partial').length===1 && document.querySelector('.overview-trend-chart--messages rect.is-partial')?.dataset.index==='23'",'only the current bucket is marked partial');
@@ -62,10 +73,13 @@ const before=(await fixture({})).requests;
 await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='7'",'polling starts from current snapshot');
 for(let i=0;i<65;i++){if((await fixture({})).requests>before)break;await wait(0.1);}
 if((await fixture({})).requests<=before)throw new Error('Visible overview did not poll');results.push('visible overview polls');
+await fixture({mode:'alerts'});await tap('刷新概览');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.overview-panel dl>div')].every(e=>e.getBoundingClientRect().right<=390) && document.querySelector('.overview-trend-chart')?.getBoundingClientRect().right<=390",'overview and its trend fit 390 CSS pixels');
+await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.overview-panel dl>div')].every(e=>e.getBoundingClientRect().right<=390) && [...document.querySelectorAll('.overview-alerts .overview-alert')].length===3 && [...document.querySelectorAll('.overview-alerts .overview-alert')].every(e=>e.getBoundingClientRect().right<=390) && document.querySelector('.overview-trend-chart')?.getBoundingClientRect().right<=390",'overview, its alert list and its trend fit 390 CSS pixels');
 cliLog({mobileScreenshot:await captureScreenshot()});
 await cdp('Emulation.clearDeviceMetricsOverride');
+await fixture({mode:'success'});await tap('刷新概览');
+await expect("!document.querySelector('.overview-alerts')",'alerts clear without a leftover warning at the default viewport');
 await fixture({mode:'empty',delay:1});await tap('刷新概览');await navigate('消息');
 await wait(1.2);await expect("document.querySelector('h1')?.innerText==='消息' && !document.querySelector('.overview-panel')",'late response cannot restore an unmounted overview');
 await fixture({mode:'success',delay:0});await navigate('概览');await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='7'",'returning to overview reads a fresh snapshot');

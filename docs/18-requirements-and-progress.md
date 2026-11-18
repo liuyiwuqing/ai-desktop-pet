@@ -97,9 +97,10 @@
 | CONSOLE-13-B | 管理员正文导出 | CORE `d07bce8` / 04 `73d9f1e` 均已推送并核对远端；管理员显式确认、已应用条件与最近七天未清正文交集、1000 行上限和 CSV 公式/引号保护；真实 HTTP 新增 1/元数据 6 项、实际 Vue 正文 15/原元数据 44 检查通过，完整 CORE 105 通过/5 跳过、路径变体/1000 条最终 verify 通过；见 [正文导出契约](../../nexus-core/docs/content-export.md) | 逐仓提交；只导出隔离测试数据，没有读取生产消息 |
 | CONSOLE-09-C | 消息条件与限定动作组合 | CORE `f39ecec` / 04 `343e23b` 均已推送并核对远端；来源/类型/关键词/优先级 AND、新消息固定提醒、公开分析原授权保护、自动提醒回环排除；HTTP/隔离库新增 3 项与原编辑/创建共 17 项 verify 通过，实际 Vue 新增 17/原编辑 99/删除 52 检查通过；见 [CORE 契约](../../nexus-core/docs/automation-conditions.md) | 同步契约/页面/专项；不开放任意动作，真实规则/消息与生产库未操作 |
 | DEVICE-CRED-01 | 设备 MQTT 凭据台账与轮换 | 软件本地已验证：V25 台账（只存 SHA-256 指纹、一次性密钥、宽限期、撤销）、管理员限定签发/轮换/撤销、接入引导按设备显示台账状态、设备详情新增凭据区块；CORE 139 项 0 失败/5 条件跳过、`DeviceCredentialFlowTest` 3 项、前端 check/build、设备页 73 项浏览器检查（新增 7 项）通过；见 [契约](../../nexus-core/docs/device-credentials.md) | CORE 不写 Broker（配置为只读绑定），应用步骤见 [1Panel 说明](../deployment/1panel/README.md#设备-mqtt-凭据device-cred-01)；真实 Broker/设备/生产库未验收；推送与 CI 见文末 |
-| OVERVIEW-TREND-01 | 概览收件/投递/失败历史趋势 | 软件本地已验证：`GET /api/v1/overview/trend`（`15m`/`1h`/`6h`/`1d` 固定桶、`date_bin` 固定原点对齐、1–168 小时、最多 400 点、末桶标 `partial`）、收件/投递/失败事件三条序列、概览页 6h/24h/7d 与独立刷新；CORE 141 项 0 失败/5 条件跳过（新增 2 项）、前端 check/build、概览页 24 项浏览器检查（新增 7 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#历史趋势--overview-trend-01) | 趋势只覆盖仍保留的记录，失败按投递历史事件计数而非当前失败回看；仍无告警阈值、推送与时区选项；未对生产库/大数据量验证；推送与 CI 见文末 |
+| OVERVIEW-TREND-01 | 概览收件/投递/失败历史趋势 | 软件本地已验证：`GET /api/v1/overview/trend`（`15m`/`1h`/`6h`/`1d` 固定桶、`date_bin` 固定原点对齐、1–168 小时、最多 400 点、末桶标 `partial`）、收件/投递/失败事件三条序列、概览页 6h/24h/7d 与独立刷新；CORE 141 项 0 失败/5 条件跳过（新增 2 项）、前端 check/build、概览页 24 项浏览器检查（新增 7 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#历史趋势--overview-trend-01) | 趋势只覆盖仍保留的记录，失败按投递历史事件计数而非当前失败回看；本项交付时无告警阈值，已由 OVERVIEW-ALERT-01 补上（固定常量、不可配置）；仍无推送与时区选项；未对生产库/大数据量验证；推送与 CI 见文末 |
 | MSG-BATCH-01 | 单条消息的投递批量撤销与重试 | 软件本地已验证：`POST /api/v1/messages/{id}/deliveries/{cancel,retry}`（`dryRun` 只读预演、确认令牌写入、单条 `UPDATE … RETURNING`、500 条上限拒绝对截断）、跳过原因按单条判定条件的否定归并、消息详情新增批量折叠区；CORE 145 项 0 失败/5 条件跳过（新增 4 项）、前端 check/build、消息批量 16 项浏览器检查与既有筛选 44/发送 33 项回归通过；见 [契约](../../nexus-core/docs/message-delivery-batch.md) | 仍无跨消息批量操作，也不能撤回设备已保存/展示的内容；真实 Broker、设备回执竞态与生产库未验收；推送与 CI 见文末 |
 | REG-01 | 全量软件回归与文档一致性核对 | 本轮不加功能：CORE `mvn verify` 145 项 0 失败/5 条件跳过、24 个管理台浏览器脚本共 1131 项检查（20 个首跑通过、2 个单跑通过、2 个真缺陷修复后通过）、契约与交付类检查通过；修掉 1 处过期选择器（`.management-record` 被断线与凭据区块抢先匹配）与 1 处 390px 竞态；`docs/18` 补 15 行缺失台账、CORE README 补 3 条接口与 3 段说明；114 条相对链接、149 个提交哈希可解析；见本节 | `test_events_ui.sh`/`test_operations_ui.sh` 连跑不稳定（单跑通过）；`test_server_release.py` 4 项受沙箱 mkdir 代理限制、同提交 CI 通过；未烧录、未连真实设备、无目标服务器与生产库操作；推送与 CI 见文末 |
+| OVERVIEW-ALERT-01 | 概览告警阈值与站内提示 | 软件本地已验证：`GET /api/v1/overview` 新增 `alerts`（`mqtt_connection`/`devices_online`/`delivery_backlog`/`delivery_failure_rate`，各带 `threshold`/`comparison`/`unit`）与 `thresholds`；阈值为代码常量（失败率 ≥10% 且样本 ≥20 条、`pending` 积压 ≥100、启用设备在线 <1），失败率条形改由服务端阈值染色；CORE 153 项 0 失败/5 条件跳过（新增 2 项 HTTP + 6 项纯函数）、前端 check/build、概览页 32 项浏览器检查（新增 8 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警阈值--overview-alert-01) | 告警是读时派生状态：不落库、不写审计、不推送、没有持续时间；阈值不可配置（改阈值需改代码发版）；真实 Broker 断开、生产库与实机未验收；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
@@ -858,3 +859,38 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 边界：没有烧录、没有连接真实设备、没有目标服务器与生产库操作；浏览器回归全部使用回环 RAM 夹具，不能替代 CORE/Broker/设备联调；5 项条件跳过仍是可选环境用例；`test_server_release.py` 的 4 项沙箱失败按环境限制记录，未写成通过。
 
 推送与 CI（2026-11-18）：CORE `6b39d126d71a285d7945bf376833eb0762f05a0b` 已推送，`git ls-remote` 核对 `origin/codex/core-baseline` 为该提交；该提交只改 `README.md`，CORE 工作流按路径过滤，未产生新的 run，因此本轮 CORE 侧没有新的远程证据，构建结论仍来自本地 `mvn verify`。04 `bc68894`（脚本修复与源码指纹）与 `70751ca`（台账与文档）已推送，`git ls-remote` 核对 `origin/main` 为 `70751ca8b9ea41ad93e315582ad6ba906fdd3437`；[04 Software checks 44223193740](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44223193740) 八个 job 全部 success，其中 `server-delivery-tools` 正是本地受沙箱 mkdir 限制的那 4 项用例——这是"环境限制而非仓库缺陷"的直接证据。该 workflow 只跑固件预设与交付检查，不执行本轮的 24 个浏览器脚本，也不覆盖契约脚本之外的文档一致性核对。
+
+## OVERVIEW-ALERT-01 · 概览告警阈值与站内提示（2026-11-18）
+
+概览页一直有个矛盾：`console-overview.md` 明确写着"不提供生产告警阈值"，但页面上已经有一个阈值——`OverviewPanel.vue` 里硬编码的 `failureRate >= 0.1` 决定失败率条形是否变色。也就是说阈值只活在前端的一个数字里，换个消费方（脚本、外部监控、以后的移动端）就得重新发明一遍；而且"今日失败率"单独一项也没法表达"样本太少不算数"。
+
+本项把判定搬到服务端，只做站内提示：`GET /api/v1/overview` 新增 `alerts` 与 `thresholds`，与计数来自同一条查询的同一快照。四条规则、固定常量（`OverviewAlerts`）：
+
+| code | 级别 | 命中条件 |
+| --- | --- | --- |
+| `mqtt_connection` | error | 本次读取传输未就绪 |
+| `devices_online` | warn | 有启用设备，但没有一台启用设备在线 |
+| `delivery_backlog` | warn | `pending` 积压 ≥ 100 |
+| `delivery_failure_rate` | warn | 今日投递 ≥ 20 条且失败率 ≥ 10% |
+
+三个刻意的取舍：
+
+1. **阈值是代码常量，不可配置。** 可配置阈值不是加个数字，而是配置面、修改审计、"谁把阈值调高了"的责任链，属于另一件事。当前口径写在响应里（`thresholds`），前端不再保存任何阈值常量——改阈值只改一处，但代价是要发版，这点在文档里写明而不是留白。
+2. **告警是读时派生的状态，不落库。** 不写审计、不推送、不记首次发生时间。每 5 秒轮询都重算，同一条告警连续出现是正常的；读取失败时 `alerts` 随快照一起消失，不会在页面上留下一块过了期的红字。要"持续时间/首次发生"就得持久化，那是另一个能力，本项不做也不假装有。
+3. **失败率有样本门槛。** 19 条投递全失败是 100%，据此报警只会变成噪音，所以样本不足 20 条时既不出告警、也不给条形染色——前后端用同一个门槛，不会出现"条形红了但没有告警"。
+
+每条告警都带 `value`/`threshold`/`comparison`/`unit`，而不是只给一句文案：`gte` 表示 `value ≥ threshold` 命中，`lt` 表示 `value < threshold` 命中。这样 `devices_online` 可以表达"在线启用设备 0 < 阈值 1"，同时消费方不需要猜方向。顺序由服务端固定（传输 → 设备 → 积压 → 失败率），页面不再排序；`code` 未知时页面原样显示，服务端加新告警不需要前端同步改版。
+
+**一个顺带的去重**：设备在线阈值原本写成 `last_seen > b.as_of-interval '90 seconds'`，现在告警还要算"启用且在线"的子集，于是把 90 秒截止时间提到 `bounds` 里只算一次（`online_cutoff`）。`devices.online` 的口径没变（停用但在线的设备仍算在线），`devices_online` 用的是它的子集，两者不能互相推导——这点也写进了接口表。
+
+验证（2026-11-18，本机 macOS/Docker 29.8.2）：
+- `mvn -Dtest=ConsoleOverviewFlowTest test`：真实 HTTP + 隔离 PostgreSQL/MQTT，6 项通过（新增 2 项）。覆盖空设备不报、只有停用设备不报、积压 99/100 边界、失败率 19 条不判定、2/20=10% 命中、`comparison` 方向。
+- 新增 `OverviewAlertsTest`：6 项纯函数测试，直接覆盖夹具起不来的分支——MQTT 不可用是唯一的 `error` 级、告警顺序、各阈值边界、安静快照返回空列表。
+- `mvn verify`：153 项，0 失败/0 错误，5 项条件跳过；此前基线 145 项。
+- 前端 `npm run check`（74 token 无散落 hex）与 `npm run build` 通过。
+- 概览浏览器检查 24 → 32 项：安静快照只列阈值不造告警、12 条样本不染色、三处越线各自成条并带各自阈值、条形按阈值染色、**把阈值上调到 30% 后同一个 22.5% 不再告警**（这条专门证明前端没有本地常量）、告警消除后不留残余、390px 下列表不溢出。夹具新增 `alerts` 模式与 `thresholds` 覆盖参数。
+- 回归：`test_overview_ui.sh` 其余 24 项（趋势、空/失败/恢复、轮询、401、390px）未受影响。
+
+**一次真实的测试缺陷**：新增断言在单跑 `-Dtest=ConsoleOverviewFlowTest` 时全绿，放进 `mvn verify` 后 3 项失败——`Expecting empty but was: ["mqtt_connection"]`。原因是 MQTT 连接是异步建立的，整套跑起来时第一个请求常早于连接就绪，于是"安静快照"里多出一条传输告警。这不是告警逻辑的问题，也不是该放宽断言：补 `awaitReady()`（最多 5 秒等 `mqtt=ready`）后再断言，并把这个竞争写在注释里。修完后 `mvn verify` 153 项稳定通过。
+
+边界：未连接真实 Broker、未能构造"传输真的断开"的端到端场景（该分支由纯函数测试覆盖）、未对生产库或大数据量验证；告警不落库，因此没有历史、没有持续时间、没有推送；阈值不可配置；本机 `rg` 仍用临时 shim 跑浏览器脚本，未提交。
