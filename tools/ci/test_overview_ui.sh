@@ -43,6 +43,24 @@ await expect("!!document.querySelector('.health-bar') && !document.querySelector
 await fixture({mode:'alerts'});await tap('刷新概览');
 await expect("document.querySelectorAll('.overview-alerts .overview-alert').length===3 && document.querySelector('.overview-alerts [data-alert=devices_online]')?.innerText.includes('低于告警阈值 1 台') && document.querySelector('.overview-alerts [data-alert=delivery_backlog]')?.innerText.includes('120 条') && document.querySelector('.overview-alerts [data-alert=delivery_failure_rate]')?.innerText.includes('22.5%')",'each breached metric becomes its own alert with the threshold it crossed');
 await expect("document.querySelector('.health-bar')?.classList.contains('health-bar--warn')",'a failure rate above the threshold colours the bar');
+// 告警钻取：目标由服务端给出，页面把筛选带过去，而不是只换页签。
+await expect("document.querySelectorAll('.overview-alerts [data-alert-action]').length===3 && document.querySelector('[data-alert-action=delivery_backlog]')?.innerText==='查看等待投递' && document.querySelector('[data-alert-action=devices_online]')?.innerText==='查看设备'",'each actionable alert offers the filter the server points it at');
+const drillBase=(await fixture({})).deliveryRequests.length;
+await tap('查看等待投递');
+await expect("document.querySelector('h1')?.innerText==='投递'",'the backlog alert opens the delivery page');
+await expect("document.querySelector('.table-shell tbody')?.innerText.includes('等待投递样本') && !document.querySelector('.table-shell tbody')?.innerText.includes('失败投递样本')",'the drill lands on a filtered list instead of the whole table');
+const drillRequests=(await fixture({})).deliveryRequests.slice(drillBase);
+if(!drillRequests.length||!drillRequests.every(path=>path.includes('status=pending')))throw new Error('drill did not carry status=pending: '+JSON.stringify(drillRequests));
+results.push('the filtered read really carried status=pending');
+await navigate('概览');
+await expect("document.querySelector('[data-alert-action=delivery_failure_rate]')",'returning to overview shows the alerts again');
+await tap('查看失败投递');
+await expect("document.querySelector('h1')?.innerText==='投递' && document.querySelector('.table-shell tbody')?.innerText.includes('失败投递样本') && !document.querySelector('.table-shell tbody')?.innerText.includes('等待投递样本')",'the failure-rate alert filters to failed deliveries');
+await navigate('概览');
+await tap('查看设备');
+await expect("document.querySelector('h1')?.innerText==='设备'",'the device alert opens the device page');
+await navigate('概览');
+await expect("document.querySelectorAll('.overview-alerts [data-alert-action]').length===3",'drilling leaves the overview intact on return');
 await fixture({mode:'alerts',thresholds:{failureRate:0.3}});await tap('刷新概览');
 await expect("document.querySelectorAll('.overview-alerts .overview-alert').length===2 && !document.querySelector('.overview-alerts [data-alert=delivery_failure_rate]') && document.querySelector('.overview-panel')?.innerText.includes('≥ 30.0%')",'the console follows the server threshold instead of a local constant');
 await expect("!!document.querySelector('.health-bar') && !document.querySelector('.health-bar').classList.contains('health-bar--warn')",'raising the threshold stops colouring the same 22.5% rate');
@@ -61,7 +79,7 @@ await expect("document.querySelector('.overview-trend [role=alert]') && !documen
 await fixture({trendMode:'success'});await tap('刷新趋势');
 await expect("!!document.querySelector('.overview-trend-chart') && !document.querySelector('.overview-trend [role=alert]')",'trend recovers after a failed read');
 await fixture({mode:'mqtt_down'});await tap('刷新概览');
-await expect("document.querySelector('.overview-panel [role=status]')?.innerText.includes('MQTT 连接不可用') && document.querySelector('[data-metric=online] dd')?.childNodes[0]?.textContent.trim()==='2'",'Broker failure never rewrites the online count');
+await expect("document.querySelector('.overview-panel [role=status]')?.innerText.includes('MQTT 连接不可用') && document.querySelector('[data-metric=online] dd')?.childNodes[0]?.textContent.trim()==='2' && !document.querySelector('[data-alert=mqtt_connection] [data-alert-action]')",'Broker failure never rewrites the online count and offers no filter it cannot honour');
 await fixture({mode:'error'});await tap('刷新概览');
 await expect("!!document.querySelector('.overview-panel [role=alert]') && !document.querySelector('.overview-panel dl')",'failed read hides stale counts instead of showing empty or healthy');
 await fixture({mode:'empty'});await tap('刷新概览');
@@ -75,7 +93,7 @@ for(let i=0;i<65;i++){if((await fixture({})).requests>before)break;await wait(0.
 if((await fixture({})).requests<=before)throw new Error('Visible overview did not poll');results.push('visible overview polls');
 await fixture({mode:'alerts'});await tap('刷新概览');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.overview-panel dl>div')].every(e=>e.getBoundingClientRect().right<=390) && [...document.querySelectorAll('.overview-alerts .overview-alert')].length===3 && [...document.querySelectorAll('.overview-alerts .overview-alert')].every(e=>e.getBoundingClientRect().right<=390) && document.querySelector('.overview-trend-chart')?.getBoundingClientRect().right<=390",'overview, its alert list and its trend fit 390 CSS pixels');
+await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.overview-panel dl>div')].every(e=>e.getBoundingClientRect().right<=390) && [...document.querySelectorAll('.overview-alerts .overview-alert')].length===3 && [...document.querySelectorAll('.overview-alerts .overview-alert, .overview-alerts [data-alert-action]')].every(e=>e.getBoundingClientRect().right<=390) && document.querySelector('.overview-trend-chart')?.getBoundingClientRect().right<=390",'overview, its alert actions and its trend fit 390 CSS pixels');
 cliLog({mobileScreenshot:await captureScreenshot()});
 await cdp('Emulation.clearDeviceMetricsOverride');
 await fixture({mode:'success'});await tap('刷新概览');

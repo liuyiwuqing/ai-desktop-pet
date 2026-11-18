@@ -12,6 +12,15 @@ from management_ui_fixture import CONTROL, TOKEN, Fixture
 BUCKETS = {'15m': 900, '1h': 3600, '6h': 21600, '1d': 86400}
 AS_OF = datetime(2026, 11, 13, 10, 0, tzinfo=timezone.utc)
 THRESHOLDS = {'failureRate': 0.1, 'failureRateMinSample': 20, 'backlogPending': 100, 'onlineMin': 1}
+# 钻取后必须看到的一行结果：两类投递各一行，用于证明页面带上了筛选而不是只换了标签页。
+DELIVERY_ROWS = [
+    {'eventId': 'drill-pending', 'messageId': 'drill-message-pending', 'deviceId': 'dodo-ui-fixture',
+     'title': '等待投递样本', 'status': 'pending', 'attempts': 0, 'canCancel': True, 'lastError': None,
+     'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
+    {'eventId': 'drill-failed', 'messageId': 'drill-message-failed', 'deviceId': 'dodo-ui-fixture',
+     'title': '失败投递样本', 'status': 'failed', 'attempts': 3, 'canCancel': False, 'lastError': 'mqtt_timeout',
+     'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
+]
 
 
 def alerts_for(value, thresholds):
@@ -20,20 +29,23 @@ def alerts_for(value, thresholds):
     alerts = []
     if value['mqtt'] != 'ready':
         alerts.append({'code': 'mqtt_connection', 'level': 'error', 'value': 0,
-                       'threshold': 1, 'comparison': 'lt', 'unit': 'state'})
+                       'threshold': 1, 'comparison': 'lt', 'unit': 'state', 'target': None})
     enabled = devices['total'] - devices['disabled']
     online_enabled = devices['online'] if devices['online'] else 0
     if enabled > 0 and online_enabled < thresholds['onlineMin']:
         alerts.append({'code': 'devices_online', 'level': 'warn', 'value': online_enabled,
-                       'threshold': thresholds['onlineMin'], 'comparison': 'lt', 'unit': 'count'})
+                       'threshold': thresholds['onlineMin'], 'comparison': 'lt', 'unit': 'count',
+                       'target': {'tab': 'devices', 'status': ''}})
     if backlog['pending'] >= thresholds['backlogPending']:
         alerts.append({'code': 'delivery_backlog', 'level': 'warn', 'value': backlog['pending'],
-                       'threshold': thresholds['backlogPending'], 'comparison': 'gte', 'unit': 'count'})
+                       'threshold': thresholds['backlogPending'], 'comparison': 'gte', 'unit': 'count',
+                       'target': {'tab': 'deliveries', 'status': 'pending'}})
     if today['deliveries'] >= thresholds['failureRateMinSample']:
         rate = today['failedDeliveries'] / today['deliveries']
         if rate >= thresholds['failureRate']:
             alerts.append({'code': 'delivery_failure_rate', 'level': 'warn', 'value': rate,
-                           'threshold': thresholds['failureRate'], 'comparison': 'gte', 'unit': 'ratio'})
+                           'threshold': thresholds['failureRate'], 'comparison': 'gte', 'unit': 'ratio',
+                           'target': {'tab': 'deliveries', 'status': 'failed'}})
     return alerts
 
 
@@ -43,6 +55,7 @@ class OverviewFixture(Fixture):
     overview_requests = 0
     trend_mode = 'success'
     thresholds = dict(THRESHOLDS)
+    delivery_requests = []
 
     def trend(self, mode):
         query = parse_qs(urlparse(self.path).query)
@@ -66,7 +79,21 @@ class OverviewFixture(Fixture):
                 'hours': hours, 'bucket': bucket, 'bucketSeconds': seconds, 'points': points, 'totals': totals}
 
     def do_GET(self):
-        if urlparse(self.path).path == '/api/v1/connectors':
+        path = urlparse(self.path).path
+        if path == '/api/v1/deliveries':
+            # 只服务于钻取检查：按 status 过滤并记录请求，证明页面真的带着筛选读了一次。
+            if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
+                return self.json_response(401, {'error': 'unauthorized'})
+            query = parse_qs(urlparse(self.path).query)
+            status = query.get('status', [''])[0]
+            page = int(query.get('page', ['1'])[0])
+            size = int(query.get('size', ['30'])[0])
+            rows = [row for row in DELIVERY_ROWS if not status or row['status'] == status]
+            with self.lock:
+                type(self).delivery_requests.append(self.path)
+            return self.json_response(200, {'items': rows[(page - 1) * size:page * size],
+                                            'total': len(rows), 'page': page, 'size': size})
+        if path == '/api/v1/connectors':
             if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
                 return self.json_response(401, {'error': 'unauthorized'})
             return self.json_response(200, {'items': [{'id': 'halo-ui', 'source': 'halo', 'configured': True,
@@ -130,7 +157,8 @@ class OverviewFixture(Fixture):
                 cls.thresholds = {**THRESHOLDS, **value['thresholds']}
             if 'delay' in value:
                 cls.overview_delay = min(max(float(value['delay']), 0), 2)
-            return self.json_response(200, {'requests': cls.overview_requests})
+            return self.json_response(200, {'requests': cls.overview_requests,
+                                            'deliveryRequests': list(cls.delivery_requests)})
 
 
 def main():

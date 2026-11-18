@@ -101,7 +101,9 @@
 | MSG-BATCH-01 | 单条消息的投递批量撤销与重试 | 软件本地已验证：`POST /api/v1/messages/{id}/deliveries/{cancel,retry}`（`dryRun` 只读预演、确认令牌写入、单条 `UPDATE … RETURNING`、500 条上限拒绝对截断）、跳过原因按单条判定条件的否定归并、消息详情新增批量折叠区；CORE 145 项 0 失败/5 条件跳过（新增 4 项）、前端 check/build、消息批量 16 项浏览器检查与既有筛选 44/发送 33 项回归通过；见 [契约](../../nexus-core/docs/message-delivery-batch.md) | 仍无跨消息批量操作，也不能撤回设备已保存/展示的内容；真实 Broker、设备回执竞态与生产库未验收；推送与 CI 见文末 |
 | REG-01 | 全量软件回归与文档一致性核对 | 本轮不加功能：CORE `mvn verify` 145 项 0 失败/5 条件跳过、24 个管理台浏览器脚本共 1131 项检查（20 个首跑通过、2 个单跑通过、2 个真缺陷修复后通过）、契约与交付类检查通过；修掉 1 处过期选择器（`.management-record` 被断线与凭据区块抢先匹配）与 1 处 390px 竞态；`docs/18` 补 15 行缺失台账、CORE README 补 3 条接口与 3 段说明；114 条相对链接、149 个提交哈希可解析；见本节 | `test_events_ui.sh`/`test_operations_ui.sh` 连跑不稳定（单跑通过）；`test_server_release.py` 4 项受沙箱 mkdir 代理限制、同提交 CI 通过；未烧录、未连真实设备、无目标服务器与生产库操作；推送与 CI 见文末 |
 | OVERVIEW-ALERT-01 | 概览告警阈值与站内提示 | 软件本地已验证：`GET /api/v1/overview` 新增 `alerts`（`mqtt_connection`/`devices_online`/`delivery_backlog`/`delivery_failure_rate`，各带 `threshold`/`comparison`/`unit`）与 `thresholds`；阈值为代码常量（失败率 ≥10% 且样本 ≥20 条、`pending` 积压 ≥100、启用设备在线 <1），失败率条形改由服务端阈值染色；CORE 153 项 0 失败/5 条件跳过（新增 2 项 HTTP + 6 项纯函数）、前端 check/build、概览页 32 项浏览器检查（新增 8 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警阈值--overview-alert-01) | 告警是读时派生状态：不落库、不写审计、不推送、没有持续时间；阈值不可配置（改阈值需改代码发版）；真实 Broker 断开、生产库与实机未验收；推送与 CI 见文末 |
+| ALERT-DRILL-01 | 概览告警钻取到已筛选列表 | 软件本地已验证：`alerts[].target{tab,status}` 由服务端下发（积压→投递 `status=pending`、失败率→`failed`、无在线设备→设备页、传输不可用为 `null` 且不给按钮）；跳转前清空旧搜索、状态筛选取代叠加，先备条件再切页签只读一次；CORE 154 项 0 失败/5 条件跳过（新增 1 项纯函数）、前端 check/build、概览 40 项浏览器检查（新增 8 项，含夹具核对请求真带 `status`）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警钻取--alert-drill-01) | 只跳到现存筛选：设备页没有离线筛选，故只打开页面而不筛；投递页只能按状态筛；未连真实 CORE/Broker/设备；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
+
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
@@ -896,3 +898,32 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 边界：未连接真实 Broker、未能构造"传输真的断开"的端到端场景（该分支由纯函数测试覆盖）、未对生产库或大数据量验证；告警不落库，因此没有历史、没有持续时间、没有推送；阈值不可配置；本机 `rg` 仍用临时 shim 跑浏览器脚本，未提交。
 
 推送与 CI（2026-11-18）：CORE `beb45678dc274acd65bc793145216821cac960c2` 已推送，`git ls-remote` 核对 `origin/codex/core-baseline` 为该提交（推送本身成功，紧随其后的 `ls-remote` 报了一次 `SSL_ERROR_SYSCALL`，重试即得，未改远程配置）；远程 [CORE Docker deployment 44225749068](https://github.com/liuyiwuqing/nexus-core/actions/runs/44225749068) 的 docker-compose job 全部步骤 success（2 分 23 秒，与上次 2 分 22 秒同量级）。04 `2e4d40f`（夹具与页面检查）已推送，`git ls-remote` 核对 `origin/main` 为 `2e4d40f8b792183e9b7d2158ecda58dc11283e2f`；[04 Software checks 44225800512](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44225800512) 八个 job 全部 success。两项 CI 只覆盖容器构建与固件预设，不执行本项新增的浏览器检查，也不覆盖"传输真的断开"的端到端场景。随后的台账提交只改 `docs/`，不在该 workflow 的 `paths`（`firmware/`、`extensions/`、`resources/`、`config/`、`tools/`、`deployment/`）里，因此不会再产生 run——上面两个 run 号对应的是含代码/脚本的推送范围，不是台账提交。
+
+## ALERT-DRILL-01 · 概览告警钻取到已筛选列表（2026-11-18）
+
+上一项把告警做成能看的，但看到"投递积压 120 条"之后无处可去：概览只报数字，投递页还是全量列表，用户得自己想起来去投递页再手选状态。本项补这一跳，并且刻意只跳**已经存在的筛选**。
+
+判定没有搬进前端。`alerts[]` 每条多一个 `target:{tab,status}`，由服务端给出：
+
+| 告警 | 目标 | 理由 |
+| --- | --- | --- |
+| `delivery_backlog` | 投递页 `status=pending` | 积压就是"等待投递"这一状态，投递页本来就能筛 |
+| `delivery_failure_rate` | 投递页 `status=failed` | 同上，失败率的分母是今日投递，分子是当前失败 |
+| `devices_online` | 设备页（不带筛选） | 设备页没有离线筛选，因此只承诺"打开设备页"，不假装能筛出离线那几台 |
+| `mqtt_connection` | `null` | 传输不可用在管理台没有对应列表筛选，给个跳转等于假装能查 |
+
+这是 DEVICE-CRED-01 之后同一条原则的延续：**能做的做干净，做不到的不装**。设备页没有离线筛选就没给按钮的筛选承诺，也没有为此临时加一个筛选控件。
+
+前端只有一行接线：`OverviewPanel` 抛 `drill` 事件，外壳收到后先备好筛选（清空上一次的搜索条件、设状态筛选、页签置 1）、再切页签，页签侦听器带着新条件读一次。顺序是有意的——先切页签会先按旧条件读一遍全量再读一遍筛选，白打一次请求。**上一次的搜索条件必须清掉**：如果用户之前在投递页按某台设备筛过，不清就会让"查看等待投递"被旧筛选悄悄收窄成另一批结果，看起来像是告警算错了。
+
+技术上有个值得记下的细节：`OverviewPanel` 是 `defineAsyncComponent` 包装的（按标签页拆 chunk），但 `@drill` 照样能通——`$attrs` 会把 `onDrill` 透传给内层组件，`emit('drill')` 就调到了外壳的处理函数。所以这次不需要为异步包装加额外的中转 props。
+
+验证（2026-11-18，本机 macOS/Docker 29.8.2）：
+- `mvn verify`：154 项，0 失败/0 错误，5 项条件跳过；此前基线 153。
+- `OverviewAlertsTest`：7 项（新增 1 项），断言三条告警各自的 `target.tab/status`，以及传输不可用时 `target` 为 `null`。
+- HTTP 专项：`ConsoleOverviewFlowTest` 6 项仍通过，新增断言积压与失败率两处 `target` 的页签/状态。
+- 前端 `npm run check`（74 token 无散落 hex）与 `npm run build` 通过。
+- 概览浏览器检查 32 → 40 项：三条告警各自带按钮且文案对应（查看等待投递/查看失败投递/查看设备）、点击后落到投递页、表格里只剩对应状态的那一行（另一行确实不在）、**夹具记录到的请求真的带 `status=pending`**（只换页签不筛选会让这条红）、回到概览后告警与按钮完好、传输告警不渲染按钮、390px 下按钮不溢出。
+- 回归：`test_console_theme_ui.sh` 68 项仍通过（它也用同一个夹具并访问概览页，含"每个按钮都是 Naive 按钮、高度/圆角统一"与 CSP 零违规）。
+
+边界：钻取只到现存筛选——投递页只能按状态筛，不能按"重试了几次/失败原因"筛；设备页只是打开，不做离线筛选；未连接真实 CORE/Broker/设备，夹具里"筛选真的生效"是由状态过滤 + 请求参数两条一起证明的，不是真实数据库的查询结果。
