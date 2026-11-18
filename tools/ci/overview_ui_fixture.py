@@ -3,16 +3,42 @@
 import argparse
 import http.server
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 import time
-from urllib.parse import urlparse
 from management_ui_fixture import CONTROL, TOKEN, Fixture
+
+BUCKETS = {'15m': 900, '1h': 3600, '6h': 21600, '1d': 86400}
+AS_OF = datetime(2026, 11, 13, 10, 0, tzinfo=timezone.utc)
 
 
 class OverviewFixture(Fixture):
     overview_mode = 'success'
     overview_delay = 0
     overview_requests = 0
+    trend_mode = 'success'
+
+    def trend(self, mode):
+        query = parse_qs(urlparse(self.path).query)
+        hours = int(query.get('hours', ['24'])[0])
+        bucket = query.get('bucket', ['1h'])[0]
+        seconds = BUCKETS.get(bucket, 3600)
+        total = max(1, hours * 3600 // seconds)
+        last = AS_OF - timedelta(seconds=AS_OF.timestamp() % seconds)
+        first = last - timedelta(seconds=seconds * (total - 1))
+        stamp = '%Y-%m-%dT%H:%M:%SZ'
+        points = []
+        for index in range(total):
+            empty = mode == 'empty'
+            messages = 0 if empty else 2 + index % 4
+            points.append({'at': (first + timedelta(seconds=seconds * index)).strftime(stamp),
+                           'messages': messages, 'deliveries': 0 if empty else messages + 1,
+                           'failures': 0 if empty else (1 if index == total - 3 else 0),
+                           'partial': index == total - 1})
+        totals = {key: sum(point[key] for point in points) for key in ('messages', 'deliveries', 'failures')}
+        return {'asOf': AS_OF.strftime(stamp), 'from': points[0]['at'], 'to': AS_OF.strftime(stamp),
+                'hours': hours, 'bucket': bucket, 'bucketSeconds': seconds, 'points': points, 'totals': totals}
 
     def do_GET(self):
         if urlparse(self.path).path == '/api/v1/connectors':
@@ -20,6 +46,14 @@ class OverviewFixture(Fixture):
                 return self.json_response(401, {'error': 'unauthorized'})
             return self.json_response(200, {'items': [{'id': 'halo-ui', 'source': 'halo', 'configured': True,
                                                       'enabled': True, 'state': 'ready'}]})
+        if urlparse(self.path).path == '/api/v1/overview/trend':
+            if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
+                return self.json_response(401, {'error': 'unauthorized'})
+            mode = type(self).trend_mode
+            if mode in ('error', 'unauthorized'):
+                return self.json_response(401 if mode == 'unauthorized' else 503,
+                                          {'error': 'unauthorized' if mode == 'unauthorized' else 'unavailable'})
+            return self.json_response(200, self.trend(mode))
         if urlparse(self.path).path != '/api/v1/overview':
             return super().do_GET()
         if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
@@ -57,6 +91,8 @@ class OverviewFixture(Fixture):
             cls = type(self)
             if 'mode' in value:
                 cls.overview_mode = value['mode']
+            if 'trendMode' in value:
+                cls.trend_mode = value['trendMode']
             if 'delay' in value:
                 cls.overview_delay = min(max(float(value['delay']), 0), 2)
             return self.json_response(200, {'requests': cls.overview_requests})

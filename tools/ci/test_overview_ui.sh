@@ -37,6 +37,18 @@ await navigate('概览');
 await expect("document.querySelector('h1')?.innerText==='运行概览' && document.querySelector('.overview-panel')?.innerText.includes('25.0%')",'overview loads its own authenticated HTTP snapshot');
 await expect("document.querySelector('.overview-panel')?.innerText.includes('2026-11-13 · UTC') && document.querySelector('[data-metric=online] dd')?.childNodes[0]?.textContent.trim()==='2' && document.querySelector('[data-metric=offline] dd')?.childNodes[0]?.textContent.trim()==='3'",'UTC day and device counts are explicit');
 await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='7' && document.querySelector('[data-metric=backlog] dd')?.childNodes[0]?.textContent.trim()==='6' && document.querySelector('.overview-panel')?.innerText.includes('停用 1 台')",'message, backlog and overlapping disabled counts are distinct');
+// 运行趋势：24 桶、最后一桶未结束、失败单独成图；范围切换与空/失败/恢复。
+await expect("document.querySelector('.overview-trend-summary')?.innerText.includes('窗口内收件') && document.querySelectorAll('.overview-trend-chart--messages .overview-trend-bar').length===24",'trend draws one bar per hour in the default 24-hour range');
+await expect("document.querySelectorAll('.overview-trend-chart--messages .overview-trend-bar.is-partial').length===1 && document.querySelector('.overview-trend-chart--messages rect.is-partial')?.dataset.index==='23'",'only the current bucket is marked partial');
+await expect("document.querySelectorAll('.overview-trend-chart--failures .overview-trend-bar:not(.is-empty)').length===1 && [...document.querySelectorAll('.overview-trend-figure figcaption')].some(node=>node.innerText.includes('失败事件'))",'failure events keep their own series and caption');
+await tap('7 天');
+await expect("document.querySelectorAll('.overview-trend-chart--messages .overview-trend-bar').length===28 && document.querySelector('.overview-trend')?.innerText.includes('每桶 6 小时')",'7-day range switches to 6-hour buckets');
+await fixture({trendMode:'empty'});await tap('刷新趋势');
+await expect("document.querySelector('.overview-trend .console-state')?.innerText.includes('没有保留') && !document.querySelector('.overview-trend-chart')",'empty trend is explicit instead of a zero chart');
+await fixture({trendMode:'error'});await tap('刷新趋势');
+await expect("document.querySelector('.overview-trend [role=alert]') && !document.querySelector('.overview-trend-chart')",'trend failure hides the stale chart');
+await fixture({trendMode:'success'});await tap('刷新趋势');
+await expect("!!document.querySelector('.overview-trend-chart') && !document.querySelector('.overview-trend [role=alert]')",'trend recovers after a failed read');
 await fixture({mode:'mqtt_down'});await tap('刷新概览');
 await expect("document.querySelector('.overview-panel [role=status]')?.innerText.includes('MQTT 连接不可用') && document.querySelector('[data-metric=online] dd')?.childNodes[0]?.textContent.trim()==='2'",'Broker failure never rewrites the online count');
 await fixture({mode:'error'});await tap('刷新概览');
@@ -51,7 +63,7 @@ await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]
 for(let i=0;i<65;i++){if((await fixture({})).requests>before)break;await wait(0.1);}
 if((await fixture({})).requests<=before)throw new Error('Visible overview did not poll');results.push('visible overview polls');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.overview-panel dl>div')].every(e=>e.getBoundingClientRect().right<=390)",'overview fits 390 CSS pixels');
+await expect("document.documentElement.scrollWidth<=390 && [...document.querySelectorAll('.overview-panel dl>div')].every(e=>e.getBoundingClientRect().right<=390) && document.querySelector('.overview-trend-chart')?.getBoundingClientRect().right<=390",'overview and its trend fit 390 CSS pixels');
 cliLog({mobileScreenshot:await captureScreenshot()});
 await cdp('Emulation.clearDeviceMetricsOverride');
 await fixture({mode:'empty',delay:1});await tap('刷新概览');await navigate('消息');
