@@ -1107,3 +1107,5 @@ MSG-BATCH-01 已支持对单条消息批量处理投递，但设备一多、消�
 - 回归：列表筛选、元数据导出、消息组合、表单、空态 125 项、管理台、主题、概览、事件检查通过。
 
 边界：未连接真实 CORE/PostgreSQL/Broker/设备；未验证接近 500 条投递时的耗时、多管理员并发处理同一批消息，以及真实 Broker 上的批量结果；跨消息批量不能撤回设备已保存或展示的内容。
+
+推送与 CI（2026-11-18）：CORE `acc95fb` / 04 `a500899` 已推送，`git ls-remote` 核对远端分支分别指向 `acc95fb1d2334300a9e1dfa1fe74ab007e4662ab` 与 `a5008991eb39012d06cdbc6a2b2b2c68b7808f14`。CI：CORE `Docker deployment` [#44268193992](https://github.com/liuyiwuqing/nexus-core/actions/runs/44268193992) `success`；04 `Software checks` [#44268212956](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44268212956) `success`。两项 workflow 不运行本项 30 项浏览器专项或完整 Maven 集成套件，这些仍为本地证据；远程 CI 不等于真实部署或生产库验证。
