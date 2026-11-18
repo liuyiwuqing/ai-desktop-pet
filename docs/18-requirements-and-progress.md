@@ -927,3 +927,5 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 - 回归：`test_console_theme_ui.sh` 68 项仍通过（它也用同一个夹具并访问概览页，含"每个按钮都是 Naive 按钮、高度/圆角统一"与 CSP 零违规）。
 
 边界：钻取只到现存筛选——投递页只能按状态筛，不能按"重试了几次/失败原因"筛；设备页只是打开，不做离线筛选；未连接真实 CORE/Broker/设备，夹具里"筛选真的生效"是由状态过滤 + 请求参数两条一起证明的，不是真实数据库的查询结果。
+
+推送与 CI（2026-11-18）：CORE `b550d727d9eef61cf6c6de63b85b87a573d3fd57` 已推送，`git ls-remote` 核对 `origin/codex/core-baseline` 为该提交；远程 [CORE Docker deployment 44229122971](https://github.com/liuyiwuqing/nexus-core/actions/runs/44229122971) 的 docker-compose job 全部步骤 success。04 `5c83c2f`（夹具与页面检查）已推送，`git ls-remote` 核对 `origin/main` 为 `5c83c2f6dc19cdf6106d97fd244259166142f466`；[04 Software checks 44229150498](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44229150498) 八个 job 全部 success。两项 CI 只覆盖容器构建与固件预设，不执行本项新增的浏览器检查；本段随后的台账提交只改 `docs/`，不在 04 workflow 的 `paths` 内，不会再产生 run。
