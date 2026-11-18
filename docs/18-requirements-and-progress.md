@@ -894,3 +894,5 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 **一次真实的测试缺陷**：新增断言在单跑 `-Dtest=ConsoleOverviewFlowTest` 时全绿，放进 `mvn verify` 后 3 项失败——`Expecting empty but was: ["mqtt_connection"]`。原因是 MQTT 连接是异步建立的，整套跑起来时第一个请求常早于连接就绪，于是"安静快照"里多出一条传输告警。这不是告警逻辑的问题，也不是该放宽断言：补 `awaitReady()`（最多 5 秒等 `mqtt=ready`）后再断言，并把这个竞争写在注释里。修完后 `mvn verify` 153 项稳定通过。
 
 边界：未连接真实 Broker、未能构造"传输真的断开"的端到端场景（该分支由纯函数测试覆盖）、未对生产库或大数据量验证；告警不落库，因此没有历史、没有持续时间、没有推送；阈值不可配置；本机 `rg` 仍用临时 shim 跑浏览器脚本，未提交。
+
+推送与 CI（2026-11-18）：CORE `beb45678dc274acd65bc793145216821cac960c2` 已推送，`git ls-remote` 核对 `origin/codex/core-baseline` 为该提交（推送本身成功，紧随其后的 `ls-remote` 报了一次 `SSL_ERROR_SYSCALL`，重试即得，未改远程配置）；远程 [CORE Docker deployment 44225749068](https://github.com/liuyiwuqing/nexus-core/actions/runs/44225749068) 的 docker-compose job 全部步骤 success（2 分 23 秒，与上次 2 分 22 秒同量级）。04 `2e4d40f`（夹具与页面检查）已推送，`git ls-remote` 核对 `origin/main` 为 `2e4d40f8b792183e9b7d2158ecda58dc11283e2f`；[04 Software checks 44225800512](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44225800512) 八个 job 全部 success。两项 CI 只覆盖容器构建与固件预设，不执行本项新增的浏览器检查，也不覆盖"传输真的断开"的端到端场景；随后的台账提交会再触发一次同样的预设 workflow，仍不跑浏览器脚本。
