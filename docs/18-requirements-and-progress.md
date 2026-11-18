@@ -1126,6 +1126,8 @@ DEVICE-LIST-02 只解决了设备页自身的搜索；外壳顶栏仍只读 `GET
 
 边界：搜索只覆盖名称与设备 ID，不搜遥测、备注或消息；不提供“浏览全部设备”的分页下拉（要按条件搜索）；没有设备删除接口，选中设备若从服务端消失，记录会保留到用户重新选择；未在超过 100 台的真实 PostgreSQL 数据上验证排序、索引与响应时间；未做真实部署或实机验收。
 
+推送与 CI（2026-11-18）：功能提交 CORE `b069bce` / 04 `cdf377e`（台账 `98b39eb`）已推送，`git ls-remote` 核对远端 `codex/core-baseline` 与 `main` 分别指向 `b069bcefd00df2b635f4b04b61318f56fb8c2a90` 与 `98b39eb7893facc95eb221ca64bc9ae3f8bf6aca`。CI：CORE `Docker deployment` [#44329094559](https://github.com/liuyiwuqing/nexus-core/actions/runs/44329094559) `success`（docker-compose 2m32s，源码构建、隔离 Compose 与镜像/1Panel 验证全部通过）；04 `Software checks` [#44329102199](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44329102199) 八个 job 全部成功。两个 workflow 不运行本项浏览器专项，概览 101 项、事件 21 项、角色 43 项仍为本地证据；远程 CI 不等于真实部署或生产库验证。
+
 ## MSG-BATCH-02 · 跨消息批量撤销与重试
 
 MSG-BATCH-01 已支持对单条消息批量处理投递，但设备一多、消息一多，逐条进详情仍然重复。本项把批量范围扩到**当前消息页的多条消息**，仍复用同一套判定和审计，不新增后台任务：
