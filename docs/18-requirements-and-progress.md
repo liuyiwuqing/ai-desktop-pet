@@ -788,3 +788,5 @@ CORE 新增 `GET /api/v1/overview/trend?hours=&bucket=`，与快照接口分开�
 - 夹具 `overview_ui_fixture.py` 新增 `trendMode`（normal/empty/error）与固定 `asOf`，使桶数可确定断言；仍只用实际编译的 Vue 与回环 RAM HTTP，没有数据库、Broker 或设备。
 
 边界：未对生产库或大数据量验证分桶耗时；趋势只覆盖保留策略尚未清理的记录，清理后对应桶会变空，不是永久累计；仍没有告警阈值、推送和时区选项。本机 `rg` 缺失的处理与 DEVICE-CRED-01 相同（临时 `grep -qE` shim，未提交）。
+
+推送与 CI（2026-11-18）：CORE `c4598ccc719fe550a52e5377ecfe9050b5b4cd75` 已推送，`git ls-remote` 核对 `origin/codex/core-baseline` 为该提交；04 `773a797`（夹具与页面检查）随文档提交一并推送，`git ls-remote` 核对 `origin/main` 为 `486822c1dfb9e9182aee437bab3a3279518ab906`。远程 [CORE Docker deployment 44216294567](https://github.com/liuyiwuqing/nexus-core/actions/runs/44216294567) 的 docker-compose job 全部步骤 success（2 分 25 秒，与上一次 2 分 19 秒同量级）；[04 Software checks 44216315178](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44216315178) 八个 job 全部 success。两项 CI 只覆盖容器构建与固件预设，不覆盖趋势接口在大数据量下的耗时，也不替代生产库与实机验收。
