@@ -27,6 +27,13 @@ DELIVERY_ROWS = [
 # 今日失败原因的折行；计数字面量与各模式的 today.failedDeliveries 对齐。
 FAILURE_REASONS = {'success': [('ack_timeout', 2), ('broker_unavailable', 1)],
                    'alerts': [('ack_timeout', 6), ('broker_unavailable', 3)]}
+# 钻取用的设备：一台启用但离线、一台已停用；两者都不在线，才能验证「离线」不是「全部非在线」。
+ALERT_DEVICES = [
+    {'deviceId': 'dodo-ui-offline', 'name': '离线样机', 'enabled': True, 'online': False,
+     'lastSeen': '2026-11-13T09:58:00Z', 'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None, 'telemetryAt': None},
+    {'deviceId': 'dodo-ui-disabled', 'name': '停用样机', 'enabled': False, 'online': False,
+     'lastSeen': '2026-11-12T20:00:00Z', 'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None, 'telemetryAt': None},
+]
 
 
 def alerts_for(value, thresholds):
@@ -41,7 +48,7 @@ def alerts_for(value, thresholds):
     if enabled > 0 and online_enabled < thresholds['onlineMin']:
         alerts.append({'code': 'devices_online', 'level': 'warn', 'value': online_enabled,
                        'threshold': thresholds['onlineMin'], 'comparison': 'lt', 'unit': 'count',
-                       'target': {'tab': 'devices', 'status': ''}})
+                       'target': {'tab': 'devices', 'status': 'offline'}})
     if backlog['pending'] >= thresholds['backlogPending']:
         alerts.append({'code': 'delivery_backlog', 'level': 'warn', 'value': backlog['pending'],
                        'threshold': thresholds['backlogPending'], 'comparison': 'gte', 'unit': 'count',
@@ -101,6 +108,15 @@ class OverviewFixture(Fixture):
                 type(self).delivery_requests.append(self.path)
             return self.json_response(200, {'items': rows[(page - 1) * size:page * size],
                                             'total': len(rows), 'page': page, 'size': size})
+        if path == '/api/v1/devices':
+            if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
+                return self.json_response(401, {'error': 'unauthorized'})
+            with self.lock:
+                mode = type(self).overview_mode
+            # 只在告警模式给两台"非在线"设备；其它模式沿用管理台夹具的在线设备。
+            if mode != 'alerts':
+                return super().do_GET()
+            return self.json_response(200, {'items': ALERT_DEVICES})
         if path == '/api/v1/connectors':
             if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
                 return self.json_response(401, {'error': 'unauthorized'})

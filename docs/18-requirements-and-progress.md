@@ -101,8 +101,9 @@
 | MSG-BATCH-01 | 单条消息的投递批量撤销与重试 | 软件本地已验证：`POST /api/v1/messages/{id}/deliveries/{cancel,retry}`（`dryRun` 只读预演、确认令牌写入、单条 `UPDATE … RETURNING`、500 条上限拒绝对截断）、跳过原因按单条判定条件的否定归并、消息详情新增批量折叠区；CORE 145 项 0 失败/5 条件跳过（新增 4 项）、前端 check/build、消息批量 16 项浏览器检查与既有筛选 44/发送 33 项回归通过；见 [契约](../../nexus-core/docs/message-delivery-batch.md) | 仍无跨消息批量操作，也不能撤回设备已保存/展示的内容；真实 Broker、设备回执竞态与生产库未验收；推送与 CI 见文末 |
 | REG-01 | 全量软件回归与文档一致性核对 | 本轮不加功能：CORE `mvn verify` 145 项 0 失败/5 条件跳过、24 个管理台浏览器脚本共 1131 项检查（20 个首跑通过、2 个单跑通过、2 个真缺陷修复后通过）、契约与交付类检查通过；修掉 1 处过期选择器（`.management-record` 被断线与凭据区块抢先匹配）与 1 处 390px 竞态；`docs/18` 补 15 行缺失台账、CORE README 补 3 条接口与 3 段说明；114 条相对链接、149 个提交哈希可解析；见本节 | `test_events_ui.sh`/`test_operations_ui.sh` 连跑不稳定（单跑通过）；`test_server_release.py` 4 项受沙箱 mkdir 代理限制、同提交 CI 通过；未烧录、未连真实设备、无目标服务器与生产库操作；推送与 CI 见文末 |
 | OVERVIEW-ALERT-01 | 概览告警阈值与站内提示 | 软件本地已验证：`GET /api/v1/overview` 新增 `alerts`（`mqtt_connection`/`devices_online`/`delivery_backlog`/`delivery_failure_rate`，各带 `threshold`/`comparison`/`unit`）与 `thresholds`；阈值为代码常量（失败率 ≥10% 且样本 ≥20 条、`pending` 积压 ≥100、启用设备在线 <1），失败率条形改由服务端阈值染色；CORE 153 项 0 失败/5 条件跳过（新增 2 项 HTTP + 6 项纯函数）、前端 check/build、概览页 32 项浏览器检查（新增 8 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警阈值--overview-alert-01) | 告警是读时派生状态：不落库、不写审计、不推送、没有持续时间；阈值不可配置（改阈值需改代码发版）；真实 Broker 断开、生产库与实机未验收；推送与 CI 见文末 |
-| ALERT-DRILL-01 | 概览告警钻取到已筛选列表 | 软件本地已验证：`alerts[].target{tab,status}` 由服务端下发（积压→投递 `status=pending`、失败率→`failed`、无在线设备→设备页、传输不可用为 `null` 且不给按钮）；跳转前清空旧搜索、状态筛选取代叠加，先备条件再切页签只读一次；CORE 154 项 0 失败/5 条件跳过（新增 1 项纯函数）、前端 check/build、概览 40 项浏览器检查（新增 8 项，含夹具核对请求真带 `status`）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警钻取--alert-drill-01) | 只跳到现存筛选：设备页没有离线筛选，故只打开页面而不筛；投递页只能按状态筛；未连真实 CORE/Broker/设备；推送与 CI 见文末 |
+| ALERT-DRILL-01 | 概览告警钻取到已筛选列表 | 软件本地已验证：`alerts[].target{tab,status}` 由服务端下发（积压→投递 `status=pending`、失败率→`failed`、无在线设备→设备页、传输不可用为 `null` 且不给按钮）；跳转前清空旧搜索、状态筛选取代叠加，先备条件再切页签只读一次；CORE 154 项 0 失败/5 条件跳过（新增 1 项纯函数）、前端 check/build、概览 40 项浏览器检查（新增 8 项，含夹具核对请求真带 `status`）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警钻取--alert-drill-01) | 交付时只跳现存筛选：设备页没有离线筛选，故只打开页面而不筛（已由 DEVICE-FILTER-01 补上）；投递页只能按状态筛；未连真实 CORE/Broker/设备；推送与 CI 见文末 |
 | DELIVERY-FAILURE-REASONS-01 | 概览失败原因归并与二级钻取 | 软件本地已验证：`GET /api/v1/overview` 新增 `failureReasons`（按 `last_error` 归并，合计由同一 CTE 求和得出 `today.failedDeliveries`）；`GET /deliveries`、`/deliveries/export` 新增 `lastError` 筛选（`[a-z_]{1,32}`，`unknown` 落回 `IS NULL`）；概览每条原因可「只看这类」跳到 `status=failed` + `lastError`；CORE 156 项 0 失败/5 条件跳过（新增 2 项）、前端 check/build、概览 51 项浏览器检查（新增 11 项）、筛选 44 项与主题 68 项回归通过；源码指纹已核对更新；见 [CORE 契约](../../nexus-core/docs/console-overview.md#失败原因--delivery-failure-reasons-01) | 原因码是代码写死的集合，新增原因要同步前端文案；未连真实 CORE/Broker/设备，未对生产库大数据量验证；推送与 CI 见文末 |
+| DEVICE-FILTER-01 | 设备页状态筛选与离线告警钻取 | 软件本地已验证：`devices_online` 目标改为 `{"tab":"devices","status":"offline"}`；设备页新增「全部/在线/离线/已停用」筛选，离线=`enabled && !online`（与告警同口径），停用单列；筛选在已读取的 `GET /devices` 结果内完成，不新增接口参数；命中 0 台给空态与「查看全部设备」；钻取前清掉壳层单设备选择，壳层另选设备时回到「全部」；CORE `OverviewAlertsTest` 7 项、`ConsoleOverviewFlowTest` 7 项（含 `devices:offline` 断言）、前端 check/build、概览 55 项浏览器检查（新增 4 项）、设备 73 项与主题 68 项回归通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警钻取--alert-drill-01) | 筛选只作用于 `GET /devices` 已返回的前 100 台，超量库需先分页；未连真实 CORE/PostgreSQL/Broker/设备；阈值仍不可配置；推送与 CI 见文末 |
 | DOC-01 | 栖团 Qitomo 命名、Logo 与项目介绍 | 本地文档与资产验证通过；README、[项目介绍](24-project-introduction.md)、[品牌说明](25-brand-identity.md)、[本地上手](26-getting-started.md)，8 份 SVG / 4 份 PNG；成长/语音演练、LVGL 10 项、契约/依赖/板型检查通过 | 本项只含 README 与 docs；固件、协议与其他仓库未更名，不触发当前 push 路径的固件 CI；提交/推送以本项 Git 历史和远端核对为准 |
 
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
@@ -910,10 +911,10 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 | --- | --- | --- |
 | `delivery_backlog` | 投递页 `status=pending` | 积压就是"等待投递"这一状态，投递页本来就能筛 |
 | `delivery_failure_rate` | 投递页 `status=failed` | 同上，失败率的分母是今日投递，分子是当前失败 |
-| `devices_online` | 设备页（不带筛选） | 设备页没有离线筛选，因此只承诺"打开设备页"，不假装能筛出离线那几台 |
+| `devices_online` | 设备页（本项不带筛选） | 当时设备页没有离线筛选，因此只承诺"打开设备页"，不假装能筛出离线那几台；DEVICE-FILTER-01 已补上 `status=offline` |
 | `mqtt_connection` | `null` | 传输不可用在管理台没有对应列表筛选，给个跳转等于假装能查 |
 
-这是 DEVICE-CRED-01 之后同一条原则的延续：**能做的做干净，做不到的不装**。设备页没有离线筛选就没给按钮的筛选承诺，也没有为此临时加一个筛选控件。
+这是 DEVICE-CRED-01 之后同一条原则的延续：**能做的做干净，做不到的不装**。设备页当时没有离线筛选，就没给按钮的筛选承诺，也没有为此临时加一个筛选控件（该控件与钻取口径由 DEVICE-FILTER-01 一并补齐）。
 
 前端只有一行接线：`OverviewPanel` 抛 `drill` 事件，外壳收到后先备好筛选（清空上一次的搜索条件、设状态筛选、页签置 1）、再切页签，页签侦听器带着新条件读一次。顺序是有意的——先切页签会先按旧条件读一遍全量再读一遍筛选，白打一次请求。**上一次的搜索条件必须清掉**：如果用户之前在投递页按某台设备筛过，不清就会让"查看等待投递"被旧筛选悄悄收窄成另一批结果，看起来像是告警算错了。
 
@@ -959,3 +960,25 @@ CORE 新增 `POST /api/v1/messages/{id}/deliveries/cancel` 与 `/retry`，带 `d
 边界：原因码是代码写死的集合，新增原因需要同步前端文案与下拉；未连接真实 CORE/Broker/设备，「筛选真的生效」由夹具的状态/原因双过滤加请求参数证明；未对生产库或大数据量验证；概览的原因折行只覆盖今日，跨天分布要看趋势（趋势目前不按原因分桶）。
 
 推送与 CI（2026-11-18）：CORE `bfb56a6`（13 个文件）与 04 `58903f1`（5 个文件）分别提交并推送，两仓改动按契约配对记录在案。CI 结果：CORE `Docker deployment` [#44231867458](https://github.com/liuyiwuqing/nexus-core/actions/runs/44231867458) `success`（含真实隔离 Compose 部署与仅镜像初始化复验）；04 `Software checks` [#44231878359](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44231878359) `success`（host/protocol/DSP/LVGL 检查）。这两条是远程 CI 的结果，仍不等于 ACC-01 的真实部署与 ACC-02 的真机验收——本项没有上过真机，也没有连过生产库。
+
+### DEVICE-FILTER-01 · 设备页状态筛选与离线告警钻取（2026-11-18）
+
+`devices_online` 此前只把用户送到设备页，页面没有状态筛选，用户还得自己从整张列表里找。本项把目标改成 `{"tab":"devices","status":"offline"}`，并给设备页加上「全部/在线/离线/已停用」。
+
+口径跟告警保持一致：离线 = `enabled && !online`。停用设备虽然同样不在线，但告警本来就把它们排除在"启用设备在线数"之外，因此单独一类，不混进离线。设备列表仍由外壳在登录后一次读取（`GET /devices`，最多 100 条），筛选在页面内完成——这个接口返回的是全局共享状态，为三类状态再加参数只会多一次读，不会多出任何信息。
+
+钻取交互有两个容易踩的点：
+- 外壳顶部有单设备选择。若钻取时不清空它，设备页只会拿到那一台，状态筛选再叠上去通常就是空列表。`drillAlert` 因此在切页签前清空 `selectedDevice`，再用 `deviceState` 取代（不是叠加）上一次的状态筛选。
+- 用户从外壳重新选具体设备时，`pickDevice` 把状态筛选复位到「全部」，避免"某一台 + 某一类"继续叠加。
+
+筛出 0 台时页面给出「没有在线/离线/已停用设备」的空态和「查看全部设备」，而不是只剩一张空网格；页头副标题在有筛选时显示「显示 X / 共 Y 台」，让用户知道筛掉了多少。
+
+验证（2026-11-18，本机 macOS/Docker 29.8.2）：
+- CORE `OverviewAlertsTest` 7 项、`ConsoleOverviewFlowTest` 7 项通过；后者新增 `devices_online.target.status=offline` 的 HTTP 断言，纯函数测试也从 `devices:` 改为 `devices:offline`。
+- 前端 `npm run check` 与 `npm run build` 通过。
+- 概览浏览器检查 51 → 55 项；新增：钻取后只剩启用离线样机、页头显示「显示 1 / 共 2 台」与「离线」、状态下拉提供「全部」、切回「全部」恢复两台。夹具在告警模式新增一台启用离线 + 一台停用设备，并让 `/api/v1/devices` 走同一份数据，其它模式仍沿用管理台夹具的在线设备。
+- 回归：`test_management_ui.sh` 73 项（设备页新增下拉后登记/更名/启停流程不变）、`test_console_theme_ui.sh` 68 项（新增控件纳入按钮高度/CSP 检查）通过。
+
+边界：筛选只发生在 `GET /devices` 已返回的前 100 台内，库中设备超过 100 台时需要先做服务端分页/搜索，否则按状态找设备仍可能漏；这是本项刻意不扩接口的代价，已记在台账。未连接真实 CORE/PostgreSQL/Broker/设备；未在超量设备库验证。
+
+推送与 CI：提交推送后补记。

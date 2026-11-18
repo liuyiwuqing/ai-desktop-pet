@@ -62,6 +62,12 @@ await expect("document.querySelector('h1')?.innerText==='投递' && document.que
 await navigate('概览');
 await clickWhenReady('[data-alert-action=devices_online]','the device alert is clickable');
 await expect("document.querySelector('h1')?.innerText==='设备'",'the device alert opens the device page');
+// 设备页按「启用且离线」过滤：停用样机虽同样不在线，但不属于这次告警。
+await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-card')?.innerText.includes('离线样机') && !document.querySelector('.device-card')?.innerText.includes('停用样机')",'the device drill shows only enabled offline devices');
+await expect("document.querySelector('.device-state-filter')?.innerText.includes('离线') && document.querySelector('.content .section-heading p')?.innerText.includes('显示 1 / 共 2 台')",'the device page states the state it filtered to and how many it hid');
+async function pickState(label){await js("document.querySelector('.device-state-filter .n-base-selection').click()");await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)})`,'state option '+label+' is offered');await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].find(o=>o.innerText.trim()===${JSON.stringify(label)});o.click();})()`);}
+await pickState('全部');
+await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.device-state-filter')?.innerText.includes('全部')",'switching the state back to all restores every device');
 await navigate('概览');
 await expect("document.querySelectorAll('.overview-alerts [data-alert-action]').length===3",'drilling leaves the overview intact on return');
 // 二级钻取：从失败原因再收敛到"只有这类失败"。
