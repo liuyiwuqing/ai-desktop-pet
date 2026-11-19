@@ -1241,4 +1241,4 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 
 边界：`waiting` 是读时聚合，不是独立状态；卡片计数与钻取列表分两次读取，并发接收/失败后可能不同。`waiting=true` 与 `status` 互斥是接口约束，页面因此用单独选项而不是叠加两个条件。未新增索引或迁移；未在真实生产库压测 `IN ('pending','sent')` 的执行计划，未做真实部署或实机验收。
 
-推送与 CI（2026-11-19）：待填。
+推送与 CI（2026-11-19）：CORE `118e9e1` / 04 `370079f` 已推送，`git ls-remote` 核对远端分支分别指向 `118e9e186cc9fcdc4778d57da1abef33620a8a0e` 与 `370079f5ea87cc72a2fc6dea2c869c58088ac6ea`。CI：CORE `Docker deployment` [#44449302279](https://github.com/liuyiwuqing/nexus-core/actions/runs/44449302279) `success`；04 `Software checks` [#44449315413](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44449315413) `success`。两项 workflow 不运行完整 Maven 套件与 132/44 项浏览器专项，这些仍为本地证据；远程 CI 不等于真实部署或实机验证。
