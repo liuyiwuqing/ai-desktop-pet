@@ -22,6 +22,13 @@ DELIVERY_ROWS = [
     {'eventId': 'drill-broker', 'messageId': 'drill-message-broker', 'deviceId': 'dodo-ui-fixture',
      'title': 'Broker 失败样本', 'status': 'failed', 'attempts': 2, 'canCancel': False,
      'lastError': 'broker_unavailable', 'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
+    # 设备卡片「待接收 2 条」的样本：一台离线设备的两条 pending/sent，正好与卡片计数对齐。
+    {'eventId': 'drill-waiting-pending', 'messageId': 'drill-message-waiting-pending', 'deviceId': 'dodo-ui-offline',
+     'title': '离线样机待发送', 'status': 'pending', 'attempts': 0, 'canCancel': True, 'lastError': None,
+     'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
+    {'eventId': 'drill-waiting-sent', 'messageId': 'drill-message-waiting-sent', 'deviceId': 'dodo-ui-offline',
+     'title': '离线样机已发送', 'status': 'sent', 'attempts': 1, 'canCancel': False, 'lastError': None,
+     'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
 ]
 # 今日失败原因的折行；计数字面量与各模式的 today.failedDeliveries 对齐。
 FAILURE_REASONS = {'success': [('ack_timeout', 2), ('broker_unavailable', 1)],
@@ -177,10 +184,18 @@ class OverviewFixture(Fixture):
             query = parse_qs(urlparse(self.path).query)
             status = query.get('status', [''])[0]
             reason = query.get('lastError', [''])[0]
+            waiting = query.get('waiting', [None])[0]
+            device = query.get('deviceId', [''])[0]
             page = int(query.get('page', ['1'])[0])
             size = int(query.get('size', ['30'])[0])
+            # 与 CORE 契约一致：waiting 只接受 true/false，true 等价 pending+sent 且不能与 status 同时出现。
+            if waiting is not None and (waiting not in ('true', 'false') or (waiting == 'true' and status)):
+                return self.json_response(400, {'error': 'invalid_list_filter'})
             rows = [row for row in DELIVERY_ROWS
-                    if (not status or row['status'] == status) and (not reason or row['lastError'] == reason)]
+                    if (not status or row['status'] == status)
+                    and (waiting != 'true' or row['status'] in ('pending', 'sent'))
+                    and (not device or row['deviceId'] == device)
+                    and (not reason or row['lastError'] == reason)]
             with self.lock:
                 type(self).delivery_requests.append(self.path)
             return self.json_response(200, {'items': rows[(page - 1) * size:page * size],

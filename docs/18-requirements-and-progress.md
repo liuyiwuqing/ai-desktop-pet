@@ -1222,3 +1222,23 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：固件版本是读时快照，OTA 安装后要等设备下一次遥测才更新；从未上报遥测的设备不显示该行；未在真实设备、真实部署或生产库验证。
 
 推送与 CI（2026-11-19）：CORE `cfc03d2` / 04 `7f1189e` 已推送，`git ls-remote` 核对远端分支分别指向 `cfc03d2060fefbc6748c7133227a9746dc4dc96d` 与 `7f1189ec5845abce326b3cc2461acb65ffec4cf2`。CI：CORE `Docker deployment` [#44441686006](https://github.com/liuyiwuqing/nexus-core/actions/runs/44441686006) `success`；04 `Software checks` [#44441693524](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44441693524) `success`。两项 workflow 不运行 `DeviceListFlowTest`、完整 Maven 套件与 126 项浏览器专项，这些仍为本地证据；远程 CI 不等于真实部署或实机验证。
+
+## DEVICE-QUEUE-DRILL-01 · 设备卡片待接收钻取
+
+设备卡片的「待接收 N 条」此前只是文本，看到积压后还要手动切到投递页、选设备、猜状态。本项把它变成可钻取入口，并让投递页的「待接收」与卡片计数同口径：
+
+- `GET /api/v1/deliveries` 与 `/deliveries/export` 新增可选 `waiting`：只接受 `true`/`false`；`true` 追加 `status IN ('pending','sent')`，`false` 等同于省略。`waiting=true` 与单值 `status` 同时出现、空值或其他拼写均返回 400（`invalid_list_filter`）；设备、失败原因、收件窗口仍可叠加，列表与导出共用同一条谓词。
+- 投递状态下拉在「全部」后新增「待接收」（内部哨兵值 `waiting`，请求时翻译为 `waiting=true`）。设备卡片的「待接收 N 条」改为按钮：清空旧搜索、写入该设备身份与「待接收」、清空旧行并回第 1 页，再切到投递页；返回设备页保留原状态筛选与页码。
+- 夹具补离线样机的 pending/sent 两行；浏览器断言请求带 `waiting=true&deviceId=dodo-ui-offline` 且不含 `status=`，结果正好两行、不含失败或其它设备行，页头显示「2 条投递」，状态下拉显示「待接收」。
+
+验证（2026-11-19，本机 macOS/Docker）：
+
+- `ConsoleListFilterFlowTest` 新增 `deliveryWaitingFilterMatchesPendingAndSentForOneDevice`：两台设备 × 四类消息（pending/sent/failed/displayed）；`waiting=true` 全表 4 行，按设备各 2 行且不混入另一台；`waiting=false` 是不限制（8 行）；`waiting=true&status=failed`、`waiting=maybe`、`waiting=` 均 400；`deliveries/export?deviceId=filter-device&waiting=true` 只含该设备的 pending/sent。该类 5 项通过。
+- `npm --prefix frontend run check` 与 `npm --prefix frontend run build` 通过。
+- 04 概览浏览器 132 项、列表筛选 44 项通过；覆盖上述钻取请求、两行结果、页头计数、状态下拉与返回设备页保留筛选。均为实际编译 Vue + 回环 RAM 夹具，不连接真实 CORE、数据库、Broker 或设备。
+- 完整 `JAVA_HOME=$(/usr/libexec/java_home -v 21) python3 tools/run_local.py build` 退出 0：177 项中 172 通过、5 项条件跳过、0 失败/错误。
+- 首轮全量暴露 `MessageDeliveryBatchFlowTest` 的既有启动竞态：投递 worker 在启动 500ms 后先跑一拍，会把用例刚建的行发布成 sent/attempted。本项在该类用 `@MockitoBean` 关掉外发，批次规则仍走真实服务与数据库；随后 177/172/5 通过。
+
+边界：`waiting` 是读时聚合，不是独立状态；卡片计数与钻取列表分两次读取，并发接收/失败后可能不同。`waiting=true` 与 `status` 互斥是接口约束，页面因此用单独选项而不是叠加两个条件。未新增索引或迁移；未在真实生产库压测 `IN ('pending','sent')` 的执行计划，未做真实部署或实机验收。
+
+推送与 CI（2026-11-19）：待填。
