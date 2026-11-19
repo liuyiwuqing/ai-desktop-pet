@@ -1306,4 +1306,4 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 
 边界：服务端不探测设备固件版本，已部署的旧固件会拒收带 `display` 的新投递；使用非缺省声音/时长前必须升级设备。声音在真实喇叭上的音量、音色与时长表现未验收；DND/优先级行为只由主机逻辑与既有测试覆盖，未在实机验证。display 只影响新投递，不重渲染旧投递。
 
-推送与 CI：待填。
+推送与 CI（2026-11-19）：CORE `002e926` / 04 `91f43a5` 已推送，`git ls-remote` 核对远端分支分别指向 `002e926aeb3f4a0c1461dd26467a5e3bb3492486` 与 `91f43a51ea573b19ba6659316f205f70f3224caa`。CORE `Docker deployment` [#44479893907](https://github.com/liuyiwuqing/nexus-core/actions/runs/44479893907) 重跑后 `success`；首次在 Docker 构建拉取 `spring-boot-starter-parent:4.1.2` 时瞬时失败，该构件当前可正常访问且 `pom.xml` 未变，与本次改动无关。04 `Software checks` [#44479911971](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44479911971) 八个 job 全部 `success`，含六个固件预设、交付工具与语音桥接准备。两项 workflow 均不运行完整 Maven 套件、36 项浏览器专项与本地固件构建，这些仍为本地证据；远程 CI 不等于真实部署或实机验证。
