@@ -8,7 +8,7 @@
 
 投递空列表增加「查看消息」动作，直接回到消息页。接口参数、数据库结构、导出规则和设备行为未改，也没有新增设备动作。
 
-CORE `test_list_filters_ui.sh` 50 项通过，新增覆盖原因在「全部」下只发送 `lastError`、31 条失败结果、`unknown` 的可见范围和清空恢复；概览 132、状态页 128、时间线 66、元数据导出 51、消息批量 30、界面主题 68 项再次通过，共 525 项浏览器检查，任务空间均关闭。浏览器夹具不连接真实 CORE、数据库、Broker 或设备。完整 CORE 构建 183 条中 178 通过、5 条条件跳过、0 失败/错误，JAR 静态资源与本轮产物哈希一致。实际契约见 [CORE 筛选文档](../../nexus-core/docs/console-list-filters.md#console-28--最近错误筛选独立可用)；提交、推送和远程 CI 记录在 [18 台账](18-requirements-and-progress.md)。
+CORE `test_list_filters_ui.sh` 50 项通过，新增覆盖原因在「全部」下只发送 `lastError`、31 条失败结果、`unknown` 的可见范围和清空恢复；概览 132、状态页 128、时间线 66、元数据导出 51、消息批量 30、界面主题 68 项再次通过，共 525 项浏览器检查，任务空间均关闭。浏览器夹具不连接真实 CORE、数据库、Broker 或设备。完整 CORE 构建 183 条中 178 通过、5 条条件跳过、0 失败/错误，JAR 静态资源与本轮产物哈希一致。实际契约见 [CORE 筛选文档](../../nexus-core/docs/console-list-filters.md#console-28--最近错误筛选独立可用)。CORE `4c13ed4` / 04 `cc42d2b` 已推送并核对远端；[Docker CI 44505125474](https://github.com/liuyiwuqing/nexus-core/actions/runs/44505125474) 全步骤 success，[04 CI 44505145934](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44505145934) 八个 job success；两项 workflow 不运行浏览器专项。提交、推送和远程 CI 记录在 [18 台账](18-requirements-and-progress.md)。
 
 ## CONSOLE-14 · Naive UI 与界面统一
 
