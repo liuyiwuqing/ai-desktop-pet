@@ -44,7 +44,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
         'telemetryRequests':[],'disconnectRequests':[],'listMode':False,'listMessages':[],'listDeliveries':[],'listRequests':[],'listError':'','listDelay':0,
         'credentialMode':'active','credentialRevision':1,'credentialSecret':'','credentialSubmissions':[],
         'batchMode':'normal','batchRequests':[],'batchCancelled':False,'batchRetried':False,
-        'multiBatchMode':'normal','multiBatchRequests':[],'multiBatchCancelled':False,'multiBatchRetried':False}
+        'multiBatchMode':'normal','multiBatchRequests':[],'multiBatchCancelled':False,'multiBatchRetried':False,
+        'queueMode':'normal','queueRequests':[],'queueWaiting':3,'queueCancelled':False}
     def log_message(self,*args):pass
     def json_response(self,status,value):
         payload=json.dumps(value,ensure_ascii=False).encode()
@@ -81,7 +82,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if delay:time.sleep(delay)
                 query=parse_qs(urlparse(self.path).query);stateKey=query.get('state',['all'])[0] or 'all'
                 page=int(query.get('page',['1'])[0]);size=int(query.get('size',['100'])[0])
-                rows=[{'deviceId':'dodo-ui-fixture','name':state['deviceName'],'enabled':True,'online':True,'lastSeen':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'wifiIp':'192.168.1.20','wifiRssi':-52,'wifiSsid':'HomeLab-2.4G','telemetryAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]
+                rows=[{'deviceId':'dodo-ui-fixture','name':state['deviceName'],'enabled':True,'online':True,'lastSeen':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'wifiIp':'192.168.1.20','wifiRssi':-52,'wifiSsid':'HomeLab-2.4G','telemetryAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),
+                    'waitingDeliveries':1 if state['queueCancelled'] else state['queueWaiting']}]
                 if stateKey=='offline':rows=[]  # 唯一设备在线，离线筛选没有命中
                 if stateKey=='disabled':rows=[]
                 value={'items':rows[(page-1)*size:page*size],'total':1,'matched':len(rows),'page':page,'size':size,'state':stateKey,'counts':{'online':1,'offline':0,'disabled':0}}
@@ -250,6 +252,32 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 'skipped':skipped,'remaining':0 if not dry else candidates},
             'messages':messages,'asOf':stamp})
 
+    def device_queue_response(self,device_id,query,state):
+        """One device's pending+sent queue: dry run explains it, cancel needs the confirm token."""
+        dry=query.get('dryRun',['false'])[0]=='true'
+        confirm=query.get('confirm',[''])[0]
+        state['queueRequests'].append({'deviceId':device_id,'dryRun':dry,'confirm':confirm})
+        mode=state['queueMode']
+        if mode=='error':return self.json_response(503,{'error':'service_unavailable'})
+        if mode=='large':return self.json_response(409,{'error':'batch_too_large'})
+        if not dry and confirm!='CANCEL_DEVICE_DELIVERIES':
+            return self.json_response(400,{'error':'delivery_batch_confirmation_required'})
+        empty=mode=='empty'
+        cancelled=state['queueCancelled']
+        before=0 if empty else 1 if cancelled else state['queueWaiting']
+        skipped=[] if empty else [{'eventId':'queue-sent','deviceId':device_id,'status':'sent','attempts':1,'reason':'not_pending'}]
+        candidates=[] if empty or cancelled else [
+            {'eventId':'queue-ok-1','deviceId':device_id,'status':'pending','attempts':0},
+            {'eventId':'queue-ok-2','deviceId':device_id,'status':'pending','attempts':0}]
+        planned=len(candidates);applied=0
+        if not dry:
+            applied=planned;state['queueCancelled']=True
+            candidates=[];state['queueWaiting']=1
+        stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+        return self.json_response(200,{'deviceId':device_id,'action':'cancel','dryRun':dry,'applied':applied,
+            'counts':{'waiting':before,'candidates':planned,'skipped':len(skipped),'remaining':len(candidates)},
+            'candidates':candidates,'skipped':skipped,'asOf':stamp})
+
     def do_POST(self):
         if urlparse(self.path).path == "/api/v1/session":
             if self.headers.get("Authorization") != "Bearer " + TOKEN:
@@ -270,7 +298,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                         listMode=False,listMessages=[],listDeliveries=[],listRequests=[],listError='',listDelay=0,
                         credentialMode='active',credentialRevision=1,credentialSecret='',credentialSubmissions=[],
                         batchMode='normal',batchRequests=[],batchCancelled=False,batchRetried=False,
-                        multiBatchMode='normal',multiBatchRequests=[],multiBatchCancelled=False,multiBatchRetried=False)
+                        multiBatchMode='normal',multiBatchRequests=[],multiBatchCancelled=False,multiBatchRetried=False,
+                        queueMode='normal',queueRequests=[],queueWaiting=3,queueCancelled=False)
                 if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success')
                 if value.get('listReset'):
                     stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
@@ -304,6 +333,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if 'multiBatchMode' in value:
                     state['multiBatchMode']=value['multiBatchMode']
                     if value['multiBatchMode']!='normal':state.update(multiBatchCancelled=False,multiBatchRetried=False)
+                if 'queueMode' in value:state['queueMode']=value['queueMode']
+                if 'queueWaiting' in value:state['queueWaiting']=int(value['queueWaiting'])
                 if 'deviceName' in value:state['deviceName']=value['deviceName']
                 if value.get('dropRenameNext'):state['dropRenameNext']=True
                 if 'renameReadDelay' in value:state['renameReadDelay']=min(max(float(value['renameReadDelay']),0),2)
@@ -369,6 +400,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 return self.json_response(200,{'items':[] if mode=='empty' else [{'messageId':'fixture-comment','content':'希望桌面伙伴能在专注结束后提醒我休息，也能记住常用的工作安排。' if mode=='visual' else '公开评论 <img src=x onerror=alert(1)>','summary':'读者希望增加专注结束提醒，并保存常用工作安排。' if mode=='visual' else 'AI 推断摘要',
                     'originalUrl':'https://example.invalid/post#comment' if mode=='visual' else 'javascript:alert(1)','verifiedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}],
                     'partial':mode=='partial','dataPolicy':'verified_public_comments_only'})
+            if path.startswith('/api/v1/devices/') and path.endswith('/deliveries/cancel'):
+                return self.device_queue_response(path.split('/')[4],parse_qs(urlparse(self.path).query),state)
             if path.endswith('/credentials/rotate'):
                 state['credentialSubmissions'].append(value)
                 if state['credentialMode']=='revoked':return self.json_response(409,{'error':'device_credential_revoked'})

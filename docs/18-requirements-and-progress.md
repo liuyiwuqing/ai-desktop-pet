@@ -1261,3 +1261,18 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：健康回读只证明设备曾在新镜像上通过自检；若之后手动降级或静默回滚且没有新的 OTA 回读/遥测，页面仍显示旧证据。版本比较依赖遥测 `received_at` 与部署 `updated_at` 均为服务端时间。未在真实 OTA 安装或实机上验证，未做真实部署。
 
 推送与 CI（2026-11-19）：CORE `71470ee` / 04 `764bdd0` 已推送，`git ls-remote` 核对远端分支分别指向 `71470eeb1c49a148b65dab8adb86c5cfcf48b4b9` 与 `764bdd0a2aa64d2248626494da81369e1d6d569c`。CI：CORE `Docker deployment` [#44453541373](https://github.com/liuyiwuqing/nexus-core/actions/runs/44453541373) `success`；04 `Software checks` 未对纯文档提交触发，功能提交 `370079f` 的 [#44449315413](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44449315413) 仍为 `success`。CORE workflow 不运行完整 Maven 套件，178 项与浏览器 132/44 项仍为本地证据；远程 CI 不等于真实部署或实机验证。
+
+## DEVICE-QUEUE-CLEAR-01 · 单设备待发队列撤销
+
+[02 §5.2](02-message-hub.md#5-在线配置管理面板) 把「清空队列」列为设备危险操作。本项把可验证范围落到设备卡片：在「待接收 N 条」旁新增管理员「撤销待发…」，只取消该设备 pending+sent 队列中尚未开始发送的投递。
+
+- 新增管理员 `POST /api/v1/devices/{id}/deliveries/cancel`：`dryRun=true` 只读预演整条队列；写入需 `confirm=CANCEL_DEVICE_DELIVERIES`。等待行超过 500 条返回 409，未知设备 404，viewer/operator 403。
+- 范围与卡片「待接收」同口径（pending+sent），但只撤销通过 `CAN_CANCEL` 的 pending 行；sent 等待回执行保留并在响应 `skipped` 中列为 `not_pending`，不会被假装撤回。failed 等终态不在本入口范围。
+- 写入复用 `DeliveryBatchService` 的同一谓词和 `UPDATE … RETURNING`，每行照常由 `delivery_history` 记录 `state_changed`，`last_error='cancelled_by_admin'`；不新增迁移、不发送撤回包、不改设备启停。
+- 页面撤销面板与设置/升级/改名/删除互斥，展开即预演并显示「待接收 / 可撤销 / 保留」与保留原因；必须输入设备名，成功后显示实际条数、重新预演并刷新卡片计数；读取失败清空旧计划，未知结果先重读队列，收起/Esc 后焦点回入口。
+
+验证（2026-11-19，本机 macOS/Docker）：`DeviceDeliveryQueueFlowTest` 3 项通过（预演只读与 sent/attempted 保留原因、单设备撤销且其他设备/已发送行不变并写历史、确认令牌/viewer/operator/404/501 条 409）；04 `test_management_ui.sh` 新增 7 项、共 81 项通过，覆盖预演计数、保留原因、设备名确认、写入后计数与读取失败。完整 CORE `JAVA_HOME=$(/usr/libexec/java_home -v 21) python3 tools/run_local.py build` 退出 0：181 项中 176 通过、5 项条件跳过、0 失败/错误，打包 27 份前端静态资源。源码契约 `test_nexus_contract.py` 通过；按已审阅差异同步 `DeliveryService`（仅注释）与 `ConsoleListQuery`（昨日 waiting 谓词）两项指纹，协议、消息 Schema 与迁移未变。前端未触及概览/筛选页面，沿用当日概览 132 项与列表筛选 44 项通过。
+
+边界：撤销只处理服务端尚未开始发送的 pending 行；已交给 Broker 或已展示的内容无法撤回，设备侧仍可能显示旧提醒。`waiting` 与结果都是读时快照，并发接收/失败可能不同。未在真实 Broker/设备上验证，未做真实部署或实机验收。
+
+推送与 CI：待填。

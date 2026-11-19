@@ -91,6 +91,25 @@ renameState=await state();if(renameState.renameSubmissions.length!==2)throw new 
 results.push('unknown rename never resends automatically');
 await tap('加载当前名称');await tap('取消');
 await expect("document.querySelector('.device-card')?.innerText.includes('HomeLab-2.4G') && document.querySelector('.device-card')?.innerText.includes('192.168.1.20') && document.querySelector('.device-card')?.innerText.includes('-52 dBm')",'device card shows the latest Wi-Fi network, address and signal');
+// 设备待发队列：先用计划解释 pending+sent，再用设备名确认撤销尚未开始的行。
+await tap('撤销待发…');
+await expect("document.querySelector('#device-queue-panel')?.innerText.includes('只撤销尚未开始发送的投递') && document.querySelector('#device-queue-panel').innerText.includes('待接收 3 条') && document.querySelector('#device-queue-panel').innerText.includes('可撤销 2 条') && document.querySelector('#device-queue-panel').innerText.includes('保留 1 条')",'queue plan explains waiting, cancellable and retained rows');
+await expectState(snapshot=>snapshot.queueRequests.length===1 && snapshot.queueRequests[0].dryRun===true && snapshot.queueRequests[0].deviceId==='dodo-ui-fixture','queue opens with one device dry run');
+await expect("document.querySelector('#device-queue-panel').innerText.includes('已发送，等待回执 1') && document.querySelector('#device-queue-panel button.primary')?.disabled",'sent retention is named and confirmation starts disabled');
+const queueName=await js("document.querySelector('.device-card .device-name-heading h2').innerText");
+await fillInput('#devicequeuepanel-field-1',queueName);
+await expect("!document.querySelector('#device-queue-panel button.primary')?.disabled",'typed device name enables cancel');
+await tap('撤销 2 条投递');
+await expect("document.querySelector('#device-queue-panel').innerText.includes('已撤销 2 条尚未开始发送的投递') && document.querySelector('#device-queue-panel').innerText.includes('待接收 1 条') && document.querySelector('#device-queue-panel').innerText.includes('当前没有可撤销的投递')",'cancel reports applied rows and reloads the plan');
+await expect("document.querySelector('.device-waiting')?.innerText==='1 条'",'device card waiting count follows the cancel');
+const queueState=await state();
+const queueWrites=queueState.queueRequests.filter(row=>!row.dryRun);
+if(queueWrites.length!==1 || queueWrites[0].confirm!=='CANCEL_DEVICE_DELIVERIES')throw new Error('Queue cancel did not use the confirm token exactly once');
+results.push('queue cancel sends the confirmation token once');
+await tap('收起');
+await fixture({queueMode:'error'});await tap('撤销待发…');
+await expect("document.querySelector('#device-queue-panel .console-state--error')?.innerText.includes('HTTP 503') && !document.querySelector('#device-queue-panel').innerText.includes('待接收 3 条')",'queue read failure is explicit');
+await tap('收起');await fixture({queueMode:'normal'});
 await tap('设置与状态');
 await expect("document.querySelector('#device-management-panel')?.innerText.includes('尚未收到设备状态')",'empty device state');
 await tap('状态历史');
