@@ -44,6 +44,9 @@ async function tap(text) {
 async function draft(title,content) {
   await tap('发送测试消息');await fillInput('.inline-form input',title);await fillInput('.inline-form textarea',content);
 }
+async function openSelect(selector){await expect(`(()=>{const s=document.querySelector('${selector} .n-base-selection');return !!s&&!s.classList.contains('n-base-selection--disabled')})()`,'select '+selector+' is enabled');if(!(await js(`document.querySelector('${selector} .n-base-selection')?.classList.contains('n-base-selection--active')`)))await js(`document.querySelector('${selector} .n-base-selection').click()`);await expect(`document.querySelector('${selector} .n-base-selection')?.classList.contains('n-base-selection--active')`,'select '+selector+' is open');}
+async function chooseVisibleOption(label){const found=await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].filter(o=>o.offsetParent!==null).filter(o=>o.innerText.trim()===${JSON.stringify(label)}).pop();if(!o)return false;o.click();return true;})()`);if(!found)throw new Error('option '+label+' is not visible');}
+async function pickPriority(label){await openSelect('.inline-form .priority-select');await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)}&&o.offsetParent!==null)`,'priority option '+label+' is offered');await chooseVisibleOption(label);await expect(`document.querySelector('.inline-form .priority-select')?.innerText.includes(${JSON.stringify(label)})`,'priority shows '+label);}
 async function send() {
   if(!await js("(()=>{const b=document.querySelector('.inline-form button.primary');if(!b||b.disabled)return false;b.click();return true;})()"))throw new Error('Send button unavailable');
 }
@@ -58,13 +61,13 @@ await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDis
 const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
 if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
 await login();
-await draft('丢失响应后的同一消息','只应保存一次');await fixture({messageNext:'save_then_drop'});await send();
+await draft('丢失响应后的同一消息','只应保存一次');await pickPriority('紧急');await fixture({messageNext:'save_then_drop'});await send();
 await expect("document.body.innerText.includes('结果尚未确认') && !!document.querySelector('.inline-form')",'response loss preserves the form');
 await send();await acknowledged('explicit retry is acknowledged');
 let observed=await state();
-if(observed.messageSubmissions.length!==2 || observed.manualMessages.length!==1 || observed.messageSubmissions[0].eventId!==observed.messageSubmissions[1].eventId)
-  throw new Error('One logical submission must retain its event ID and produce one saved message; observed '+JSON.stringify({requests:observed.messageSubmissions.length,saved:observed.manualMessages.length,sameId:observed.messageSubmissions[0]?.eventId===observed.messageSubmissions[1]?.eventId}));
-results.push('saved response loss retries the same event ID and saves one message');
+if(observed.messageSubmissions.length!==2 || observed.manualMessages.length!==1 || observed.messageSubmissions[0].eventId!==observed.messageSubmissions[1].eventId || observed.messageSubmissions[0].priority!=='critical')
+  throw new Error('One logical submission must retain its event ID, priority and produce one saved message; observed '+JSON.stringify({requests:observed.messageSubmissions.length,saved:observed.manualMessages.length,sameId:observed.messageSubmissions[0]?.eventId===observed.messageSubmissions[1]?.eventId,priority:observed.messageSubmissions[0]?.priority}));
+results.push('saved response loss retries the same event ID and priority and saves one message');
 await expect("document.querySelector('#last-send-receipt')?.innerText.includes('刚发送消息的投递状态') && document.querySelector('#last-send-receipt').innerText.includes('共 2 条投递') && document.querySelector('#last-send-receipt').innerText.includes('用户已读 1') && document.querySelector('#last-send-receipt').innerText.includes('dodo-ui-fixture')",'acknowledged send shows per-device delivery status');
 observed=await state();
 if(!observed.receiptRequests.at(-1)?.includes('/messages/manual-1/deliveries'))throw new Error('Acknowledged send did not read the new message receipts: '+JSON.stringify(observed.receiptRequests));
@@ -77,11 +80,12 @@ results.push('receipt refresh re-reads the same message');
 await draft('下一条有意发送的消息','新的逻辑提交');await send();await acknowledged('next intentional submission succeeds');
 observed=await state();
 if(observed.manualMessages.length!==2 || observed.messageSubmissions[2].eventId===observed.messageSubmissions[1].eventId)throw new Error('New logical submission reused an acknowledged ID');
-results.push('acknowledged submission releases its ID for the next message');
-await draft('未保存就断线','导航后仍保留请求');await fixture({messageNext:'drop_before_save'});await send();
-await expect("document.querySelector('.inline-form input')?.readOnly && document.querySelector('.inline-form textarea')?.readOnly && document.querySelector('.inline-form button.primary')?.innerText==='重试同一消息'",'unknown submission freezes its payload and offers explicit retry');
+if(observed.messageSubmissions[2].priority!=='normal')throw new Error('A new test message must start from the normal priority; observed '+observed.messageSubmissions[2].priority);
+results.push('acknowledged submission releases its ID and resets the priority for the next message');
+await draft('未保存就断线','导航后仍保留请求');await pickPriority('高');await fixture({messageNext:'drop_before_save'});await send();
+await expect("document.querySelector('.inline-form input')?.readOnly && document.querySelector('.inline-form textarea')?.readOnly && document.querySelector('.inline-form .priority-select .n-base-selection')?.classList.contains('n-base-selection--disabled') && document.querySelector('.inline-form .priority-select')?.innerText.includes('高') && document.querySelector('.inline-form button.primary')?.innerText==='重试同一消息'",'unknown submission freezes its payload, priority and offers explicit retry');
 await click('.sidebar nav button[data-tab=devices]');await expect("document.querySelector('h1')?.innerText==='设备'",'navigation remains available');await click('.sidebar nav button[data-tab=inbox]');
-await expect("document.querySelector('.inline-form input')?.value==='未保存就断线' && document.querySelector('.inline-form textarea')?.value==='导航后仍保留请求' && document.querySelector('.inline-form input')?.readOnly",'unknown payload survives tab navigation');
+await expect("document.querySelector('.inline-form input')?.value==='未保存就断线' && document.querySelector('.inline-form textarea')?.value==='导航后仍保留请求' && document.querySelector('.inline-form input')?.readOnly && document.querySelector('.inline-form .priority-select')?.innerText.includes('高')",'unknown payload and priority survive tab navigation');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
 await expect("document.documentElement.scrollWidth<=390 && document.querySelector('.inline-form .scope-note[role=alert]')?.innerText.includes('发送结果尚未确认')",'unknown result fits 390 CSS px and is announced assertively');
 await cdp('Emulation.clearDeviceMetricsOverride');
