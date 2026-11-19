@@ -79,6 +79,7 @@
 | CONSOLE-26 | 刷新恢复登录与令牌维护 | 软件本地已验证：8h 会话、退出/失效/跨页保护；管理员文件令牌修改，角色编辑/重新生成 | 23 组浏览器 1098 条、完整 128 项校验（5 条件跳过）、真实 5173/8088 会话与 SSE；交付见末尾 |
 | CONSOLE-27 | 登录会话跨 CORE 重启持久化 | 软件本地已验证：私有摘要会话、重启恢复、退出持久删除、逐请求核验父凭据 | 真实独立 JVM、HTTPS 容器重建、本地 5173/8088 重启与退出复核；交付见末尾 |
 | CONSOLE-28 | 最近错误筛选独立可用 | 软件本地已验证：原因筛选在任意状态可用、只发 `lastError`，`unknown` 仅失败状态；投递空列表可回消息页。CORE `4c13ed4` / 04 `cc42d2b` 已推送，[Docker CI 44505125474](https://github.com/liuyiwuqing/nexus-core/actions/runs/44505125474) 全步骤 success，[04 CI 44505145934](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44505145934) 八个 job success | 本地新增筛选 50 项、相关回归 475 项、完整构建 178 通过/5 条件跳过、JAR 资源一致；真实数据库/Broker/设备未验收 |
+| SOURCE-01 | 来源回执事件时间线 | 软件本地已验证：`GET /api/v1/hooks/{id}/messages/{message}` 追加 `events`（按设备/发生顺序，含 kind/previousStatus/status/recordedAt 与当时回执时间），不含 `lastError`/下次尝试，500 条截断；既有 `deliveries` 与鉴权不变。CORE `e3e2660` 已推送，[Docker CI 44507910931](https://github.com/liuyiwuqing/nexus-core/actions/runs/44507910931) 全步骤 success，见 [23](23-console-completion.md#source-01--来源回执事件时间线) | `WebhookSourceFlowTest` 4 项（真实 HTTP/隔离 PostgreSQL/MQTT）；04 纯文档不触发 workflow；真实 Broker/设备、生产库和第三方发送方未验收 |
 | CONSOLE-02 | 管理台完成度与验收清单 | `65eb2ef` 已推送；已按八导航、原完整规划及真实控制器核对；当前功能/验证/缺项见 [23](23-console-completion.md#console-02--当前实现与完整规划的差距) | 完整规划尚未全部实现；文档核对不算缺项完成。状态筛选已单独交付 CONSOLE-03 |
 | CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；更多筛选/元数据导出见 CONSOLE-13，取消/时间线见 CONSOLE-04 |
 | CONSOLE-04 | 投递状态时间线与受限取消 | CORE `109b83f` / 04 `0dec4b6` 已推送并核对远程；HTTP/worker/隔离 SQL 6 项，实际 Vue 新增 62/既有 191 项，Java→固件 C→Java 契约通过；完整构建 70 通过/5 跳过、JAR 一致；见 [23](23-console-completion.md#console-04--事务状态时间线与受限取消) | CORE [43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) Docker job、04 [43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job 全绿；V13 只在隔离库验证，旧行历史未知，无设备撤回或生产迁移 |
@@ -1323,3 +1324,18 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：原因筛选仍是读取时快照；`pending` 行只有 `broker_unavailable` 这类最近错误，不代表设备已收到或未收到。原因值来自既有 `last_error`，没有新增错误码、审计或清理规则。没有真实环境、部署或设备验收结论。
 
 推送与 CI（2026-11-19）：CORE `4c13ed4` / 04 `cc42d2b` 已正常推送并核对远端；CORE Docker deployment [#44505125474](https://github.com/liuyiwuqing/nexus-core/actions/runs/44505125474) 全步骤 `success`，04 Software checks [#44505145934](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44505145934) 八个 job 全部 `success`（六个固件预设、交付工具、语音桥接准备）。证据文档 `aafd944` 及本次补充只改 `docs/`，04 workflow 的路径过滤不会为纯文档提交新建运行。两项 workflow 不运行上述 525 项浏览器专项或完整 Maven 套件，这些仍为本地证据；远程 CI 不等于真实部署、真实数据库/Broker 或实机验证。
+
+## SOURCE-01 · 来源回执事件时间线
+
+[02 §6.1](02-message-hub.md#61-发送消息) 要求按消息查询返回投递状态与时间线，[CORE 来源契约](../../nexus-core/docs/webhook-sources.md) 的 `GET /api/v1/hooks/{id}/messages/{message}` 此前只返回每设备当前状态和收到/展示/已读时间，没有事件部分。
+
+- 响应在既有 `id`/`deliveries` 之外新增 `events`：来自 `delivery_history`，按 `deviceId`、发生顺序排列；每条含 `deviceId`、`kind`、`previousStatus`、`status`、`recordedAt` 和当时的收到/展示/已读时间，时间统一为 ISO-8601 UTC。
+- 公开投影不含 `lastError`、下次尝试时间、操作人或管理员字段；来源作用域、令牌、停用 403 和跨来源/未知消息 404 保持原样。
+- 单次最多 500 条事件，超出按同顺序截断并返回 `eventsTruncated:true`；有界读取不提供分页，不新增迁移，不改变投递状态机、设备行为或管理员历史接口。
+- [02 §6](02-message-hub.md#6-第三方推送接口规范) 同步改写为已落地的 `POST /api/v1/hooks/{id}` 契约，移除“来源令牌/HMAC/限流/202/时间线尚未落地”的过期描述，并区分管理员 `POST /api/v1/messages`。
+
+验证（2026-11-19，本机 macOS/Docker）：`JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -Dtest=WebhookSourceFlowTest test` 退出 0，4 项通过、0 失败/错误；真实 HTTP/隔离 PostgreSQL/Mosquitto 覆盖创建事件与 `previousStatus` 为空、`UPDATE` 推进后新增 `state_changed`（pending→sent）、跨来源读取 404、501 条历史截断为 500 且 `eventsTruncated=true`、响应不含 `lastError`/`nextAttemptAt`/凭据。事件时间格式先用 jshell 确认 Jackson 3 默认输出 ISO-8601，再用 `ApiRows.normalize` 固定。前端与管理台未改，未运行浏览器专项；编译覆盖全部主代码与测试源码。
+
+边界：时间线是服务端事务历史，不是网络抓包、设备日志或操作审计；迁移前旧行只有 `baseline`，不能补造更早过程。设备未回执时不会出现 received/displayed/read 事件，`queued` 只表示入库。未连接真实 Broker/设备、未部署、未迁移生产库，也未与真实第三方发送方联调。
+
+推送与 CI（2026-11-19）：CORE `e3e2660` 已推送，`git ls-remote` 核对远端分支指向 `e3e2660d11711b6e9ba5423883044cd889c82345`。CORE `Docker deployment` [#44507910931](https://github.com/liuyiwuqing/nexus-core/actions/runs/44507910931) 全步骤 `success`（2m27s），含 CLI、源码构建、隔离 Compose 与 1Panel 镜像验证。本次 04 只改 `docs/02`、`docs/18`、`docs/23`，`software.yml` 的 `paths` 不含 `docs/`，不会为该纯文档提交新建运行；本项没有 04 代码或浏览器改动。CORE workflow 不运行本地 4 项 `WebhookSourceFlowTest`；远程 CI 不等于真实部署、真实 Broker/设备或第三方发送方联调。

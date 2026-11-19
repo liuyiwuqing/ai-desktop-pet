@@ -140,26 +140,28 @@
 
 ## 6. 第三方推送接口规范
 
-本节保留通用 Webhook 的目标契约；来源令牌、HMAC、限流、202 响应及按消息查询的第三方时间线尚未落地。当前 CORE 的同路径接口是管理员 Bearer 的管理入口：首次保存 201、同 `connectorId + eventId` 重放 200，均返回 `{messageId}`，不采用本节尚未实现的响应/鉴权声明；实际接口见 CORE README 和 [测试消息说明](../../nexus-core/docs/console-messages.md)。CONSOLE-04 的管理员投递历史接口另见 [时间线与受限取消](23-console-completion.md#console-04--事务状态时间线与受限取消)，不等于本节的来源访问契约。
+本节是已落地的第三方来源契约（CONSOLE-06-A）。通用来源入口为 `POST /api/v1/hooks/{sourceId}`，使用来源令牌 + HMAC + 时间戳 + 限流，成功返回 202；管理员 `POST /api/v1/messages` 仍是独立的 Bearer 管理入口（同 `connectorId + eventId` 重放 200），不采用来源鉴权。实际字段、错误码与边界以 [CORE 来源契约](../../nexus-core/docs/webhook-sources.md) 为准；CONSOLE-04 的管理员投递历史接口不等于来源访问契约。
 
 ### 6.1 发送消息
 
 ```http
-POST /api/v1/messages
+POST /api/v1/hooks/{sourceId}
 Authorization: Bearer <source-token>
 Content-Type: application/json
-Idempotency-Key: <可选，建议 UUID>
-X-Nexus-Signature: sha256=<hmac>
+X-Nexus-Timestamp: <Unix 秒，10 位>
+X-Nexus-Signature: sha256=<64 位小写十六进制 HMAC>
+
+{"eventId":"<UUID>","eventType":"alert.test","title":"...","content":"...","priority":"normal"}
 ```
 
-- `source-token` 按来源签发，最小权限；只允许写入绑定的设备/路由。
-- 签名：`HMAC-SHA256(timestamp + "." + rawBody, sourceSecret)`；时间戳容差 5 分钟；防重放。
-- 成功：`202 Accepted`，返回 `{ "id": "...", "status": "queued" }`。
-- 错误：`400` 参数错误、`401` 未认证、`403` 无权限、`409` 幂等冲突、`413` 超限、`429` 限流。
-- 限流：每来源 60 条/分钟，突发 20；超限返回 `Retry-After`。
-- 重试：5xx/超时按指数退避重试 3 次；4xx 不重试。
-- 查询状态：`GET /api/v1/messages/{id}` 返回投递状态与时间线。
-- 测试：`POST /api/v1/sources/{id}/test` 只发测试消息，不进入生产统计。
+- `source-token` 按来源签发，最小权限；只允许写入绑定的设备范围，并与当前路由结果取交集。
+- 签名：`HMAC-SHA256(timestamp + "." + rawBody, sourceSecret)`；时间戳容差 ±300 秒；未通过令牌/签名/时间窗 401，来源停用 403。
+- 成功：`202 Accepted`，返回 `{ "id": "...", "status": "queued", "duplicate": false }`。
+- 错误：`400` 内容错误、`401` 未认证、`403` 来源停用、`409` 同 UUID 不同字节、`413` 超过 32768 字节、`429` 限流（带 `Retry-After: 60`）。
+- 限流：每秒 1 令牌、桶容量 20，滚动 60 秒最多 60 条；已接受的相同事件重放不重复扣额。
+- 重试：5xx/超时用同一 `eventId` 和完全相同 JSON 字节重试，返回相同消息 ID；重新序列化导致字节不同会 409。
+- 查询状态：`GET /api/v1/hooks/{sourceId}/messages/{messageId}` 使用同来源 Bearer，返回每设备当前状态与事件时间线（按设备、发生顺序；单次最多 500 条，超出置 `eventsTruncated`），不暴露 `lastError`、下次尝试时间或管理员字段。
+- 测试：`POST /api/v1/sources/{id}/test` 只发测试消息，不计入生产统计。
 
 ### 6.2 来源接入
 

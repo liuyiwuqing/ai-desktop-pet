@@ -2,6 +2,20 @@
 
 更新：2026-11-19。管理员管理台现有十二个主导航，按角色显示入口；本轮管理台切片的软件实现已补齐。[02 §5](02-message-hub.md#5-在线配置管理面板) 的完整产品规划仍有设备维护扩展、二期和真实环境验收边界。软件检查、真实服务联调、设备回执和生产验收分别记录，不能用页面存在代替完成。
 
+## SOURCE-01 · 来源回执事件时间线
+
+[CORE 来源契约](../../nexus-core/docs/webhook-sources.md) 的按消息回执此前只有每设备当前状态和收到/展示/已读时间，[02 §6.1](02-message-hub.md#61-发送消息) 要求的“查询状态返回投递状态与时间线”缺事件部分。本次在 `GET /api/v1/hooks/{id}/messages/{message}` 响应中追加 `events`，既有 `id`/`deliveries` 字段与鉴权不变。
+
+- 事件来自 CORE `delivery_history`，按 `deviceId` 和发生顺序排列；每条含 `deviceId`、`kind`、`previousStatus`、`status`、`recordedAt` 及当时的收到/展示/已读时间，时间为 ISO-8601 UTC。
+- 只返回公开时间线字段：不含 `lastError`、下次尝试时间、操作人或管理员字段；来源仍只能读取自己接收的消息，其他来源与未知消息 404，停用 403。
+- 单次最多 500 条事件，超出按同顺序截断并返回 `eventsTruncated:true`；有界读取不提供分页，不改变投递状态机、数据库结构、设备行为或管理员历史接口。
+
+验证（2026-11-19，本机 macOS/Docker）：`WebhookSourceFlowTest` 4 项通过，真实 HTTP/隔离 PostgreSQL/MQTT 覆盖创建事件、状态推进后的 `state_changed`/`previousStatus`、跨来源 404、501 条历史截断为 500、响应不含内部字段与来源凭据。`docs/02` §6 同步改写为实际 `POST /api/v1/hooks/{id}` 契约，移除“尚未落地”的过期描述。
+
+边界：时间线是服务端事务历史，不是网络抓包、设备日志或操作审计；迁移前旧行只有 `baseline`，不能补造更早过程。设备未回执时不会出现 received/displayed/read 事件，`queued` 只表示入库。未连接真实 Broker/设备、未部署、未迁移生产库，也未与真实第三方发送方联调。
+
+推送与 CI：CORE `e3e2660` 已推送并核对远端；[Docker CI 44507910931](https://github.com/liuyiwuqing/nexus-core/actions/runs/44507910931) 全步骤 `success`。04 仅文档，路径过滤不触发 workflow。CI 不运行上述 4 项 HTTP 测试；真实部署、外部发送方与设备回执未验收。
+
 ## CONSOLE-28 · 最近错误筛选独立可用
 
 投递页的「最近错误」不再只在状态为「投递失败」时出现。`lastError` 也保留在 `pending`/`sent`（`broker_unavailable`）和 `cancelled`（`cancelled_by_admin`）行上，按失败过滤会漏掉这些记录；现在可在「全部」或任一状态下直接选择原因，请求只带 `lastError`，不隐式附加 `status`。`unknown`（未记录原因）仍只在「投递失败」下提供，避免在其它状态下把没有 `last_error` 的成功行全部带入；切换状态会清掉已选原因。
