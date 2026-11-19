@@ -65,6 +65,15 @@ let observed=await state();
 if(observed.messageSubmissions.length!==2 || observed.manualMessages.length!==1 || observed.messageSubmissions[0].eventId!==observed.messageSubmissions[1].eventId)
   throw new Error('One logical submission must retain its event ID and produce one saved message; observed '+JSON.stringify({requests:observed.messageSubmissions.length,saved:observed.manualMessages.length,sameId:observed.messageSubmissions[0]?.eventId===observed.messageSubmissions[1]?.eventId}));
 results.push('saved response loss retries the same event ID and saves one message');
+await expect("document.querySelector('#last-send-receipt')?.innerText.includes('刚发送消息的投递状态') && document.querySelector('#last-send-receipt').innerText.includes('共 2 条投递') && document.querySelector('#last-send-receipt').innerText.includes('用户已读 1') && document.querySelector('#last-send-receipt').innerText.includes('dodo-ui-fixture')",'acknowledged send shows per-device delivery status');
+observed=await state();
+if(!observed.receiptRequests.at(-1)?.includes('/messages/manual-1/deliveries'))throw new Error('Acknowledged send did not read the new message receipts: '+JSON.stringify(observed.receiptRequests));
+results.push('receipt view reads the acknowledged message');
+const receiptCount=observed.receiptRequests.length;
+await tap('刷新投递状态');
+for(let i=0;i<20;i++){if((await state()).receiptRequests.length>receiptCount)break;await wait(.1);}
+if((await state()).receiptRequests.length<=receiptCount)throw new Error('Receipt refresh did not re-read the same message');
+results.push('receipt refresh re-reads the same message');
 await draft('下一条有意发送的消息','新的逻辑提交');await send();await acknowledged('next intentional submission succeeds');
 observed=await state();
 if(observed.manualMessages.length!==2 || observed.messageSubmissions[2].eventId===observed.messageSubmissions[1].eventId)throw new Error('New logical submission reused an acknowledged ID');

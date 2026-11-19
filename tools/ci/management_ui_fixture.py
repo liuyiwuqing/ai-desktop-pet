@@ -45,7 +45,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
         'credentialMode':'active','credentialRevision':1,'credentialSecret':'','credentialSubmissions':[],
         'batchMode':'normal','batchRequests':[],'batchCancelled':False,'batchRetried':False,
         'multiBatchMode':'normal','multiBatchRequests':[],'multiBatchCancelled':False,'multiBatchRetried':False,
-        'queueMode':'normal','queueRequests':[],'queueWaiting':3,'queueCancelled':False}
+        'queueMode':'normal','queueRequests':[],'queueWaiting':3,'queueCancelled':False,
+        'receiptMode':'normal','receiptRequests':[]}
     def log_message(self,*args):pass
     def json_response(self,status,value):
         payload=json.dumps(value,ensure_ascii=False).encode()
@@ -96,6 +97,19 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 rows=state['listMessages' if messages else 'listDeliveries']
                 rows=[row for row in rows if not status or row[key]==status]
                 value={'items':copy.deepcopy(rows[(page-1)*size:page*size]),'total':len(rows),'page':page,'size':size}
+            elif path.startswith('/api/v1/messages/') and path.endswith('/deliveries'):
+                state['receiptRequests'].append(self.path)
+                mode=state['receiptMode']
+                if mode=='error':return self.json_response(503,{'error':'unavailable'})
+                stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+                items=[] if mode=='empty' else [
+                    {'eventId':'receipt-read','deviceId':'dodo-ui-fixture','status':'read','attempts':1,'lastError':None,
+                     'nextAttemptAt':stamp,'receivedAt':stamp,'displayedAt':stamp,'readAt':stamp},
+                    {'eventId':'receipt-pending','deviceId':'dodo-reading','status':'pending','attempts':0,'lastError':None,
+                     'nextAttemptAt':stamp,'receivedAt':None,'displayedAt':None,'readAt':None}]
+                counts={}
+                for item in items:counts[item['status']]=counts.get(item['status'],0)+1
+                value={'messageId':path.split('/')[4],'total':len(items),'counts':counts,'items':items,'page':1,'size':100}
             elif path in ('/api/v1/connectors','/api/v1/deliveries'):value={'items':[],'total':0,'page':1,'size':30}
             elif path=='/api/v1/memory':value={'configured':state['memoryMode']!='disabled','storedCopies':1,'pendingDeletions':2,'deletedCopies':3,'deletionErrors':1,'invalidationPolicy':'stop_retrieval_and_delete'}
             elif path=='/api/v1/status':value={'database':'ready','mqtt':'ready','mqttError':'','schemaVersion':9}
@@ -299,7 +313,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                         credentialMode='active',credentialRevision=1,credentialSecret='',credentialSubmissions=[],
                         batchMode='normal',batchRequests=[],batchCancelled=False,batchRetried=False,
                         multiBatchMode='normal',multiBatchRequests=[],multiBatchCancelled=False,multiBatchRetried=False,
-                        queueMode='normal',queueRequests=[],queueWaiting=3,queueCancelled=False)
+                        queueMode='normal',queueRequests=[],queueWaiting=3,queueCancelled=False,
+                        receiptMode='normal',receiptRequests=[])
                 if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success')
                 if value.get('listReset'):
                     stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
@@ -335,6 +350,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     if value['multiBatchMode']!='normal':state.update(multiBatchCancelled=False,multiBatchRetried=False)
                 if 'queueMode' in value:state['queueMode']=value['queueMode']
                 if 'queueWaiting' in value:state['queueWaiting']=int(value['queueWaiting'])
+                if 'receiptMode' in value:state['receiptMode']=value['receiptMode']
                 if 'deviceName' in value:state['deviceName']=value['deviceName']
                 if value.get('dropRenameNext'):state['dropRenameNext']=True
                 if 'renameReadDelay' in value:state['renameReadDelay']=min(max(float(value['renameReadDelay']),0),2)

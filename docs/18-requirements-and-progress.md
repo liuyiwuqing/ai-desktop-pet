@@ -1276,3 +1276,18 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：撤销只处理服务端尚未开始发送的 pending 行；已交给 Broker 或已展示的内容无法撤回，设备侧仍可能显示旧提醒。`waiting` 与结果都是读时快照，并发接收/失败可能不同。未在真实 Broker/设备上验证，未做真实部署或实机验收。
 
 推送与 CI（2026-11-19）：CORE `ac1dfd2` / 04 `07210ef` 已推送，`git ls-remote` 核对远端分支分别指向 `ac1dfd209829fe1ab44a0320c7d15311ae6038dc` 与 `07210ef49a3b49b094a55a95dc02904917f92bed`。CI：CORE `Docker deployment` [#44455924120](https://github.com/liuyiwuqing/nexus-core/actions/runs/44455924120) `success`；04 `Software checks` [#44455980159](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44455980159) 八个 job 全部 `success`，含五个固件预设与 full 主机/协议/DSP/LVGL。两项 workflow 均不运行完整 Maven 套件与 81/132 项浏览器专项，这些仍为本地证据；远程 CI 不等于真实部署或实机验证。
+
+## TEST-SEND-RECEIPT-01 · 测试发送后的逐设备投递状态
+
+[02 §5.2](02-message-hub.md#5-在线配置管理面板) 要求测试发送在提交后显示 queued → sent → received → displayed → read 时间线。本次在不改变测试发送仍为广播语义的前提下，补上逐设备只读状态。
+
+- 新增 `GET /api/v1/messages/{id}/deliveries`：`page` 从 1 开始，`size` 默认/上限 100；返回 `items`（`eventId`/`deviceId`/`status`/`attempts`/`lastError`/`nextAttemptAt`/`receivedAt`/`displayedAt`/`readAt`）、覆盖全部分页的 `counts` 与 `total/page/size`；未知消息 404 `message_not_found`。所有已登录角色可读，写入仍走既有批量接口。
+- 测试发送拿到有效 `messageId` 后，消息页在表单下方显示「刚发送消息的投递状态」，逐设备列出状态、尝试次数、失败原因或下次尝试时间，以及收到/展示/已读时间；消息详情也显示同一视图。刷新只重读同一消息，不轮询；超过 100 条时标注总数并提示去投递页查看。
+- 状态与时间戳直接取自投递行/设备回执，不推断在线、播放或用户已看；视图不提供撤销/重试按钮，避免与批量操作的确认/权限边界混淆。
+- 未改动 `POST /api/v1/messages`、路由页定向测试、投递状态机或数据库结构；普通测试发送仍为 normal/广播，选设备/模板/优先级仍在路由页。
+
+验证（2026-11-19，本机 macOS/Docker）：`MessageDeliveryBatchFlowTest` 新增 1 项、共 5 项通过（逐设备与计数、分页跨页计数、viewer/operator 可读、未知消息 404）；完整 CORE `run_local.py build` 退出 0：182 项中 177 通过、5 项条件跳过、0 失败/错误，打包 27 份前端静态资源。浏览器：消息发送 36 项（+3）、管理台 86 项（+5）、消息批量 30 项、列表筛选 44 项（首轮投递状态下拉一次「全部」选项未就绪，未改代码立即重跑 44/44 通过）、表单 48 项。源码契约通过；按已审阅差异同步 `DeliveryService`（仅新增只读查询）指纹，协议、消息 Schema 与迁移未变。
+
+边界：状态是读取时快照，不自动刷新；设备已收到/展示/已读仍以回执为准，页面显示 pending 不代表设备未收到。批量撤销/重试会改变这里的状态，本视图不提供它们。未在真实 Broker/设备验证，未做真实部署或实机验收。
+
+推送与 CI：待填。
