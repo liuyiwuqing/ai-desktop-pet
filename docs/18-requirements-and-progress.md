@@ -1260,4 +1260,4 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 
 边界：健康回读只证明设备曾在新镜像上通过自检；若之后手动降级或静默回滚且没有新的 OTA 回读/遥测，页面仍显示旧证据。版本比较依赖遥测 `received_at` 与部署 `updated_at` 均为服务端时间。未在真实 OTA 安装或实机上验证，未做真实部署。
 
-推送与 CI（2026-11-19）：待填。
+推送与 CI（2026-11-19）：CORE `71470ee` / 04 `764bdd0` 已推送，`git ls-remote` 核对远端分支分别指向 `71470eeb1c49a148b65dab8adb86c5cfcf48b4b9` 与 `764bdd0a2aa64d2248626494da81369e1d6d569c`。CI：CORE `Docker deployment` [#44453541373](https://github.com/liuyiwuqing/nexus-core/actions/runs/44453541373) `success`；04 `Software checks` 未对纯文档提交触发，功能提交 `370079f` 的 [#44449315413](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44449315413) 仍为 `success`。CORE workflow 不运行完整 Maven 套件，178 项与浏览器 132/44 项仍为本地证据；远程 CI 不等于真实部署或实机验证。
