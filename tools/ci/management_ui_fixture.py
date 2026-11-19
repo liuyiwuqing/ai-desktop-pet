@@ -46,7 +46,8 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
         'batchMode':'normal','batchRequests':[],'batchCancelled':False,'batchRetried':False,
         'multiBatchMode':'normal','multiBatchRequests':[],'multiBatchCancelled':False,'multiBatchRetried':False,
         'queueMode':'normal','queueRequests':[],'queueWaiting':3,'queueCancelled':False,
-        'receiptMode':'normal','receiptRequests':[]}
+        'receiptMode':'normal','receiptRequests':[],
+        'resendRequests':[],'resendNext':'success'}
     def log_message(self,*args):pass
     def json_response(self,status,value):
         payload=json.dumps(value,ensure_ascii=False).encode()
@@ -324,8 +325,9 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                         batchMode='normal',batchRequests=[],batchCancelled=False,batchRetried=False,
                         multiBatchMode='normal',multiBatchRequests=[],multiBatchCancelled=False,multiBatchRetried=False,
                         queueMode='normal',queueRequests=[],queueWaiting=3,queueCancelled=False,
-                        receiptMode='normal',receiptRequests=[])
-                if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success',messageTemplates=False)
+                        receiptMode='normal',receiptRequests=[],
+                        resendRequests=[],resendNext='success')
+                if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success',messageTemplates=False,resendRequests=[],resendNext='success')
                 if value.get('listReset'):
                     stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
                     state.update(listMode=True,listError='',listDelay=0,listRequests=[],listMessages=[{
@@ -340,6 +342,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if 'listDelay' in value:state['listDelay']=min(max(float(value['listDelay']),0),2)
                 if value.get('listEmpty'):state['listMessages']=[];state['listDeliveries']=[]
                 if 'messageNext' in value:state['messageNext']=value['messageNext']
+                if 'resendNext' in value:state['resendNext']=value['resendNext']
                 if value.get('otaReset'):state.update(otaMode='disabled',otaRequests=[],otaSubmissions=[],otaDrop=False,otaBoot='1'*32,otaLastError='')
                 if 'otaMode' in value:state['otaMode']=value['otaMode']
                 if 'growthMode' in value:state['growthMode']=value['growthMode']
@@ -388,6 +391,26 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 action=path.rsplit('/',1)[-1]
                 if action not in ('cancel','retry'):return self.json_response(404,{'error':'not_found'})
                 return self.batch_response(path.split('/')[4],action,parse_qs(urlparse(self.path).query),state)
+            if path.startswith('/api/v1/messages/') and path.endswith('/resend'):
+                source_id=path.split('/')[4]
+                state['resendRequests'].append({'messageId':source_id,**value})
+                outcome=state['resendNext'];state['resendNext']='success'
+                if outcome=='reject':return self.json_response(409,{'error':'no_enabled_devices'})
+                if outcome=='unauthorized':return self.json_response(401,{'error':'unauthorized'})
+                existing=next((row for row in state['manualMessages'] if row.get('resendOf')==source_id and row.get('eventId')==value.get('eventId')),None)
+                created=existing is None
+                if outcome!='drop_before_save' and existing is None:
+                    stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+                    existing={'connectorId':'manual','source':'manual','eventId':value['eventId'],'resendOf':source_id,
+                        'messageId':'resend-'+str(len(state['manualMessages'])+1),'eventType':'manual.test',
+                        'title':'重发的消息','content':'重发内容','summary':'重发内容','sender':'','originalUrl':'',
+                        'priority':'normal','receivedAt':stamp,'createdAt':stamp,'expiresAt':stamp,
+                        'readAt':None,'readStatus':'unread','dataClass':'internal'}
+                    state['manualMessages'].insert(0,existing)
+                if outcome in ('save_then_drop','drop_before_save'):
+                    self.close_connection=True;self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();return
+                if outcome=='save_then_500':return self.json_response(503,{'error':'unavailable'})
+                return self.json_response(201 if created else 200,{'messageId':existing['messageId'],'queued':2,'skipped':1})
             if path=='/api/v1/messages':
                 state['messageSubmissions'].append(value)
                 outcome=state['messageNext'];state['messageNext']='success'

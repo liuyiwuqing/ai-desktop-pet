@@ -73,6 +73,11 @@ async function login() {
   await expect("!!document.querySelector('.sidebar')",'authenticated console is shown');
 }
 async function acknowledged(label) {await expect("!document.querySelector('.inline-form') && document.body.innerText.includes('测试消息已保存')",label);}
+async function openMessage(title) {
+  await expect(`[...document.querySelectorAll('.message-row')].some(b=>b.innerText.includes(${JSON.stringify(title)}))`,'message '+title+' is listed');
+  await js(`(()=>{const b=[...document.querySelectorAll('.message-row')].find(b=>b.innerText.includes(${JSON.stringify(title)}));if(!b)return false;b.click();return true;})()`);
+  await expect(`document.querySelector('.message-detail')?.innerText.includes(${JSON.stringify(title)})`,'message detail '+title+' opens');
+}
 await fixture({reset:true,messageReset:true,messageDevices:true,messageTemplates:true});
 await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
 const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
@@ -145,6 +150,36 @@ await draft('认证失效的消息','自动退出也需清除');await fixture({m
 await expect("!!document.querySelector('.login-card') && document.querySelector('.token-label input').value===''",'401 logs out and clears the token');await login();
 await expect("!document.querySelector('.inline-form') && !document.body.innerText.includes('认证失效的消息')",'401 logout clears the pending payload');
 await expect("[...Object.values(localStorage),...Object.values(sessionStorage)].every(value=>!value.includes('ui-regression-fixture-token-at-least-32-characters') && !value.includes('不保留到新会话') && !value.includes('认证失效的消息'))",'submission data and token are not placed in browser storage');
+await openMessage('丢失响应后的同一消息');
+await tap('重发…');
+await expect("document.querySelector('.message-detail')?.innerText.includes('已停用设备会跳过')",'resend confirmation explains the target scope');
+await tap('确认重发');
+await expect("document.querySelector('#last-resend-receipt')?.innerText.includes('2 台启用设备已入队') && document.querySelector('#last-resend-receipt').innerText.includes('1 台已停用设备已跳过') && document.querySelector('#last-resend-receipt').innerText.includes('重发消息的投递状态') && document.querySelector('#last-resend-receipt').innerText.includes('共 2 条投递')",'resend shows queued and skipped counts with the new receipts');
+let resendObserved=await state();
+if(resendObserved.resendRequests.length!==1 || resendObserved.resendRequests[0].messageId!=='manual-1' || typeof resendObserved.resendRequests[0].eventId!=='string')throw new Error('Resend did not post the source message and a request ID: '+JSON.stringify(resendObserved.resendRequests));
+const firstResend=resendObserved.manualMessages.find(m=>m.resendOf==='manual-1');
+if(!firstResend || !resendObserved.receiptRequests.at(-1)?.includes('/messages/'+firstResend.messageId+'/deliveries'))throw new Error('Resend receipts did not read the new message: '+JSON.stringify({firstResend,receipts:resendObserved.receiptRequests.slice(-3)}));
+results.push('resend creates a new message and shows its receipts');
+await fixture({resendNext:'save_then_drop'});
+await tap('重发…');await tap('确认重发');
+await expect("document.querySelector('.message-detail')?.innerText.includes('重发结果尚未确认')",'unknown resend is announced');
+await click('.sidebar nav button[data-tab=devices]');await expect("document.querySelector('h1')?.innerText==='设备'",'navigation stays available during an unknown resend');
+await click('.sidebar nav button[data-tab=inbox]');await openMessage('丢失响应后的同一消息');
+await expect("document.querySelector('.message-detail')?.innerText.includes('重发结果尚未确认') && [...document.querySelectorAll('button')].some(b=>b.innerText.trim()==='重发…')",'unknown resend survives navigation');
+await tap('重发…');await tap('重试重发');
+await expect("document.querySelector('#last-resend-receipt')?.innerText.includes('2 台启用设备已入队') && document.querySelector('#last-resend-receipt').innerText.includes('共 2 条投递')",'resend retry resolves against the saved new message');
+resendObserved=await state();
+const dropped=resendObserved.resendRequests.at(-2), retried=resendObserved.resendRequests.at(-1);
+if(dropped.eventId!==retried.eventId || resendObserved.manualMessages.filter(m=>m.resendOf==='manual-1').length!==2)throw new Error('Unknown resend did not reuse its request ID or created a duplicate');
+results.push('unknown resend reuses the same request ID and does not duplicate the new message');
+await fixture({resendNext:'reject'});
+await tap('重发…');await tap('确认重发');
+await expect("document.body.innerText.includes('当前没有启用的设备') && [...document.querySelectorAll('button')].some(b=>b.innerText.trim()==='确认重发')",'definitive resend rejection is shown');
+await tap('确认重发');
+await expect("document.querySelector('#last-resend-receipt')?.innerText.includes('2 台启用设备已入队') && document.querySelector('#last-resend-receipt').innerText.includes('共 2 条投递')",'resend after a rejection succeeds');
+resendObserved=await state();
+if(resendObserved.resendRequests.at(-2).eventId===resendObserved.resendRequests.at(-1).eventId)throw new Error('A definitive rejection must release the resend request ID');
+results.push('definitive resend rejection uses a fresh request ID');
 cliLog({passed:results.length,checks:results,scope:'actual Vue bundle and explicit HTTP outcomes; no database, broker or device'});
 EOF
 # Complete only after the preceding browser checks have succeeded.
