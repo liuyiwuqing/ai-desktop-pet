@@ -30,10 +30,10 @@ FAILURE_REASONS = {'success': [('ack_timeout', 2), ('broker_unavailable', 1)],
 ALERT_DEVICES = [
     {'deviceId': 'dodo-ui-offline', 'name': '离线样机', 'enabled': True, 'online': False,
      'lastSeen': '2026-11-13T09:58:00Z', 'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None,
-     'telemetryAt': None, 'waitingDeliveries': 2},
+     'telemetryAt': None, 'firmwareVersion': '0.4.0-dev', 'waitingDeliveries': 2},
     {'deviceId': 'dodo-ui-disabled', 'name': '停用样机', 'enabled': False, 'online': False,
      'lastSeen': '2026-11-12T20:00:00Z', 'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None,
-     'telemetryAt': None, 'waitingDeliveries': 0},
+     'telemetryAt': None, 'firmwareVersion': None, 'waitingDeliveries': 0},
 ]
 # 分页样本：22 在线、2 启用离线、2 停用；24 台一页，第二页只剩停用的两台。
 MANY_DEVICES = [
@@ -41,7 +41,7 @@ MANY_DEVICES = [
      'enabled': index < 24, 'online': index < 22,
      'lastSeen': '2026-11-13T09:58:00Z' if index < 22 else None,
      'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None, 'telemetryAt': None,
-     'waitingDeliveries': 0}
+     'firmwareVersion': None, 'waitingDeliveries': 0}
     for index in range(26)
 ]
 # 顶栏搜索样本：120 台超过默认每页 100 台，只有搜索才能选到第 120 台。
@@ -50,7 +50,7 @@ CROWD_DEVICES = [
      'enabled': True, 'online': index < 100,
      'lastSeen': '2026-11-13T09:58:00Z' if index < 100 else None,
      'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None, 'telemetryAt': None,
-     'waitingDeliveries': 0}
+     'firmwareVersion': None, 'waitingDeliveries': 0}
     for index in range(120)
 ]
 # 删除样本：24 号有历史，只能停用；其它设备可删除，用于验证二次确认和壳层选择清理。

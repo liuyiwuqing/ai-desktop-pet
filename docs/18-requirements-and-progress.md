@@ -116,6 +116,7 @@
 | DEVICE-LIST-03 | 壳层顶栏设备选择器服务端搜索 | 软件本地已验证：顶栏 `NSelect` 改为 `filterable remote`，默认仍显示 `GET /devices` 前 100 台；输入时 300ms 防抖调用 `GET /devices?size=50&sort=name&order=asc&q=…`，空查询恢复默认清单，结果始终含“全部设备”和当前选中项，加载/失败/无匹配各有明确状态；选中不在默认清单的设备时保留独立记录，整表刷新不会清空选择；告警钻取仍清空选择与搜索；前端 check/build、概览浏览器 83 → 101 项、事件 21 项、角色 43 项通过；见文末 | 搜索只覆盖名称/设备 ID，不提供“浏览全部设备”的分页下拉；设备删除由 DEVICE-DELETE-01 承接；未连真实 CORE/PostgreSQL/Broker/设备，生产规模数据与实机未验收 |
 | DEVICE-DELETE-01 | 设备删除与历史保护 | 软件本地已验证：管理员设备卡片新增「删除设备」，确认区必须输入完整设备名称；`DELETE /api/v1/devices/{id}` 对投递/遥测/配置/OTA/成长/凭据历史返回 409 `device_has_history`，对路由/来源引用返回 409 `device_referenced`，未使用设备 204 且重复删除幂等；成功后清除顶栏选择并整表刷新；见文末 | 只能清理登记错误且从未使用的设备，有历史请停用；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DEVICE-QUEUE-01 | 设备卡片待接收投递数 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `waitingDeliveries`（`pending`+`sent` 合计，其余状态不计），V27 部分索引支撑按设备聚合；设备卡片在 Wi-Fi 行后显示「待接收 N 条」，0 不显示；CORE `DeviceListFlowTest` 6 项（新增 1 项）与完整构建 175 项 0 失败/5 条件跳过、前端 check/build、概览浏览器 125 项、角色 43 项与事件 21 项回归通过；见文末 | 计数是读时快照，不代表设备已展示/已读；未连真实 CORE/PostgreSQL/Broker/设备，生产库大数据量与索引效果未压测；推送与 CI 见文末 |
+| DEVICE-FIRMWARE-01 | 设备卡片最近固件版本 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `firmwareVersion`（最近一条遥测，无遥测为 `null`）；设备卡片在 Wi-Fi 行后显示「固件 <version>」，`null` 不显示；`DeviceListFlowTest` 7 项（新增 1 项）、完整构建 176 项 0 失败/5 条件跳过、前端 check/build、概览浏览器 126 项通过；见文末 | 固件是读时快照，OTA 安装后要等下一次遥测；与 Wi-Fi 分别取样本，可能来自不同时间；未连真实设备或部署；推送与 CI 见文末 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
@@ -1203,3 +1204,21 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：计数是读时快照，包含已交给 Broker 但设备未 ACK 的 `sent` 行，不代表设备已展示或已读；接收、失败、取消后要等下一次列表轮询才回退。未在真实 PostgreSQL 生产库、超大投递表或并发写入时压测索引与聚合耗时；未做真实部署或实机验收。
 
 推送与 CI（2026-11-19）：CORE `e2cf780` / 04 `378bba3` 已推送，`git ls-remote` 核对远端分支分别指向 `e2cf78057dbecea007c0631fcf9e3484308405ec` 与 `378bba36325e3cdc5d5aeeca4c9216079f4a8f20`。CI：CORE `Docker deployment` [#44438083599](https://github.com/liuyiwuqing/nexus-core/actions/runs/44438083599) `success`；04 `Software checks` [#44438125030](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44438125030) 八个 job 全部 `success`。两项 workflow 不运行 `DeviceListFlowTest`、完整 Maven 套件与 125 项浏览器专项，这些仍为本地证据；远程 CI 不等于真实部署或生产库验证。
+
+## DEVICE-FIRMWARE-01 · 设备卡片最近固件版本
+
+产品清单要求设备页可查看固件。此前固件只在 OTA 面板读取，卡片只能看到连接、Wi-Fi 与待接收数。本项在卡片上补一个只读版本：
+
+- `GET /api/v1/devices` 每台设备新增 `firmwareVersion`：取该设备最近一条遥测样本的 `firmware_version`，无遥测为 `null`。它与 Wi-Fi 字段各自取样本：Wi-Fi 仍来自最近一条带 SSID/IP 的样本，两者可能来自不同时间。
+- 设备卡片在 Wi-Fi 行后显示「固件 <version>」，`null` 不渲染；沿用 `device_telemetry_samples(device_id, observed_at)` 主键取每台设备最新一行，不新增索引或迁移，不改 OTA、配置与投递状态机。
+
+验证（2026-11-19，本机 macOS/Docker）：
+
+- `DeviceListFlowTest` 新增 `firmwareVersionComesFromTheLatestTelemetrySample`：两条遥测取最新 `0.4.0-dev`；无遥测设备为 `null`；再插入一条无 Wi-Fi 的更新样本后固件变为 `0.5.0-dev`，而 Wi-Fi 仍取上一条带 Wi-Fi 的样本。该类 7 项通过。
+- 完整 `python3 tools/run_local.py build` 退出 0：176 项中 171 通过、5 项条件跳过、0 失败/错误；JAR 的 27 份前端与 27 份迁移逐字节匹配当前输出。
+- 04 概览浏览器 126 项：告警钻取后的离线样机显示「固件 0.4.0-dev」，26 台无遥测设备不显示固件行。
+- 首轮“固件”断言先后被页头说明和卡片上的“固件升级”按钮误命中，最终限定为 `.device-seen` 信息行；同轮把概览卸载检查改为等上一轮刷新结束、按钮可用后再点击，消除读取中禁用造成的既有竞态。浏览器均为实际编译 Vue + 回环 RAM 夹具，不连接真实 CORE、数据库、Broker 或设备。
+
+边界：固件版本是读时快照，OTA 安装后要等设备下一次遥测才更新；从未上报遥测的设备不显示该行；未在真实设备、真实部署或生产库验证。
+
+推送与 CI（2026-11-19）：待提交后回填。

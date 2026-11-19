@@ -63,7 +63,7 @@ await navigate('概览');
 await clickWhenReady('[data-alert-action=devices_online]','the device alert is clickable');
 await expect("document.querySelector('h1')?.innerText==='设备'",'the device alert opens the device page');
 // 设备页按「启用且离线」过滤：停用样机虽同样不在线，但不属于这次告警。
-await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-card')?.innerText.includes('离线样机') && !document.querySelector('.device-card')?.innerText.includes('停用样机') && document.querySelector('.device-card')?.innerText.includes('待接收') && document.querySelector('.device-card')?.innerText.includes('2 条')",'the device drill shows only enabled offline devices and their waiting deliveries');
+await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-card')?.innerText.includes('离线样机') && !document.querySelector('.device-card')?.innerText.includes('停用样机') && document.querySelector('.device-card')?.innerText.includes('待接收') && document.querySelector('.device-card')?.innerText.includes('2 条') && document.querySelector('.device-card')?.innerText.includes('固件') && document.querySelector('.device-card')?.innerText.includes('0.4.0-dev')",'the device drill shows only enabled offline devices with their waiting deliveries and firmware');
 await expect("document.querySelector('.device-state-filter')?.innerText.includes('离线') && document.querySelector('.content .section-heading p')?.innerText.includes('显示 1 / 共 2 台')",'the device page states the state it filtered to and how many it hid');
 async function openSelect(selector){await expect(`(()=>{const s=document.querySelector('${selector} .n-base-selection');return !!s&&!s.classList.contains('n-base-selection--disabled')})()`,'select '+selector+' is enabled');if(!(await js(`document.querySelector('${selector} .n-base-selection')?.classList.contains('n-base-selection--active')`)))await js(`document.querySelector('${selector} .n-base-selection').click()`);await expect(`document.querySelector('${selector} .n-base-selection')?.classList.contains('n-base-selection--active')`,'select '+selector+' is open');}
 async function chooseVisibleOption(label){const found=await js(`(()=>{const o=[...document.querySelectorAll('.n-base-select-option')].filter(o=>o.offsetParent!==null).filter(o=>o.innerText.trim()===${JSON.stringify(label)}).pop();if(!o)return false;o.click();return true;})()`);if(!found)throw new Error('option '+label+' is not visible');}
@@ -73,7 +73,7 @@ await expect("document.querySelectorAll('.device-card').length===2 && document.q
 // 设备分页：26 台样本由服务端分页，页头写全表总数；外壳下拉仍读未过滤的完整清单。
 await fixture({mode:'many'});
 await navigate('概览');await navigate('设备');
-await expect("document.querySelectorAll('.device-card').length===24 && document.querySelector('.content .section-heading p')?.innerText.includes('26 台设备') && document.querySelector('.content .section-heading p')?.innerText.includes('22 台在线') && document.querySelector('.device-pagination')?.innerText.includes('1 / 2') && !document.querySelector('.device-grid')?.innerText.includes('待接收')",'the device page reads one server page, states the global total and hides a zero waiting count');
+await expect("document.querySelectorAll('.device-card').length===24 && document.querySelector('.content .section-heading p')?.innerText.includes('26 台设备') && document.querySelector('.content .section-heading p')?.innerText.includes('22 台在线') && document.querySelector('.device-pagination')?.innerText.includes('1 / 2') && [...document.querySelectorAll('.device-card')].every(card=>!card.innerText.includes('待接收') && ![...card.querySelectorAll('.device-seen')].some(line=>line.innerText.startsWith('固件')))",'the device page reads one server page, states the global total and hides zero waiting and unknown firmware');
 await tap('下一页');
 await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.device-pagination')?.innerText.includes('2 / 2') && document.querySelector('.device-grid')?.innerText.includes('分页设备 24') && document.querySelector('.device-grid')?.innerText.includes('分页设备 25')",'the next page asks the server for the remaining devices');
 await pickState('离线');
@@ -224,7 +224,7 @@ cliLog({mobileScreenshot:await captureScreenshot()});
 await cdp('Emulation.clearDeviceMetricsOverride');
 await fixture({mode:'success'});await tap('刷新概览');
 await expect("!document.querySelector('.overview-alerts')",'alerts clear without a leftover warning at the default viewport');
-await fixture({mode:'empty',delay:1});await tap('刷新概览');await navigate('消息');
+await fixture({mode:'empty',delay:1});await clickWhenReady('.overview-panel .section-heading button','the overview refresh control is ready for the unmount check');await navigate('消息');
 await wait(1.2);await expect("document.querySelector('h1')?.innerText==='消息' && !document.querySelector('.overview-panel')",'late response cannot restore an unmounted overview');
 await fixture({mode:'success',delay:0});await navigate('概览');await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='7'",'returning to overview reads a fresh snapshot');
 // 阈值配置：读写同一份服务端状态，版本与变更审计随响应返回，保存后概览立即采用。
