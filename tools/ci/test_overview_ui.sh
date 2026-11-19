@@ -175,11 +175,11 @@ await expect("document.querySelector('.table-shell tbody')?.innerText.includes('
 const reasonRequests=(await fixture({})).deliveryRequests.slice(reasonBase);
 if(!reasonRequests.length||!reasonRequests.some(path=>path.includes('status=failed')&&path.includes('lastError=ack_timeout')))throw new Error('reason drill did not carry status+lastError: '+JSON.stringify(reasonRequests));
 results.push('the reason read carried both status=failed and lastError');
-await expect("document.querySelector('[aria-label=失败原因]')?.innerText.includes('设备确认超时')",'the delivery page shows the reason filter it applied');
+await expect("document.querySelector('[aria-label=最近错误]')?.innerText.includes('设备确认超时')",'the delivery page shows the reason filter it applied');
 const clearBase=(await fixture({})).deliveryRequests.length;
 await expect("(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='清空筛选');return !!b&&!b.disabled;})()",'the clear control is available after a drill');
 await tap('清空筛选');
-await expect("!document.querySelector('[aria-label=失败原因]') && document.querySelector('.table-shell tbody')?.innerText.includes('等待投递样本')",'clearing the filter drops the reason control and restores the unfiltered list');
+await expect("document.querySelector('[aria-label=最近错误]')?.innerText.trim()==='全部原因' && document.querySelector('.table-shell tbody')?.innerText.includes('等待投递样本')",'clearing the filter resets the reason control and restores the unfiltered list');
 const cleared=(await fixture({})).deliveryRequests.slice(clearBase);
 if(!cleared.length||cleared.some(path=>path.includes('lastError=')||path.includes('status=')))throw new Error('clearing left a filter behind: '+JSON.stringify(cleared));
 results.push('clearing removes both status and lastError from the read');

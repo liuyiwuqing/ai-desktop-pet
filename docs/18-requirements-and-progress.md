@@ -78,6 +78,7 @@
 | CONSOLE-25 | 统一加载、空状态与错误反馈 | 软件本地已验证：统一展示组件、读取状态去重与紧凑提示，保留校验/核对/重试 | 22 组浏览器 1038 次检查、完整构建与最终包通过；跨仓交付见末尾 |
 | CONSOLE-26 | 刷新恢复登录与令牌维护 | 软件本地已验证：8h 会话、退出/失效/跨页保护；管理员文件令牌修改，角色编辑/重新生成 | 23 组浏览器 1098 条、完整 128 项校验（5 条件跳过）、真实 5173/8088 会话与 SSE；交付见末尾 |
 | CONSOLE-27 | 登录会话跨 CORE 重启持久化 | 软件本地已验证：私有摘要会话、重启恢复、退出持久删除、逐请求核验父凭据 | 真实独立 JVM、HTTPS 容器重建、本地 5173/8088 重启与退出复核；交付见末尾 |
+| CONSOLE-28 | 最近错误筛选独立可用 | 软件本地已验证：原因筛选在任意状态可用、只发 `lastError`，`unknown` 仅失败状态；投递空列表可回消息页 | 本地新增筛选 50 项、相关回归 475 项、完整构建 178 通过/5 条件跳过、JAR 资源一致；提交/CI 见末尾 |
 | CONSOLE-02 | 管理台完成度与验收清单 | `65eb2ef` 已推送；已按八导航、原完整规划及真实控制器核对；当前功能/验证/缺项见 [23](23-console-completion.md#console-02--当前实现与完整规划的差距) | 完整规划尚未全部实现；文档核对不算缺项完成。状态筛选已单独交付 CONSOLE-03 |
 | CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；更多筛选/元数据导出见 CONSOLE-13，取消/时间线见 CONSOLE-04 |
 | CONSOLE-04 | 投递状态时间线与受限取消 | CORE `109b83f` / 04 `0dec4b6` 已推送并核对远程；HTTP/worker/隔离 SQL 6 项，实际 Vue 新增 62/既有 191 项，Java→固件 C→Java 契约通过；完整构建 70 通过/5 跳过、JAR 一致；见 [23](23-console-completion.md#console-04--事务状态时间线与受限取消) | CORE [43410896935](https://github.com/liuyiwuqing/nexus-core/actions/runs/43410896935) Docker job、04 [43410974174](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43410974174) 七个 job 全绿；V13 只在隔离库验证，旧行历史未知，无设备撤回或生产迁移 |
@@ -1307,3 +1308,16 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：服务端不探测设备固件版本，已部署的旧固件会拒收带 `display` 的新投递；使用非缺省声音/时长前必须升级设备。声音在真实喇叭上的音量、音色与时长表现未验收；DND/优先级行为只由主机逻辑与既有测试覆盖，未在实机验证。display 只影响新投递，不重渲染旧投递。
 
 推送与 CI（2026-11-19）：CORE `002e926` / 04 `91f43a5` 已推送，`git ls-remote` 核对远端分支分别指向 `002e926aeb3f4a0c1461dd26467a5e3bb3492486` 与 `91f43a51ea573b19ba6659316f205f70f3224caa`。CORE `Docker deployment` [#44479893907](https://github.com/liuyiwuqing/nexus-core/actions/runs/44479893907) 重跑后 `success`；首次在 Docker 构建拉取 `spring-boot-starter-parent:4.1.2` 时瞬时失败，该构件当前可正常访问且 `pom.xml` 未变，与本次改动无关。04 `Software checks` [#44479911971](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44479911971) 八个 job 全部 `success`，含六个固件预设、交付工具与语音桥接准备。两项 workflow 均不运行完整 Maven 套件、36 项浏览器专项与本地固件构建，这些仍为本地证据；远程 CI 不等于真实部署或实机验证。
+
+## CONSOLE-28 · 最近错误筛选独立可用
+
+[02 §5.1](02-message-hub.md#5-在线配置管理面板) 的投递筛选清单包含失败原因，但页面此前只在状态为「投递失败」时显示原因下拉。`lastError` 同样保留在 `pending`/`sent`（`broker_unavailable`）和 `cancelled`（`cancelled_by_admin`）行上，按失败过滤会漏掉这些记录。
+
+- 投递页「最近错误」始终显示，可在「全部」或任一状态下选择；选择原因只发送 `lastError`，不隐式附加 `status`。`unknown`（未记录原因）仍只在「投递失败」下提供，因为其它状态下它等于 `last_error IS NULL`，会把成功行全部带进来。
+- 切换状态会清掉已选原因，避免留下与当前状态不相干的条件；「清空筛选」和退出登录仍同时清除状态与原因。
+- 投递空列表增加「查看消息」动作，直接回到消息页；接口参数、数据库结构、导出规则、设备动作和状态机未改。
+- 浏览器夹具补充 `lastError` 过滤，使原因筛选能按服务端语义返回 31 条失败行；夹具仍为回环 HTTP，不代表真实数据库或 Broker。
+
+验证（2026-11-19，本机 macOS）：`bash tools/ci/test_list_filters_ui.sh` 50 项通过，新增覆盖原因在「全部」下只发送 `lastError`、31 条失败结果、非失败状态不提供 `unknown`、失败状态提供 `unknown`、清空原因恢复 37 条混合列表、重新登录同时重置状态与原因；首轮失败是断言误判“清空后首页应出现非失败行”（37 条中前 31 条为失败），修正为核对总数后完整重跑通过，没有改产品源码。`test_overview_ui.sh` 132 项、`test_console_states_ui.sh` 128 项（含空投递「查看消息」跳转）、投递时间线 66 项、元数据导出 51 项、消息批量 30 项、界面主题 68 项再次通过，共 525 项浏览器检查，任务空间均关闭。完整 `JAVA_HOME="$(/usr/libexec/java_home -v 21)" python3 tools/run_local.py build` 退出 0：183 条中 178 通过、5 条条件跳过、0 失败/错误；JAR 的 index、DeliveryPanel 脚本/样式与 `target/frontend` 逐字节哈希一致，无旧资源。本地未启动真实 CORE、数据库、Broker 或设备。
+
+边界：原因筛选仍是读取时快照；`pending` 行只有 `broker_unavailable` 这类最近错误，不代表设备已收到或未收到。原因值来自既有 `last_error`，没有新增错误码、审计或清理规则。没有真实环境、部署或设备验收结论。

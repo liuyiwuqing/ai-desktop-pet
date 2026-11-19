@@ -96,6 +96,9 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 messages=path.endswith('/messages');key='readStatus' if messages else 'status';status=query.get(key,[''])[0]
                 rows=state['listMessages' if messages else 'listDeliveries']
                 rows=[row for row in rows if not status or row[key]==status]
+                if not messages:
+                    reason=query.get('lastError',[''])[0]
+                    if reason:rows=[row for row in rows if (row.get('lastError') or 'unknown')==reason]
                 value={'items':copy.deepcopy(rows[(page-1)*size:page*size]),'total':len(rows),'page':page,'size':size}
             elif path.startswith('/api/v1/messages/') and path.endswith('/deliveries'):
                 state['receiptRequests'].append(self.path)

@@ -70,6 +70,10 @@ for(const [tab,resource,scope,empty] of cases){
 }
 await qa({path:'/api/v1/messages',mode:'success',delay:0});await nav('inbox');
 await expect("document.querySelector('.empty-state h2')?.innerText==='暂无消息'",'shared empty title');await shot('empty-desktop');
+await nav('deliveries');
+await expect("document.querySelector('.console-state-actions button')?.innerText==='查看消息'",'empty deliveries offers the next step');
+await js("document.querySelector('.console-state-actions button').click()");
+await expect("document.querySelector('.app-layout > .sidebar [data-tab=inbox]').getAttribute('aria-current')==='page' && document.querySelector('.content h1')?.innerText==='消息'",'empty deliveries action opens messages');
 const filterTop=await js("document.querySelector('.list-filters').getBoundingClientRect().top");
 await qa({delay:2});await expect("(()=>{const b=document.querySelector('.topbar button[aria-label=刷新]');if(!b||b.disabled)return false;b.click();return true})()",'visible refresh becomes available');
 await expect("!!document.querySelector('.loading-state .n-skeleton')&&!document.querySelector('.empty-state')",'first-data loading has themed skeletons without a false empty state');
