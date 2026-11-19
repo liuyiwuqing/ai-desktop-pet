@@ -79,6 +79,19 @@
 
 推送与 CI：CORE `e3e2660` 已推送并核对远端；[Docker CI 44507910931](https://github.com/liuyiwuqing/nexus-core/actions/runs/44507910931) 全步骤 `success`。04 仅文档，路径过滤不触发 workflow。CI 不运行上述 4 项 HTTP 测试；真实部署、外部发送方与设备回执未验收。
 
+## SOURCE-02 · 来源最近事件
+
+[02 §5.1](02-message-hub.md#51-功能清单) 把“最近事件”列为消息源维护内容，但来源卡片此前只显示最近接收时间。第三方发送方接入后，管理员只能看到“有事件”而看不到最近收到了什么；本次在既有 `GET /api/v1/sources` 响应中追加只读的最近事件投影，不新增端点、迁移或写入路径。
+
+- 每个来源新增 `recentEvents`：最多 3 条，来自 `webhook_receipts` 关联仍存在的 `inbox_messages`，按接收时间倒序、`messageId` 兜底排序；字段为 `messageId`、`eventType`、`title`、`priority`、`receivedAt`、`contentPurgedAt`。时间为 ISO-8601 UTC，与列表既有时间字段一致。
+- 只读 `webhook_receipts` 天然排除管理员“测试来源”消息；该操作仍只生成测试消息，不会伪装成来源事件。正文被保留策略清理后事件仍保留，`title` 为空（库内为空串）且 `contentPurgedAt` 非空。
+- 查询使用窗口函数按来源取前 3 条，单次列表只增加一条有界 SQL；不改变来源启停、轮换、设备范围、令牌/HMAC、回执时间线或消息状态机。
+- 来源卡片以「最近事件」列出时间与标题，空状态显示「最近事件：暂无」，已清理正文显示「正文已清理」；标题过长在卡片内换行，不新增抽屉或二级页面。
+
+验证（2026-11-19，本机 macOS/Docker）：`JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -Dtest=WebhookSourceFlowTest test` 退出 0，5 项通过、0 失败/错误；新增用例覆盖 4 条事件只返回最新 3 条且倒序、字段与 UTC 时间、测试来源消息不进入、列表不含令牌/密钥、正文清理后 `title` 为空且 `contentPurgedAt` 非空。`npm run check` 与 `npm run build` 通过；`bash tools/ci/test_sources_ui.sh` 42 项通过，新增覆盖空状态、3 条事件顺序、清理正文回退文案，既有创建/凭据/启停/轮换/未知结果/401/390px 检查保持通过。
+
+边界：最近事件是接收投影，不是网络抓包、设备日志或完整消息时间线；消息被保留策略彻底删除后对应事件不再显示，但 `received` 计数仍包含历史回执。未连接真实 Broker/设备、未部署、未迁移生产库，也未与真实第三方发送方联调。
+
 ## CONSOLE-28 · 最近错误筛选独立可用
 
 投递页的「最近错误」不再只在状态为「投递失败」时出现。`lastError` 也保留在 `pending`/`sent`（`broker_unavailable`）和 `cancelled`（`cancelled_by_admin`）行上，按失败过滤会漏掉这些记录；现在可在「全部」或任一状态下直接选择原因，请求只带 `lastError`，不隐式附加 `status`。`unknown`（未记录原因）仍只在「投递失败」下提供，避免在其它状态下把没有 `last_error` 的成功行全部带入；切换状态会清掉已选原因。

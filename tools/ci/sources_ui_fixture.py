@@ -59,7 +59,7 @@ class SourcesFixture(RoutingFixture):
             elif source:
                 value = {'source': source, 'credentialsAvailable': False}
             else:
-                source = {'id': source_id, 'name': body['name'], 'enabled': False, 'version': 1, 'deviceIds': body['deviceIds'], 'received': 0, 'lastReceivedAt': None}
+                source = {'id': source_id, 'name': body['name'], 'enabled': False, 'version': 1, 'deviceIds': body['deviceIds'], 'received': 0, 'lastReceivedAt': None, 'recentEvents': []}
                 state['sources'].append(source)
                 value = {'source': source, 'credentialsAvailable': True, 'token': 'fixture-token-once-not-real', 'secret': 'fixture-secret-once-not-real'}
             value = copy.deepcopy(value)
