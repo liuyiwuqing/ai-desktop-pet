@@ -1291,3 +1291,19 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：状态是读取时快照，不自动刷新；设备已收到/展示/已读仍以回执为准，页面显示 pending 不代表设备未收到。批量撤销/重试会改变这里的状态，本视图不提供它们。未在真实 Broker/设备验证，未做真实部署或实机验收。
 
 推送与 CI（2026-11-19）：CORE `44ab663` / 04 `e5d8bfa` 已推送，`git ls-remote` 核对远端分支分别指向 `44ab6637cd5b0d71cd990a4b4cd9c3db056ea917` 与 `e5d8bfa597875cbfe67eb80efb3566040227670f`。CI：CORE `Docker deployment` [#44460704016](https://github.com/liuyiwuqing/nexus-core/actions/runs/44460704016) `success`（2m15s）；04 `Software checks` [#44460721426](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44460721426) 八个 job 全部 `success`，含六个固件预设、交付工具与语音桥接准备。两项 workflow 均不运行完整 Maven 套件与 36/86/30/44/48 项浏览器专项，这些仍为本地证据；远程 CI 不等于真实部署或实机验证。
+
+## TEMPLATE-DISPLAY-01 · 模板声音与展示时长
+
+[02 §5.1](02-message-hub.md#5-在线配置管理面板) 的模板规划包含声音与时长；此前服务端和设备契约都固定为无提示音、8 秒。本项先把协议、固件、CORE 与页面一起升级，避免只加表单字段。
+
+- 模板定义接受 `sound ∈ {none,chime,alert}` 与整数 `durationSeconds ∈ [5,30]`；其他值仍 400 `invalid_template_definition`。`templates` 的 capabilities 改为声音列表与 5–30 秒范围，预览响应增加 `sound`/`durationMs`。
+- V28 给 `deliveries` 增加可空 `sound`、`duration_ms` 与取值约束；创建投递时把模板快照的声音/时长与标题/摘要/事件类型一起写入，定向测试幂等重放和模板后续修改都保留首次快照。没有模板的行保持 NULL。
+- DeliveryWorker 仅在快照为非缺省组合（声音非 `none` 或时长非 8000）时向 v1 信封加入可选 `payload.display`，缺省组合继续发送旧线格式。display 不携带模板类型，卡片仍由 `eventType` 前缀决定。
+- 设备 nexus 解析接受 `display` 的 `sound` 与 `durationMs`；未知/重复/空对象、非对象、非法声音和越界时长仍拒收。既有模板、通知与 DND 逻辑直接生效：声音受 DND 约束，critical 仍按原规则打断。
+- 页面新增提示音下拉与显示时长数字框，记录卡片和预览显示实际声音/时长；范围说明改为 5–30 秒，并提示旧固件必须先升级。未增加模板动作、路由或投递状态机字段。
+
+验证（2026-11-19，本机 macOS/Docker）：`MessageTemplateFlowTest` 3 项通过，新增定向测试快照（chime/15 秒写入投递，重放与模板改为 alert/30 秒后仍保留首次快照）、非法声音/4 秒/31 秒 400 与预览 sound/durationMs 断言。设备主机 `test_nexus_codec` 通过：接受单/双字段与 5000/30000 边界，拒绝 4999/30001、字符串时长、非法声音、重复字段、未知字段、空对象、数组与重复 display，缺省仍为 none/8000，DND 时保留展示但静音；完整 `tools/ci/test_host.sh` 在 `LC_ALL=C` 下退出 0（默认中文 Git 区域的构建矩阵用例只匹配英文 `dubious ownership`，属既有环境敏感测试，未改代码）。`check_contracts.py` 与 `schema_codegen.py` 通过，schema/示例镜像一致；源码契约 Java→固件→Java 通过，含 display 的投递信封 640 UTF-8 字节，低于 1024 上限。`bash tools/ci/test_templates_ui.sh` 实际 Vue + 回环 RAM 36 项通过（选择提示音/15 秒、预览、保存请求身份、记录展示及既有回归）；首轮“关闭草稿焦点回归”一次未通过，未改产品代码重跑 36/36、再次完整运行 36/36 通过。CORE 完整 `build` 退出 0：183 条中 178 通过、5 条条件跳过、0 失败/错误；JAR 的 index/JS/CSS 与本轮前端产物逐字节一致，无旧资源。固件在 ESP-IDF 6.1 下 `source export.sh` 后 `idf.py build` 退出 0，生成 `nexus_pet.bin`（0x2def70 字节，最小 app 分区余量 28%）；首次直接调用 ninja 增量构建因未加载 IDF 环境在 CMake 配置阶段失败，加载环境后完整构建通过，未烧录设备。
+
+边界：服务端不探测设备固件版本，已部署的旧固件会拒收带 `display` 的新投递；使用非缺省声音/时长前必须升级设备。声音在真实喇叭上的音量、音色与时长表现未验收；DND/优先级行为只由主机逻辑与既有测试覆盖，未在实机验证。display 只影响新投递，不重渲染旧投递。
+
+推送与 CI：待填。

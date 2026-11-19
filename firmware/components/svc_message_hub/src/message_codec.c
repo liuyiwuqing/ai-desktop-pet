@@ -789,11 +789,64 @@ static bool nexus_text_valid(const char *text)
     return true;
 }
 
+static pet_message_error_t parse_nexus_display(cursor_t *cursor, pet_message_view_t *out)
+{
+    if (!consume(cursor, '{')) {
+        return PET_MESSAGE_ERR_DISPLAY;
+    }
+
+    unsigned seen = 0;
+    char next = '\0';
+    if (!peek(cursor, &next)) {
+        return PET_MESSAGE_ERR_DISPLAY;
+    }
+    if (next == '}') {
+        return PET_MESSAGE_ERR_DISPLAY;
+    }
+
+    for (;;) {
+        char key[16];
+        if (parse_string(cursor, key, sizeof(key)) != STRING_OK || !consume(cursor, ':')) {
+            return PET_MESSAGE_ERR_DISPLAY;
+        }
+        if (strcmp(key, "durationMs") == 0) {
+            uint32_t duration = 0;
+            if (!parse_uint(cursor, &duration) || duration < 5000 || duration > 30000 ||
+                (seen & 1u) != 0) {
+                return PET_MESSAGE_ERR_DISPLAY;
+            }
+            out->duration_ms = duration;
+            seen |= 1u;
+        } else if (strcmp(key, "sound") == 0) {
+            char text[16];
+            if (parse_string(cursor, text, sizeof(text)) != STRING_OK || (seen & 2u) != 0 ||
+                parse_sound(text, &out->sound) != PET_MESSAGE_OK) {
+                return PET_MESSAGE_ERR_DISPLAY;
+            }
+            seen |= 2u;
+        } else {
+            return PET_MESSAGE_ERR_DISPLAY;
+        }
+        if (!peek(cursor, &next)) {
+            return PET_MESSAGE_ERR_DISPLAY;
+        }
+        if (next == '}') {
+            cursor->cur++;
+            break;
+        }
+        if (next != ',' || !consume(cursor, ',')) {
+            return PET_MESSAGE_ERR_DISPLAY;
+        }
+    }
+    return PET_MESSAGE_OK;
+}
+
 static pet_message_error_t parse_nexus_payload(cursor_t *cursor, pet_message_view_t *out)
 {
     if (!consume(cursor, '{'))
         return PET_MESSAGE_ERR_SCHEMA;
     field_mask_t fields = {0};
+    bool display_seen = false;
     for (;;) {
         char key[16];
         if (parse_string(cursor, key, sizeof(key)) != STRING_OK || !consume(cursor, ':'))
@@ -838,6 +891,13 @@ static pet_message_error_t parse_nexus_payload(cursor_t *cursor, pet_message_vie
                 parse_string(cursor, priority, sizeof(priority)) != STRING_OK ||
                 parse_priority(priority, &out->priority) != PET_MESSAGE_OK)
                 return PET_MESSAGE_ERR_PRIORITY;
+        } else if (strcmp(key, "display") == 0) {
+            if (display_seen)
+                return PET_MESSAGE_ERR_SCHEMA;
+            display_seen = true;
+            const pet_message_error_t err = parse_nexus_display(cursor, out);
+            if (err != PET_MESSAGE_OK)
+                return err;
         } else {
             return PET_MESSAGE_ERR_SCHEMA;
         }

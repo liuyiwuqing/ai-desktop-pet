@@ -166,6 +166,11 @@ export interface MessageRejection {
   reason: "busy" | "storage_error" | "time_unavailable" | "expired" | "invalid";
 }
 
+export interface MessageEnvelopePayloadDisplay {
+  durationMs?: number;
+  sound?: "none" | "chime" | "alert";
+}
+
 export interface MessageEnvelopePayload {
   messageId: string;
   source: string;
@@ -173,6 +178,8 @@ export interface MessageEnvelopePayload {
   title: string;
   summary: string;
   priority: "low" | "normal" | "high" | "critical";
+  /** 可选；缺省等价于 sound=none、durationMs=8000。仅非缺省模板值发送，模板类型仍由 eventType 前缀决定。 */
+  display?: MessageEnvelopePayloadDisplay;
 }
 
 export interface MessageEnvelope {

@@ -58,7 +58,9 @@ class TemplatesFixture(RolesFixture):
             for name, content in message.items():
                 value = value.replace('{' + name + '}', str(content))
             rendered[key] = value
-        return self.json_response(200, {**rendered, 'eventType': definition['icon'] + '.template'})
+        return self.json_response(200, {**rendered, 'eventType': definition['icon'] + '.template',
+                                        'sound': definition['sound'],
+                                        'durationMs': int(float(definition['durationSeconds']) * 1000)})
 
     def do_DELETE(self):
         if not self.path.startswith('/api/v1/templates/'):

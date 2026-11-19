@@ -72,7 +72,7 @@
 - `payload.messageId` 与 `eventId` 保持服务端小写标准 UUID；不截断、散列或替换成 `msg_…`。
 - `sentAt/expiresAt` 为 UTC epoch 秒，设备范围为正 uint32，且 `expiresAt > sentAt`。时间未同步时暂不接受新投递，等待服务端重试。
 - JSON 总长不超过 1024 UTF-8 字节；`title` 不超过 96 字节，`summary` 不超过 180 字节。服务端 `DeviceText.fit` 在 UTF-8 边界裁剪，并将控制字符替换为空格。
-- `priority` 为 `low/normal/high/critical`；UI 按 `eventType` 的 `comment./alert./growth./system.` 前缀映射模板，其他类型使用文本卡片。首版持续 8 秒、无声音；DND 策略保持不变。
+- `priority` 为 `low/normal/high/critical`；UI 按 `eventType` 的 `comment./alert./growth./system.` 前缀映射模板，其他类型使用文本卡片。`payload.display` 可选，承载模板的非缺省 `sound`（`none/chime/alert`）与 `durationMs`（5000–30000）；缺省等价于 `none`/8000，DND 策略保持不变。
 - 未知字段、重复字段、非法 UTF-8、无效身份、版本和时间范围均拒收；失败不会产生成功回执。
 
 ### 3.3 回执与在线状态
@@ -187,7 +187,7 @@ X-Nexus-Signature: sha256=<hmac>
 
 - 单条全屏卡片；正文超出 6 行进入纵向滚动，底部显示页码/进度。
 - 标题最多 2 行，超出省略；正文按 UTF-8 字符换行，避免截断多字节字符。
-- 展示时长：`max(5000, min(30000, 字数 × 80 ms))`，可由 `display.durationMs` 覆盖。
+- 展示时长：默认 `8000 ms`；模板可经 `display.durationMs` 覆盖为 5000–30000，设备仍以 `message.durationMs` 上限约束。旧固件会拒收未知 `display` 字段，使用非缺省值时需先升级设备。
 - 优先级抢占：`critical` 立即打断当前消息并红色边框抖动；`high` 当前消息结束后优先；`normal` FIFO；`low` 仅在空闲时展示。
 - 消息到达：短提示音 + 惊讶表情；`critical` 使用警报音 + 抖动；DND 下静默。
 - 已读：消息可见时 BOOT 短按；自动滚动到底部不自动已读。

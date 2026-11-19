@@ -82,6 +82,26 @@
             "high",
             "critical"
           ]
+        },
+        "display": {
+          "description": "可选；缺省等价于 sound=none、durationMs=8000。仅非缺省模板值发送，模板类型仍由 eventType 前缀决定。",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "durationMs": {
+              "type": "integer",
+              "minimum": 5000,
+              "maximum": 30000
+            },
+            "sound": {
+              "type": "string",
+              "enum": [
+                "none",
+                "chime",
+                "alert"
+              ]
+            }
+          }
         }
       }
     }

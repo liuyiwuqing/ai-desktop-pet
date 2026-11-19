@@ -26,10 +26,11 @@ public final class ContractProbe {
 
         @Override public List<Map<String, Object>> queryForList(String sql, Object... args) {
             if (sql.contains("SELECT d.event_id,d.device_id")) {
-                return List.of(Map.of("event_id", EVENT, "device_id", "dodo-01", "message_id", MESSAGE,
-                    "attempts", 0, "expires_at", expires, "source", "Halo_Blog", "event_type", "comment.created",
-                    "title", "新评论\n带引号\"与 emoji 🐾".repeat(8),
-                    "summary", "访客：你好，桌宠。\t测试转义\\与 UTF-8。".repeat(12), "priority", "high"));
+                return List.of(Map.ofEntries(Map.entry("event_id", EVENT), Map.entry("device_id", "dodo-01"), Map.entry("message_id", MESSAGE),
+                    Map.entry("attempts", 0), Map.entry("expires_at", expires), Map.entry("source", "Halo_Blog"), Map.entry("event_type", "comment.created"),
+                    Map.entry("title", "新评论\n带引号\"与 emoji 🐾".repeat(8)),
+                    Map.entry("summary", "访客：你好，桌宠。\t测试转义\\与 UTF-8。".repeat(12)), Map.entry("priority", "high"),
+                    Map.entry("sound", "chime"), Map.entry("duration_ms", 15000)));
             }
             if (sql.contains("SELECT d.status,d.attempts")) {
                 ++reads;

@@ -3,9 +3,9 @@
   "capturedAt": "2026-11-14",
   "sourceRepository": "../nexus-core",
   "sources": {
-    "src/main/java/dev/nexus/core/delivery/DeliveryWorker.java": "eeb3b33afb44e8e82bfaadc7a18e35d6b7df6ea3f7c923196c9e06783e0400d7",
+    "src/main/java/dev/nexus/core/delivery/DeliveryWorker.java": "0c254352d81ca6e64f99971b9b893290e6a4ab165d1f0bff736d1efa10c007ea",
     "src/main/java/dev/nexus/core/delivery/DeviceText.java": "c031dd6f5fb4548e6738d7bd60bb276ff7ac5377052d71e4d5046779530309a1",
-    "src/main/java/dev/nexus/core/delivery/DeliveryService.java": "192925ed614eef7dddb53ded019a94262047b31721bd789cb2a0950c28f45c4a",
+    "src/main/java/dev/nexus/core/delivery/DeliveryService.java": "fdcea160f8f8dce9d8d5525a0c63242f902f0bfc927aa7db4d5e8663a6a8d28a",
     "src/main/java/dev/nexus/core/delivery/MqttTransport.java": "9fde74b37a224b6d3bf2c3826759ddfd796d48f9437b0c80be88109aa5e05eff",
     "src/main/java/dev/nexus/core/inbox/MessageInput.java": "ec9803cf48979caefb56a122b43276f2b6d4020a6a7bc748ed2e14a4bd38b8b5",
     "src/main/resources/db/migration/V1__inbox_and_delivery.sql": "4cd29fada39046a6001c5e8bda9c875a30b800dae347e4c3e0ef34cc00a779e6",
