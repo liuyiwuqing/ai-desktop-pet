@@ -727,6 +727,29 @@ int main(int argc, char **argv)
         puts("AI agent: 100ms prebuffer, bounded underrun and recovery passed");
         return 0;
     }
+    if (failing("jitter-buffer")) {
+        /* 起播门限仍是 100 ms；容量扩大后，中途断流应先消耗抖动余量而不是补静音。 */
+        for (unsigned i=0;i<5;++i) assert(pet_ai_agent_play(1,pcm,480,false)==ESP_OK);
+        run_task();
+        assert(playback_starts==1 && written_samples==480);
+        unsigned peak=status().buffered_samples;
+        for (unsigned i=0;i<12;++i) {
+            assert(pet_ai_agent_play(1,pcm,480,false)==ESP_OK);
+            assert(pet_ai_agent_play(1,pcm,480,false)==ESP_OK);
+            run_task();
+            if (status().buffered_samples>peak) peak=status().buffered_samples;
+        }
+        assert(peak>=7200); /* 旧容量只有 2,880 样本；新容量把预缓冲扩到 7,200。 */
+        run_task(); /* 无新包时先把上一个 tick 多喂的一包并回预缓冲，队列清零。 */
+        for (unsigned i=0;i<8;++i) assert(pet_ai_agent_play(1,pcm,480,false)==ESP_OK);
+        for (unsigned i=0;i<18;++i) run_task(); /* 360 ms 断流，仍是 0 次欠载。 */
+        assert(status().playback_underruns==0);
+        assert(pet_ai_agent_play(1,NULL,0,true)==ESP_OK);
+        for (unsigned i=0;i<40 && status().view.state==PET_AI_SPEAKING;++i) run_task();
+        assert(status().view.state==PET_AI_IDLE && drains==1 && status().playback_underruns==0);
+        puts("AI agent: expanded jitter buffer absorbs 360ms gap without underrun passed");
+        return 0;
+    }
     assert(pet_ai_agent_play(99, pcm, PET_AUDIO_PLAYBACK_SAMPLES, false) == ESP_OK);
     assert(pet_ai_agent_play(1, pcm, PET_AUDIO_PLAYBACK_SAMPLES, false) == ESP_OK);
     memset(pcm, 0, sizeof(pcm)); /* 生产者可立即复用缓冲区。 */

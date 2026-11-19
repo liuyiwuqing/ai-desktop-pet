@@ -113,7 +113,7 @@ build_and_run test_ai_agent \
     "${repo_root}/firmware/components/svc_ai_agent/src/ai_runtime.c" \
     "${repo_root}/firmware/components/pet_hal/src/audio_pcm.c" \
     "${repo_root}/firmware/tests/host/test_ai_agent.c" -lm
-for scenario in notification notification-only notification-critical prebuffer wake alloc-fail control-queue-fail playback-queue-fail task-fail init-fail \
+for scenario in notification notification-only notification-critical prebuffer jitter-buffer wake alloc-fail control-queue-fail playback-queue-fail task-fail init-fail \
     capture-fail read-fail read-overrun deinit-fail read-stall partial-read burst-read transport-fail \
     stop-fail write-fail partial-write write-stall drain-fail queue-full cancel-fail \
     empty-playback playback-stall barge-in priority-mute priority-cancel privacy privacy-read \

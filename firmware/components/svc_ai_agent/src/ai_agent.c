@@ -13,7 +13,9 @@
 
 #define CONTROL_DEPTH 8u
 #define PLAYBACK_DEPTH 8u
-#define PREBUFFER_SAMPLES 2400u
+/* 起播门限保持 100 ms，不让首响变慢；容量决定中途可吸收的抖动，随对象放在 PSRAM。 */
+#define PREBUFFER_START_SAMPLES 2400u
+#define PREBUFFER_CAPACITY_SAMPLES 7200u
 #define IO_TIMEOUT_MS 20u
 #define PLAYBACK_STALL_MS 500u
 
@@ -47,7 +49,7 @@ typedef struct {
     uint64_t playback_progress_ms;
     bool submitted_audio, playing, cancel_pending, response_ended;
     pet_audio_buffer_t prebuffer;
-    int16_t prebuffer_pcm[PREBUFFER_SAMPLES + PET_AUDIO_PLAYBACK_SAMPLES];
+    int16_t prebuffer_pcm[PREBUFFER_CAPACITY_SAMPLES + PET_AUDIO_PLAYBACK_SAMPLES];
     int16_t last_output;
     uint64_t next_silence_ms;
     pet_message_sound_t notification;
@@ -412,7 +414,7 @@ static bool write_playback(agent_t *owner, uint32_t turn, bool *progress)
         }
     }
     if (!owner->playing) {
-        if (owner->prebuffer.count>=PREBUFFER_SAMPLES || (owner->response_ended && owner->prebuffer.count)) {
+        if (owner->prebuffer.count>=PREBUFFER_START_SAMPLES || (owner->response_ended && owner->prebuffer.count)) {
             esp_err_t error=owner->config.audio->playback_start(PET_AUDIO_PLAYBACK_RATE);
             if (error!=ESP_OK) { owner->hardware_error=error; return dispatch(owner,PET_AI_AUDIO_FAILED,turn); }
             owner->playing=true; owner->next_silence_ms=monotonic_ms()+PET_AUDIO_FRAME_MS;
@@ -663,7 +665,7 @@ esp_err_t pet_ai_agent_start(const pet_ai_agent_config_t *config)
     if (owner == NULL) return ESP_ERR_NO_MEM;
     memset(owner, 0, sizeof(*owner));
     owner->config = *config;
-    (void)pet_audio_buffer_init(&owner->prebuffer,owner->prebuffer_pcm,PREBUFFER_SAMPLES+PET_AUDIO_PLAYBACK_SAMPLES);
+    (void)pet_audio_buffer_init(&owner->prebuffer,owner->prebuffer_pcm,PREBUFFER_CAPACITY_SAMPLES+PET_AUDIO_PLAYBACK_SAMPLES);
     owner->status.policy = config->initial_policy;
     owner->status.volume_pct = config->volume_pct;
     owner->status.voice_enabled = !config->notifications_only;

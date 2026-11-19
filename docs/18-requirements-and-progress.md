@@ -38,6 +38,7 @@
 | HW-11 | 设备热点自定义与配网页扩展 | 软件已验证；热点名称/密码策略（随机/固定/开放）、隐藏、信道、连接数、设置窗口保存到 NVS `pet_setup/portal_v1`，配网页新增“设备热点”区与保存后重开热点；见 [28](28-device-web-setup.md#设备热点设置) | 新增 `test_setup_portal` 覆盖默认值/边界/生效规则/JSON 往返/部分更新；完整主机测试、隔离固件构建与 10 项 LVGL 通过；实机改名、隐藏与重开热点待验收，提交/CI 见末尾 |
 | HW-12 | 家庭网络地址与主机名设置 | 软件已验证；`net` 分组扩展 `ip_mode/ip/netmask/gateway/dns/hostname`，共享规则 `pet/netcfg.h`，固定地址经 `pet_netif_apply_ip` 在设置态与正常启动都生效；配网页第 1 节新增“家庭网络高级设置”与只读当前地址；见 [28](28-device-web-setup.md#家庭网络高级设置可选) | `test_setup_portal::netcfg` 与 `test_config_service` 新增地址用例，完整主机测试、10 项 LVGL、隔离固件构建通过；真实路由器连通与断网恢复待验收，提交/CI 见末尾 |
 | HW-13 | 配网页“当前状态”概览 | 软件已验证；首屏默认展示家庭 Wi-Fi（名称/状态/IP/掩码/网关/DNS/信号/地址方式/主机名）、设备热点（名称/来源/安全/信道/连接数与上限/剩余时间）和管理台摘要（设备 ID/Broker/TLS/脱敏账号/CA/配置状态），空状态与未连接状态明确标注；见 [28](28-device-web-setup.md#当前状态默认展示) | 新增 `status_helpers` 覆盖 Broker 解析与账号脱敏，修正 Wi-Fi 名称被设备 ID 覆盖的旧缺陷；完整主机测试、10 项 LVGL、隔离构建与双状态浏览器检查通过；实机计数/信道/掉线状态待验收，提交/CI 见末尾 |
+| HW-14 | 播放抖动缓冲扩容 | 软件已验证；起播门限保持 100 ms，预缓冲容量从 2,880 扩到 7,200+480 样本（约 320 ms，仍在 PSRAM），叠加 8 包队列后可吸收约 480 ms 中途断流；见 [01 §5.1](01-ai-agent.md#51-数据流) | 新增 `test_ai_agent::jitter-buffer`（7,200 样本峰值 + 360 ms 断流 0 欠载 + 正常 DRAINED），完整主机/ASan/UBSan、10 项 LVGL 与隔离 default 构建通过；真实长回答欠载计数待实机复测，提交/CI 见末尾 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -1423,3 +1424,16 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：最近事件是接收投影，不是网络抓包、设备日志、完整消息时间线或投递回执；消息被保留策略彻底删除后对应事件不再显示，但 `received` 计数仍包含历史回执。未连接真实第三方发送方、Broker/设备，未部署，未迁移生产库，也未实机验收。
 
 推送与 CI（2026-11-19）：CORE `e8d192a` / 04 `eb5aa43` 已推送并核对远端（`git ls-remote` 分别指向 `e8d192ab86eeb645164ba9d5fba1dc58713046af` 与 `eb5aa437ebf015af0d873dcf6c70681e886a0790`）。CORE `Docker deployment` [#44549049557](https://github.com/liuyiwuqing/nexus-core/actions/runs/44549049557) 全步骤 `success`（2m19s）；04 [Software checks #44549079109](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44549079109) 八个 job 全部 `success`。两项 workflow 都不运行上述浏览器专项与 `WebhookSourceFlowTest`，远程 CI 不能替代真实部署、第三方发送方、Broker 或设备验收。
+
+## HW-14 · 播放抖动缓冲扩容
+
+[01 §5.1](01-ai-agent.md#51-数据流) 的欠载策略是补静音并计数；HW-08/HW-09 实机长回答仍记录过 20–24 次播放欠载。此前起播门限与预缓冲容量共用 2,400 样本（100 ms），实际中途余量只有约 280 ms，短时 WSS/TLS 停顿就会耗尽。本次只调整语音拥有者的缓冲容量，不改变欠载与失败语义。
+
+- 起播门限保持 2,400 样本（100 ms），首响延迟不变；预缓冲容量改为 7,200+480 样本（约 320 ms），仍随语音拥有者对象分配在 PSRAM，内部堆占用不增加。
+- 叠加 8 包播放队列（8×20 ms）后，中途可吸收约 480 ms 断流才补静音；欠载补 20 ms 静音并计数、500 ms 无进展失败、隐私/打断清空、DRAINED 判定和队列深度均未改。
+- 主机新增 `test_ai_agent::jitter-buffer`：起播后突发填充到 7,200 样本，再排入 8 包，随后 360 ms 不喂包，断言 0 次欠载、正常 IDLE/DRAINED；原 `prebuffer` 首包 100 ms 门限与欠载恢复场景保持通过。
+- 边界：这是容量调优，不是网络抓包、设备日志或音质验收；真实长回答的欠载计数是否下降、PSRAM 带宽与内存余量仍需实机复测。未烧录、未改生产配置或云端参数。
+
+验证（2026-11-19，本机 macOS）：`LC_ALL=C bash tools/ci/test_host.sh` 退出 0（全部主机测试，含新增场景）；`PET_HOST_SANITIZE=1 LC_ALL=C bash tools/ci/test_host.sh` ASan/UBSan 通过；`LC_ALL=C bash tools/ci/test_ui_host.sh` 10/10 通过；`python3 tools/build_matrix.py --profile default --build-root /tmp/pet-build-jitter --execute --jobs 6` 隔离 default 构建成功并产出 `build-evidence.json`。`test_host.sh` 在中文 Git 环境下会因 `test_build_matrix.py` 断言英文 `dubious ownership` 而失败，改用 `LC_ALL=C` 后通过；未改测试。
+
+推送与 CI：（待提交后补充）
