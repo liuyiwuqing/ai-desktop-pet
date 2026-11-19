@@ -40,7 +40,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
     lock=threading.Lock()
     state={'mode':'empty','config':copy.deepcopy(CONFIG),'revision':1,'requests':[],'submissions':[],'dropNext':False,
         'otaMode':'disabled','otaRequests':[],'otaSubmissions':[],'otaDrop':False,'otaBoot':'1'*32,'otaLastError':'','growthMode':'disabled',
-        'messageSubmissions':[],'manualMessages':[],'messageNext':'success','deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success',
+        'messageSubmissions':[],'manualMessages':[],'messageNext':'success','messageDevices':False,'deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success',
         'telemetryRequests':[],'disconnectRequests':[],'listMode':False,'listMessages':[],'listDeliveries':[],'listRequests':[],'listError':'','listDelay':0,
         'credentialMode':'active','credentialRevision':1,'credentialSecret':'','credentialSubmissions':[],
         'batchMode':'normal','batchRequests':[],'batchCancelled':False,'batchRetried':False,
@@ -83,11 +83,16 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if delay:time.sleep(delay)
                 query=parse_qs(urlparse(self.path).query);stateKey=query.get('state',['all'])[0] or 'all'
                 page=int(query.get('page',['1'])[0]);size=int(query.get('size',['100'])[0])
-                rows=[{'deviceId':'dodo-ui-fixture','name':state['deviceName'],'enabled':True,'online':True,'lastSeen':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'wifiIp':'192.168.1.20','wifiRssi':-52,'wifiSsid':'HomeLab-2.4G','telemetryAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),
-                    'waitingDeliveries':1 if state['queueCancelled'] else state['queueWaiting']}]
+                stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
+                def device(device_id,name,enabled,online):
+                    return {'deviceId':device_id,'name':name,'enabled':enabled,'online':online,'lastSeen':stamp,'wifiIp':'192.168.1.20','wifiRssi':-52,'wifiSsid':'HomeLab-2.4G','telemetryAt':stamp,
+                        'waitingDeliveries':1 if state['queueCancelled'] else state['queueWaiting']}
+                rows=[device('dodo-ui-fixture',state['deviceName'],True,True)]
+                if state['messageDevices']:rows.append(device('dodo-ui-second','第二台设备',True,False));rows.append(device('dodo-ui-paused','已停用设备',False,False))
                 if stateKey=='offline':rows=[]  # 唯一设备在线，离线筛选没有命中
                 if stateKey=='disabled':rows=[]
-                value={'items':rows[(page-1)*size:page*size],'total':1,'matched':len(rows),'page':page,'size':size,'state':stateKey,'counts':{'online':1,'offline':0,'disabled':0}}
+                value={'items':rows[(page-1)*size:page*size],'total':3 if state['messageDevices'] else 1,'matched':len(rows),'page':page,'size':size,'state':stateKey,
+                    'counts':{'online':1,'offline':1 if state['messageDevices'] else 0,'disabled':1 if state['messageDevices'] else 0}}
             elif state['listMode'] and path in ('/api/v1/messages','/api/v1/deliveries'):
                 state['listRequests'].append(self.path)
                 if state['listDelay']:time.sleep(state['listDelay'])
@@ -311,7 +316,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if self.headers.get('X-QA-Key')!=CONTROL:return self.json_response(401,{'error':'unauthorized'})
                 if value.get('reset'):
                     state.update(mode='empty',config=copy.deepcopy(CONFIG),revision=1,requests=[],submissions=[],dropNext=False,
-                        deviceName='回归测试设备',renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',telemetryRequests=[],disconnectRequests=[],growthMode='disabled',
+                        deviceName='回归测试设备',messageDevices=False,renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',telemetryRequests=[],disconnectRequests=[],growthMode='disabled',
                         listMode=False,listMessages=[],listDeliveries=[],listRequests=[],listError='',listDelay=0,
                         credentialMode='active',credentialRevision=1,credentialSecret='',credentialSubmissions=[],
                         batchMode='normal',batchRequests=[],batchCancelled=False,batchRetried=False,
@@ -355,6 +360,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if 'queueWaiting' in value:state['queueWaiting']=int(value['queueWaiting'])
                 if 'receiptMode' in value:state['receiptMode']=value['receiptMode']
                 if 'deviceName' in value:state['deviceName']=value['deviceName']
+                if 'messageDevices' in value:state['messageDevices']=bool(value['messageDevices'])
                 if value.get('dropRenameNext'):state['dropRenameNext']=True
                 if 'renameReadDelay' in value:state['renameReadDelay']=min(max(float(value['renameReadDelay']),0),2)
                 if value.get('advance'):state['revision']+=1;state['config']['volume']=35
