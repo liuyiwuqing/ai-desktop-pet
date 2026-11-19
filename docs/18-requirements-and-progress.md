@@ -1436,4 +1436,4 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 
 验证（2026-11-19，本机 macOS）：`LC_ALL=C bash tools/ci/test_host.sh` 退出 0（全部主机测试，含新增场景）；`PET_HOST_SANITIZE=1 LC_ALL=C bash tools/ci/test_host.sh` ASan/UBSan 通过；`LC_ALL=C bash tools/ci/test_ui_host.sh` 10/10 通过；`python3 tools/build_matrix.py --profile default --build-root /tmp/pet-build-jitter --execute --jobs 6` 隔离 default 构建成功并产出 `build-evidence.json`。`test_host.sh` 在中文 Git 环境下会因 `test_build_matrix.py` 断言英文 `dubious ownership` 而失败，改用 `LC_ALL=C` 后通过；未改测试。
 
-推送与 CI：（待提交后补充）
+推送与 CI（2026-11-19）：04 `940ee30` 已推送并核对远端（`git ls-remote` 指向 `940ee30197cd0e693f1694ada353e1ff854cff80`）；[Software checks #44553087742](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44553087742) 八个 job 全部 `success`（约 7m45s），含 default/voice/full/tones/off/duplex 六种固件构建。CI 不运行上述隔离 `default` 构建证据与实机复测；真实长回答欠载计数、PSRAM 带宽与长期稳定性仍未验收。
