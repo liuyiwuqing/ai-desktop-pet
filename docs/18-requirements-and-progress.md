@@ -1242,3 +1242,22 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：`waiting` 是读时聚合，不是独立状态；卡片计数与钻取列表分两次读取，并发接收/失败后可能不同。`waiting=true` 与 `status` 互斥是接口约束，页面因此用单独选项而不是叠加两个条件。未新增索引或迁移；未在真实生产库压测 `IN ('pending','sent')` 的执行计划，未做真实部署或实机验收。
 
 推送与 CI（2026-11-19）：CORE `118e9e1` / 04 `370079f` 已推送，`git ls-remote` 核对远端分支分别指向 `118e9e186cc9fcdc4778d57da1abef33620a8a0e` 与 `370079f5ea87cc72a2fc6dea2c869c58088ac6ea`。CI：CORE `Docker deployment` [#44449302279](https://github.com/liuyiwuqing/nexus-core/actions/runs/44449302279) `success`；04 `Software checks` [#44449315413](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44449315413) `success`。两项 workflow 不运行完整 Maven 套件与 132/44 项浏览器专项，这些仍为本地证据；远程 CI 不等于真实部署或实机验证。
+
+## DEVICE-FIRMWARE-02 · 健康 OTA 回读即时更新固件版本
+
+设备卡片的固件版本此前只读最近一条遥测，OTA 健康确认后要等设备下一次上报才变化。本项让版本取两处证据中更晚的一处：
+
+- 最近一条遥测的 `firmwareVersion`；
+- 最近一次状态为 `healthy` 的 OTA 部署目标版本（`device_ota_deployments.target->>'version'`）。
+
+健康回读的 `updated_at` 不早于最近遥测的 `received_at` 时用 OTA 版本，否则用遥测；`rolled_back` 的部署不再提供版本，自动退回遥测。比较用服务端接收时间，避免设备时钟偏差把旧样本当成新证据。无证据时仍为 `null`，卡片不渲染该行。前端未改动，未新增索引或迁移，未改 OTA/配置/投递状态机。
+
+验证（2026-11-19，本机 macOS/Docker）：
+
+- `DeviceListFlowTest` 新增 1 项：健康回读晚于遥测时显示目标版本；随后收到旧版本遥测时退回遥测；`rolled_back` 部署不冒充运行版本。该类 8 项通过。
+- 完整 `JAVA_HOME=$(/usr/libexec/java_home -v 21) python3 tools/run_local.py build` 退出 0：178 项中 173 通过、5 项条件跳过、0 失败/错误；打包 27 份前端静态资源。
+- 前端与夹具未改动，沿用今日已通过的概览 132 项、列表筛选 44 项；本次未重跑浏览器脚本。
+
+边界：健康回读只证明设备曾在新镜像上通过自检；若之后手动降级或静默回滚且没有新的 OTA 回读/遥测，页面仍显示旧证据。版本比较依赖遥测 `received_at` 与部署 `updated_at` 均为服务端时间。未在真实 OTA 安装或实机上验证，未做真实部署。
+
+推送与 CI（2026-11-19）：待填。
