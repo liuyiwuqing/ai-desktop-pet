@@ -1290,4 +1290,4 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 
 边界：状态是读取时快照，不自动刷新；设备已收到/展示/已读仍以回执为准，页面显示 pending 不代表设备未收到。批量撤销/重试会改变这里的状态，本视图不提供它们。未在真实 Broker/设备验证，未做真实部署或实机验收。
 
-推送与 CI：待填。
+推送与 CI（2026-11-19）：CORE `44ab663` / 04 `e5d8bfa` 已推送，`git ls-remote` 核对远端分支分别指向 `44ab6637cd5b0d71cd990a4b4cd9c3db056ea917` 与 `e5d8bfa597875cbfe67eb80efb3566040227670f`。CI：CORE `Docker deployment` [#44460704016](https://github.com/liuyiwuqing/nexus-core/actions/runs/44460704016) `success`（2m15s）；04 `Software checks` [#44460721426](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44460721426) 八个 job 全部 `success`，含六个固件预设、交付工具与语音桥接准备。两项 workflow 均不运行完整 Maven 套件与 36/86/30/44/48 项浏览器专项，这些仍为本地证据；远程 CI 不等于真实部署或实机验证。
