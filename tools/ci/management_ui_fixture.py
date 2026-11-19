@@ -40,7 +40,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
     lock=threading.Lock()
     state={'mode':'empty','config':copy.deepcopy(CONFIG),'revision':1,'requests':[],'submissions':[],'dropNext':False,
         'otaMode':'disabled','otaRequests':[],'otaSubmissions':[],'otaDrop':False,'otaBoot':'1'*32,'otaLastError':'','growthMode':'disabled',
-        'messageSubmissions':[],'manualMessages':[],'messageNext':'success','messageDevices':False,'deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success',
+        'messageSubmissions':[],'manualMessages':[],'messageNext':'success','messageDevices':False,'messageTemplates':False,'deviceName':'回归测试设备','renameSubmissions':[],'dropRenameNext':False,'renameReadDelay':0,'deviceReadDelay':0,'memoryMode':'success',
         'telemetryRequests':[],'disconnectRequests':[],'listMode':False,'listMessages':[],'listDeliveries':[],'listRequests':[],'listError':'','listDelay':0,
         'credentialMode':'active','credentialRevision':1,'credentialSecret':'','credentialSubmissions':[],
         'batchMode':'normal','batchRequests':[],'batchCancelled':False,'batchRetried':False,
@@ -56,7 +56,9 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
         if urlparse(self.path).path == "/api/v1/connectors/pull":
             return self.json_response(200, {"items": []})
         if urlparse(self.path).path == "/api/v1/templates":
-            return self.json_response(200, {"items": [], "variables": []})
+            with self.lock:
+                items=[{'templateId':'template-ui-fixture','definition':{'name':'评论提醒','title':'{title} · 模板','summary':'{content}','icon':'comment','sound':'chime','durationSeconds':8},'version':1,'deleted':False}] if self.state['messageTemplates'] else []
+            return self.json_response(200, {"items": items, "variables": []})
 
         path=urlparse(self.path).path
         if path=='/__qa/state':
@@ -316,14 +318,14 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if self.headers.get('X-QA-Key')!=CONTROL:return self.json_response(401,{'error':'unauthorized'})
                 if value.get('reset'):
                     state.update(mode='empty',config=copy.deepcopy(CONFIG),revision=1,requests=[],submissions=[],dropNext=False,
-                        deviceName='回归测试设备',messageDevices=False,renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',telemetryRequests=[],disconnectRequests=[],growthMode='disabled',
+                        deviceName='回归测试设备',messageDevices=False,messageTemplates=False,renameSubmissions=[],dropRenameNext=False,renameReadDelay=0,deviceReadDelay=0,memoryMode='success',telemetryRequests=[],disconnectRequests=[],growthMode='disabled',
                         listMode=False,listMessages=[],listDeliveries=[],listRequests=[],listError='',listDelay=0,
                         credentialMode='active',credentialRevision=1,credentialSecret='',credentialSubmissions=[],
                         batchMode='normal',batchRequests=[],batchCancelled=False,batchRetried=False,
                         multiBatchMode='normal',multiBatchRequests=[],multiBatchCancelled=False,multiBatchRetried=False,
                         queueMode='normal',queueRequests=[],queueWaiting=3,queueCancelled=False,
                         receiptMode='normal',receiptRequests=[])
-                if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success')
+                if value.get('messageReset'):state.update(messageSubmissions=[],manualMessages=[],messageNext='success',messageTemplates=False)
                 if value.get('listReset'):
                     stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
                     state.update(listMode=True,listError='',listDelay=0,listRequests=[],listMessages=[{
@@ -361,6 +363,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if 'receiptMode' in value:state['receiptMode']=value['receiptMode']
                 if 'deviceName' in value:state['deviceName']=value['deviceName']
                 if 'messageDevices' in value:state['messageDevices']=bool(value['messageDevices'])
+                if 'messageTemplates' in value:state['messageTemplates']=bool(value['messageTemplates'])
                 if value.get('dropRenameNext'):state['dropRenameNext']=True
                 if 'renameReadDelay' in value:state['renameReadDelay']=min(max(float(value['renameReadDelay']),0),2)
                 if value.get('advance'):state['revision']+=1;state['config']['volume']=35

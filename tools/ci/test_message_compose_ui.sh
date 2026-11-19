@@ -57,6 +57,13 @@ async function pickDevice(label){
   await closeSelect('.inline-form .device-select');
   await expect("document.querySelector('.inline-form .form-footer')?.innerText.includes('仅发送到 1 台设备')",'footer names the selected device scope');
 }
+async function pickTemplate(label){
+  await openSelect('.inline-form .template-select');
+  await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)}&&o.offsetParent!==null)`,'template '+label+' is offered');
+  await chooseVisibleOption(label);
+  await expect(`document.querySelector('.inline-form .template-select')?.innerText.includes(${JSON.stringify(label)})`,'template shows '+label);
+  await closeSelect('.inline-form .template-select');
+}
 async function send() {
   if(!await js("(()=>{const b=document.querySelector('.inline-form button.primary');if(!b||b.disabled)return false;b.click();return true;})()"))throw new Error('Send button unavailable');
 }
@@ -66,19 +73,19 @@ async function login() {
   await expect("!!document.querySelector('.sidebar')",'authenticated console is shown');
 }
 async function acknowledged(label) {await expect("!document.querySelector('.inline-form') && document.body.innerText.includes('测试消息已保存')",label);}
-await fixture({reset:true,messageReset:true,messageDevices:true});
+await fixture({reset:true,messageReset:true,messageDevices:true,messageTemplates:true});
 await openOrReuseTab(base,{wait:true,timeout:15});await cdp('Network.setCacheDisabled',{cacheDisabled:true});await gotoAndWait(base+'/?qa='+Date.now(),{timeout:15});
 const builtScript=(await serverFetch(base+'/index.html')).match(/src="([^"]+\.js)"/)?.[1];
 if(!builtScript || !await js(`[...document.scripts].some(s=>new URL(s.src).pathname===${JSON.stringify(builtScript)})`))throw new Error('Page must load the current compiled console');
 await login();
-await draft('丢失响应后的同一消息','只应保存一次');await pickPriority('紧急');await pickDevice('第二台设备（dodo-ui-second）');await fixture({messageNext:'save_then_drop'});await send();
-await expect("document.body.innerText.includes('结果尚未确认') && !!document.querySelector('.inline-form') && document.querySelector('.inline-form .device-select .n-base-selection')?.classList.contains('n-base-selection--disabled') && document.querySelector('.inline-form .device-select')?.innerText.includes('第二台设备')",'response loss preserves the form, payload and target devices');
+await draft('丢失响应后的同一消息','只应保存一次');await pickPriority('紧急');await pickDevice('第二台设备（dodo-ui-second）');await pickTemplate('评论提醒');await fixture({messageNext:'save_then_drop'});await send();
+await expect("document.body.innerText.includes('结果尚未确认') && !!document.querySelector('.inline-form') && document.querySelector('.inline-form .device-select .n-base-selection')?.classList.contains('n-base-selection--disabled') && document.querySelector('.inline-form .device-select')?.innerText.includes('第二台设备') && document.querySelector('.inline-form .template-select .n-base-selection')?.classList.contains('n-base-selection--disabled') && document.querySelector('.inline-form .template-select')?.innerText.includes('评论提醒')",'response loss preserves the form, payload, target devices and template');
 await send();await acknowledged('explicit retry is acknowledged');
 let observed=await state();
-const targeted=['dodo-ui-second'];
-if(observed.messageSubmissions.length!==2 || observed.manualMessages.length!==1 || observed.messageSubmissions[0].eventId!==observed.messageSubmissions[1].eventId || observed.messageSubmissions[0].priority!=='critical' || JSON.stringify(observed.messageSubmissions[0].devices)!==JSON.stringify(targeted) || JSON.stringify(observed.messageSubmissions[1].devices)!==JSON.stringify(targeted))
-  throw new Error('One logical submission must retain its event ID, priority and target devices and produce one saved message; observed '+JSON.stringify({requests:observed.messageSubmissions.length,saved:observed.manualMessages.length,sameId:observed.messageSubmissions[0]?.eventId===observed.messageSubmissions[1]?.eventId,priority:observed.messageSubmissions[0]?.priority,devices:observed.messageSubmissions[0]?.devices}));
-results.push('saved response loss retries the same event ID, priority and target devices and saves one message');
+const targeted=['dodo-ui-second'], chosenTemplate='template-ui-fixture';
+if(observed.messageSubmissions.length!==2 || observed.manualMessages.length!==1 || observed.messageSubmissions[0].eventId!==observed.messageSubmissions[1].eventId || observed.messageSubmissions[0].priority!=='critical' || observed.messageSubmissions[0].templateId!==chosenTemplate || observed.messageSubmissions[1].templateId!==chosenTemplate || JSON.stringify(observed.messageSubmissions[0].devices)!==JSON.stringify(targeted) || JSON.stringify(observed.messageSubmissions[1].devices)!==JSON.stringify(targeted))
+  throw new Error('One logical submission must retain its event ID, priority, template and target devices and produce one saved message; observed '+JSON.stringify({requests:observed.messageSubmissions.length,saved:observed.manualMessages.length,sameId:observed.messageSubmissions[0]?.eventId===observed.messageSubmissions[1]?.eventId,priority:observed.messageSubmissions[0]?.priority,templateId:observed.messageSubmissions[0]?.templateId,devices:observed.messageSubmissions[0]?.devices}));
+results.push('saved response loss retries the same event ID, priority, template and target devices and saves one message');
 await expect("document.querySelector('#last-send-receipt')?.innerText.includes('刚发送消息的投递状态') && document.querySelector('#last-send-receipt').innerText.includes('共 2 条投递') && document.querySelector('#last-send-receipt').innerText.includes('用户已读 1') && document.querySelector('#last-send-receipt').innerText.includes('dodo-ui-fixture')",'acknowledged send shows per-device delivery status');
 observed=await state();
 if(!observed.receiptRequests.at(-1)?.includes('/messages/manual-1/deliveries'))throw new Error('Acknowledged send did not read the new message receipts: '+JSON.stringify(observed.receiptRequests));
@@ -88,16 +95,17 @@ await tap('刷新投递状态');
 for(let i=0;i<20;i++){if((await state()).receiptRequests.length>receiptCount)break;await wait(.1);}
 if((await state()).receiptRequests.length<=receiptCount)throw new Error('Receipt refresh did not re-read the same message');
 results.push('receipt refresh re-reads the same message');
-await draft('下一条有意发送的消息','新的逻辑提交');await expect("document.querySelector('.inline-form .form-footer')?.innerText.includes('未选择设备时按当前路由发送')",'a new draft returns to the default target scope');await send();await acknowledged('next intentional submission succeeds');
+await draft('下一条有意发送的消息','新的逻辑提交');await expect("document.querySelector('.inline-form .form-footer')?.innerText.includes('未选择设备时按当前路由发送') && document.querySelector('.inline-form .template-select')?.innerText.includes('原始文本')",'a new draft returns to the default target scope and template');await send();await acknowledged('next intentional submission succeeds');
 observed=await state();
 if(observed.manualMessages.length!==2 || observed.messageSubmissions[2].eventId===observed.messageSubmissions[1].eventId)throw new Error('New logical submission reused an acknowledged ID');
 if(observed.messageSubmissions[2].priority!=='normal')throw new Error('A new test message must start from the normal priority; observed '+observed.messageSubmissions[2].priority);
 if('devices' in observed.messageSubmissions[2])throw new Error('The default target scope must omit devices and keep the existing routing');
-results.push('acknowledged submission releases its ID and resets the priority and target devices for the next message');
-await draft('未保存就断线','导航后仍保留请求');await pickPriority('高');await pickDevice('第二台设备（dodo-ui-second）');await fixture({messageNext:'drop_before_save'});await send();
-await expect("document.querySelector('.inline-form input')?.readOnly && document.querySelector('.inline-form textarea')?.readOnly && document.querySelector('.inline-form .priority-select .n-base-selection')?.classList.contains('n-base-selection--disabled') && document.querySelector('.inline-form .priority-select')?.innerText.includes('高') && document.querySelector('.inline-form .device-select .n-base-selection')?.classList.contains('n-base-selection--disabled') && document.querySelector('.inline-form .device-select')?.innerText.includes('第二台设备') && document.querySelector('.inline-form button.primary')?.innerText==='重试同一消息'",'unknown submission freezes its payload, priority, target devices and offers explicit retry');
+if('templateId' in observed.messageSubmissions[2])throw new Error('The default template must be omitted and keep the original text');
+results.push('acknowledged submission releases its ID and resets the priority, template and target devices for the next message');
+await draft('未保存就断线','导航后仍保留请求');await pickPriority('高');await pickDevice('第二台设备（dodo-ui-second）');await pickTemplate('评论提醒');await fixture({messageNext:'drop_before_save'});await send();
+await expect("document.querySelector('.inline-form input')?.readOnly && document.querySelector('.inline-form textarea')?.readOnly && document.querySelector('.inline-form .priority-select .n-base-selection')?.classList.contains('n-base-selection--disabled') && document.querySelector('.inline-form .priority-select')?.innerText.includes('高') && document.querySelector('.inline-form .device-select .n-base-selection')?.classList.contains('n-base-selection--disabled') && document.querySelector('.inline-form .device-select')?.innerText.includes('第二台设备') && document.querySelector('.inline-form .template-select .n-base-selection')?.classList.contains('n-base-selection--disabled') && document.querySelector('.inline-form .template-select')?.innerText.includes('评论提醒') && document.querySelector('.inline-form button.primary')?.innerText==='重试同一消息'",'unknown submission freezes its payload, priority, target devices, template and offers explicit retry');
 await click('.sidebar nav button[data-tab=devices]');await expect("document.querySelector('h1')?.innerText==='设备'",'navigation remains available');await click('.sidebar nav button[data-tab=inbox]');
-await expect("document.querySelector('.inline-form input')?.value==='未保存就断线' && document.querySelector('.inline-form textarea')?.value==='导航后仍保留请求' && document.querySelector('.inline-form input')?.readOnly && document.querySelector('.inline-form .priority-select')?.innerText.includes('高') && document.querySelector('.inline-form .device-select')?.innerText.includes('第二台设备')",'unknown payload, priority and target devices survive tab navigation');
+await expect("document.querySelector('.inline-form input')?.value==='未保存就断线' && document.querySelector('.inline-form textarea')?.value==='导航后仍保留请求' && document.querySelector('.inline-form input')?.readOnly && document.querySelector('.inline-form .priority-select')?.innerText.includes('高') && document.querySelector('.inline-form .device-select')?.innerText.includes('第二台设备') && document.querySelector('.inline-form .template-select')?.innerText.includes('评论提醒')",'unknown payload, priority, target devices and template survive tab navigation');
 await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
 await expect("document.documentElement.scrollWidth<=390 && document.querySelector('.inline-form .scope-note[role=alert]')?.innerText.includes('发送结果尚未确认')",'unknown result fits 390 CSS px and is announced assertively');
 await cdp('Emulation.clearDeviceMetricsOverride');
@@ -105,8 +113,8 @@ await js("(()=>{const i=document.querySelector('.inline-form input');i.value='�
 await send();await acknowledged('retry after no server save succeeds');
 observed=await state();
 const before=observed.messageSubmissions[3], after=observed.messageSubmissions[4];
-if(JSON.stringify(before)!==JSON.stringify(after) || observed.manualMessages.length!==3 || JSON.stringify(before.devices)!==JSON.stringify(targeted))throw new Error('Unknown request payload or target devices changed or were not retried exactly');
-results.push('retry reuses the frozen payload even if form input is changed programmatically');
+if(JSON.stringify(before)!==JSON.stringify(after) || observed.manualMessages.length!==3 || JSON.stringify(before.devices)!==JSON.stringify(targeted) || before.templateId!==chosenTemplate)throw new Error('Unknown request payload, template or target devices changed or were not retried exactly');
+results.push('retry reuses the frozen payload including its template even if form input is changed programmatically');
 await draft('明确拒绝的消息','允许修改后重新提交');await fixture({messageNext:'reject'});await send();
 await expect("document.body.innerText.includes('请检查填写的内容') && !document.querySelector('.inline-form input')?.readOnly && !document.querySelector('.inline-form button.primary')?.disabled",'definitive rejection keeps an editable draft');
 await fillInput('.inline-form input','修改后的消息');await send();await acknowledged('corrected rejected draft succeeds');
