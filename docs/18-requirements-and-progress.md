@@ -1322,4 +1322,4 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 
 边界：原因筛选仍是读取时快照；`pending` 行只有 `broker_unavailable` 这类最近错误，不代表设备已收到或未收到。原因值来自既有 `last_error`，没有新增错误码、审计或清理规则。没有真实环境、部署或设备验收结论。
 
-推送与 CI（2026-11-19）：CORE `4c13ed4` / 04 `cc42d2b` 已正常推送并核对远端；CORE Docker deployment [#44505125474](https://github.com/liuyiwuqing/nexus-core/actions/runs/44505125474) 全步骤 `success`，04 Software checks [#44505145934](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44505145934) 八个 job 全部 `success`（六个固件预设、交付工具、语音桥接准备）。两项 workflow 不运行上述 525 项浏览器专项或完整 Maven 套件，这些仍为本地证据；远程 CI 不等于真实部署、真实数据库/Broker 或实机验证。
+推送与 CI（2026-11-19）：CORE `4c13ed4` / 04 `cc42d2b` 已正常推送并核对远端；CORE Docker deployment [#44505125474](https://github.com/liuyiwuqing/nexus-core/actions/runs/44505125474) 全步骤 `success`，04 Software checks [#44505145934](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44505145934) 八个 job 全部 `success`（六个固件预设、交付工具、语音桥接准备）。证据文档 `aafd944` 及本次补充只改 `docs/`，04 workflow 的路径过滤不会为纯文档提交新建运行。两项 workflow 不运行上述 525 项浏览器专项或完整 Maven 套件，这些仍为本地证据；远程 CI 不等于真实部署、真实数据库/Broker 或实机验证。
