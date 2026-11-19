@@ -92,6 +92,8 @@
 
 边界：最近事件是接收投影，不是网络抓包、设备日志或完整消息时间线；消息被保留策略彻底删除后对应事件不再显示，但 `received` 计数仍包含历史回执。未连接真实 Broker/设备、未部署、未迁移生产库，也未与真实第三方发送方联调。
 
+推送与 CI：CORE `e8d192a` / 04 `eb5aa43` 已推送并核对远端；[CORE Docker CI 44549049557](https://github.com/liuyiwuqing/nexus-core/actions/runs/44549049557) 全步骤 `success`，[04 Software checks 44549079109](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44549079109) 八个 job `success`。两项 workflow 都不运行本项新增的 HTTP 测试与浏览器专项，CI 不替代真实部署、第三方发送方或设备验收。
+
 ## CONSOLE-28 · 最近错误筛选独立可用
 
 投递页的「最近错误」不再只在状态为「投递失败」时出现。`lastError` 也保留在 `pending`/`sent`（`broker_unavailable`）和 `cancelled`（`cancelled_by_admin`）行上，按失败过滤会漏掉这些记录；现在可在「全部」或任一状态下直接选择原因，请求只带 `lastError`，不隐式附加 `status`。`unknown`（未记录原因）仍只在「投递失败」下提供，避免在其它状态下把没有 `last_error` 的成功行全部带入；切换状态会清掉已选原因。
