@@ -115,6 +115,7 @@
 | DEVICE-LIST-02 | 设备名称搜索、排序与每页条数 | 软件本地已验证：`GET /api/v1/devices` 新增 `q`（名称/ID 字面量、大小写不敏感、≤80 字）、`sort=created\|name\|last_seen`、`order=asc\|desc`；排序白名单 + `device_id` 稳定次序，`last_seen` 空值两种方向都靠后；`total` 仍为整表，`matched` 与三类计数按搜索结果统计；设备页新增搜索（300ms 防抖）、排序与 12/24/48/96 页大小，条件变化回第 1 页，空结果给清空入口；CORE `DeviceListFlowTest` 5 项、完整 170 项（5 条件跳过）、前端 check/build、概览浏览器 83 项通过；见文末 | 名称排序依赖数据库排序规则，中文按库默认 collation；搜索只覆盖名称与设备 ID，不搜遥测/备注；未连真实 CORE/PostgreSQL/Broker/设备，生产库大数据量与索引未验证 |
 | DEVICE-LIST-03 | 壳层顶栏设备选择器服务端搜索 | 软件本地已验证：顶栏 `NSelect` 改为 `filterable remote`，默认仍显示 `GET /devices` 前 100 台；输入时 300ms 防抖调用 `GET /devices?size=50&sort=name&order=asc&q=…`，空查询恢复默认清单，结果始终含“全部设备”和当前选中项，加载/失败/无匹配各有明确状态；选中不在默认清单的设备时保留独立记录，整表刷新不会清空选择；告警钻取仍清空选择与搜索；前端 check/build、概览浏览器 83 → 101 项、事件 21 项、角色 43 项通过；见文末 | 搜索只覆盖名称/设备 ID，不提供“浏览全部设备”的分页下拉；设备删除由 DEVICE-DELETE-01 承接；未连真实 CORE/PostgreSQL/Broker/设备，生产规模数据与实机未验收 |
 | DEVICE-DELETE-01 | 设备删除与历史保护 | 软件本地已验证：管理员设备卡片新增「删除设备」，确认区必须输入完整设备名称；`DELETE /api/v1/devices/{id}` 对投递/遥测/配置/OTA/成长/凭据历史返回 409 `device_has_history`，对路由/来源引用返回 409 `device_referenced`，未使用设备 204 且重复删除幂等；成功后清除顶栏选择并整表刷新；见文末 | 只能清理登记错误且从未使用的设备，有历史请停用；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
+| DEVICE-QUEUE-01 | 设备卡片待接收投递数 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `waitingDeliveries`（`pending`+`sent` 合计，其余状态不计），V27 部分索引支撑按设备聚合；设备卡片在 Wi-Fi 行后显示「待接收 N 条」，0 不显示；CORE `DeviceListFlowTest` 6 项（新增 1 项）与完整构建 175 项 0 失败/5 条件跳过、前端 check/build、概览浏览器 125 项、角色 43 项与事件 21 项回归通过；见文末 | 计数是读时快照，不代表设备已展示/已读；未连真实 CORE/PostgreSQL/Broker/设备，生产库大数据量与索引效果未压测；推送与 CI 见文末 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
@@ -1183,3 +1184,22 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 - 边界：这是本地回环夹具设置，不代表真实 CORE 或生产负载；浏览器套件不在远程 CI 运行，远程 CI 只覆盖源码检查与打包；未验证更高并发或极端端口耗尽。
 
 推送与 CI（2026-11-18）：04 `74cd1a4` 已推送，`git ls-remote` 核对 `main` 指向 `74cd1a46840cd55ba1249dc87e794cd7ac0b76ac`。CI `Software checks` [#44347892513](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44347892513) 八个 job 全部 `success`。该 workflow 不运行浏览器套件，本项的 30 次诊断登录与连跑压测仍为本地证据；远程 CI 通过不代表回环夹具在生产并发下的表现。
+
+## DEVICE-QUEUE-01 · 设备卡片待接收投递数
+
+产品计划要求设备页可见运行时队列。此前设备卡片只有在线/最近连接与 Wi-Fi，管理员看不到某台设备还有多少条消息尚未接收。本项补一个只读计数：
+
+- `GET /api/v1/devices` 每台设备新增 `waitingDeliveries`：该设备仍处于 `pending` 或 `sent` 的投递数（等待首次发送、等待重试、已交 Broker 未 ACK），`received`/`displayed`/`read`/`failed`/`expired` 不计入；无投递 `COALESCE` 为 0。状态筛选、搜索、排序与分页只决定返回哪些设备，不改变各设备自己的计数。
+- V27 新增部分索引 `deliveries_waiting_device ON deliveries(device_id) WHERE status IN ('pending','sent')`，聚合只扫描未完成行，不随历史投递增长。
+- 设备卡片在 Wi-Fi 行后显示「待接收 N 条」，N 为 0 不显示；不改设备筛选、分页、删除、设置或投递状态机。
+
+验证（2026-11-19，本机 macOS/Docker）：
+
+- `DeviceListFlowTest` 新增 `waitingDeliveriesCountOnlyUnfinishedRows`：`pending`+`sent` 计 2；`received`/`displayed`/`read`/`failed`/`expired` 全不计；`state=disabled` 与 `page=2&size=1` 筛选分页后计数不变。该类 6 项通过。
+- 完整 `python3 tools/run_local.py build` 退出 0：175 项中 170 通过、5 项条件跳过、0 失败/错误；Flyway 27 个迁移；JAR 的 27 份前端与 27 份迁移逐字节匹配当前输出。
+- 04 概览浏览器 125 项：告警钻取后的离线样机显示「待接收」与「2 条」，多设备分页页不出现 0 值文案；角色 43 项、事件 21 项回归通过。首轮新断言按连续文本「待接收 2 条」匹配失败——模板渲染为相邻节点、`innerText` 无空格——改为分别断言两段文本后复跑通过。
+- 浏览器使用实际编译 Vue + 回环 RAM HTTP 夹具，不连接真实 CORE、数据库、Broker 或设备。
+
+边界：计数是读时快照，包含已交给 Broker 但设备未 ACK 的 `sent` 行，不代表设备已展示或已读；接收、失败、取消后要等下一次列表轮询才回退。未在真实 PostgreSQL 生产库、超大投递表或并发写入时压测索引与聚合耗时；未做真实部署或实机验收。
+
+推送与 CI（2026-11-19）：待提交后回填。
