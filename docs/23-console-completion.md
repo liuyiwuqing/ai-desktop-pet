@@ -2,12 +2,28 @@
 
 更新：2026-11-19。管理员管理台现有十二个主导航，按角色显示入口；本轮管理台切片的软件实现已补齐。[02 §5](02-message-hub.md#5-在线配置管理面板) 的完整产品规划仍有设备维护扩展、二期和真实环境验收边界。软件检查、真实服务联调、设备回执和生产验收分别记录，不能用页面存在代替完成。
 
+## CONSOLE-30 · 测试消息目标设备
+
+[02 §5.2](02-message-hub.md#52-交互设计) 要求测试发送可选择设备，消息页此前只能沿用当前路由。CORE `POST /api/v1/messages` 新增可选 `devices`：省略或 `null` 保持原路由/广播，显式列表只写选定启用设备的投递。
+
+- 页面只列出已启用设备并支持多选；不选择时不发送 `devices`，页脚显示“未选择设备时按当前路由发送”。选择后页脚显示“仅发送到 N 台设备：名称”，不改变设备端 DND。
+- 显式列表必须非空、最多 32 项；元素沿用设备 ID 规则并在服务端去重。空数组由请求校验返回 400；未知或已停用设备返回 400 `invalid_route`，不写消息与投递。
+- 同一 `connectorId + eventId` 的重放在事件级 advisory lock 内比对原投递设备集合：一致返回原消息和 200，不同返回 409 `idempotency_conflict`，不追加投递。省略 `devices` 的旧请求仍走原有幂等语义。
+- 未知结果时目标设备与标题、正文、优先级一起冻结，切换导航后恢复同一选择；确认成功后清空回默认，明确 4xx 拒绝保留可编辑草稿与所选设备，重试沿用冻结集合。
+- 不新增表、迁移、MQTT 主题或设备动作；不改鉴权与投递状态机。显式投递只表示已入库，不代表设备在线、已展示或已读。
+
+验证（2026-11-19，本机 macOS）：CORE 前端 `npm run check` 退出 0，`vite build` 由浏览器专项通过。`mvn -Dtest=InboxFlowTest test` 15 项通过，新用例 `consoleMessageTargetsOnlyChosenEnabledDevicesAndRejectsChangedReplays` 覆盖省略设备仍广播、定向只写选定投递、空/未知/停用列表 400 且不落库、同 `eventId` 改变设备集合 409。`bash tools/ci/test_message_compose_ui.sh` 57 项通过，新增停用设备不出现、选择后页脚范围、未知结果冻结设备、导航恢复、确认后默认复位与请求携带 `devices`；原有单 ID 重试、回执、退出/401 与 390px 检查保持。`bash tools/ci/test_list_filters_ui.sh` 50 项在重跑通过；前两次分别在选项打开与 390px 断言处超时，未改产品语义。
+
+边界：浏览器夹具使用真实 Vue 产物和回环 RAM HTTP，不连接真实 CORE、数据库、Broker 或设备。CORE 测试使用隔离 PostgreSQL/MQTT；仍不代表生产或真实设备投递。本轮未重跑 `tools/run_local.py build`、JAR 哈希、部署、迁移、烧录或实机。
+
+推送与 CI：CORE `3192ce5` / 04 `bf2423e` 已推送并核对远端。CORE [Docker CI 44519439241](https://github.com/liuyiwuqing/nexus-core/actions/runs/44519439241) 全步骤 `success`；04 [Software checks 44519457057](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44519457057) 八个 job 全部 `success`。两项 workflow 都运行真实源码/隔离 Compose 或固件检查，但不运行上述浏览器专项；真实部署、Broker、设备与实机仍未验收。
+
 ## CONSOLE-29 · 测试消息优先级选择
 
 [02 §5.2](02-message-hub.md#52-交互设计) 要求测试发送可选择优先级，但消息页此前固定以 `normal` 发送；CORE `POST /api/v1/messages` 本来就接受 `low|normal|high|critical`。本次只在消息页表单增加优先级选择，默认“普通”，失败与未知结果处理沿用原逻辑提交状态。
 
 - 未知结果时优先级与标题、正文一起冻结，切换导航后恢复同一选择；确认成功后清空表单并回到“普通”，明确 4xx 拒绝保留可编辑草稿和所选优先级，重试始终沿用冻结值。
-- 仍发送到所有已启用设备；不新增设备定向、模板选择、消息 API、数据库结构或设备动作，设备 DND 规则不变。定向设备与模板测试仍在路由页。
+- 本次仍发送到所有已启用设备，不新增设备定向、模板选择、消息 API、数据库结构或设备动作，设备 DND 规则不变。消息页设备定向后由 CONSOLE-30 补齐；模板测试仍在路由页。
 - 表单底部说明提醒效果：低/普通只入队不打扰、高亮屏不发声、紧急正常提醒。
 
 验证（2026-11-19，本机 macOS）：前端 `npm run check` 的类型检查与样式 token 检查通过，`vite build` 通过。`bash tools/ci/test_message_compose_ui.sh` 44 项通过，新增覆盖选择“紧急”后请求携带 `critical`、未知结果时选择器冻结并保留“高”、导航恢复、确认后新消息回到“普通”；原有单 ID 重试、拒绝/503/无效确认、退出/401 与 390px 检查保持。`bash tools/ci/test_list_filters_ui.sh` 50 项回归通过。

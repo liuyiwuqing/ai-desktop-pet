@@ -80,6 +80,7 @@
 | CONSOLE-27 | 登录会话跨 CORE 重启持久化 | 软件本地已验证：私有摘要会话、重启恢复、退出持久删除、逐请求核验父凭据 | 真实独立 JVM、HTTPS 容器重建、本地 5173/8088 重启与退出复核；交付见末尾 |
 | CONSOLE-28 | 最近错误筛选独立可用 | 软件本地已验证：原因筛选在任意状态可用、只发 `lastError`，`unknown` 仅失败状态；投递空列表可回消息页。CORE `4c13ed4` / 04 `cc42d2b` 已推送，[Docker CI 44505125474](https://github.com/liuyiwuqing/nexus-core/actions/runs/44505125474) 全步骤 success，[04 CI 44505145934](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44505145934) 八个 job success | 本地新增筛选 50 项、相关回归 475 项、完整构建 178 通过/5 条件跳过、JAR 资源一致；真实数据库/Broker/设备未验收 |
 | SOURCE-01 | 来源回执事件时间线 | 软件本地已验证：`GET /api/v1/hooks/{id}/messages/{message}` 追加 `events`（按设备/发生顺序，含 kind/previousStatus/status/recordedAt 与当时回执时间），不含 `lastError`/下次尝试，500 条截断；既有 `deliveries` 与鉴权不变。CORE `e3e2660` 已推送，[Docker CI 44507910931](https://github.com/liuyiwuqing/nexus-core/actions/runs/44507910931) 全步骤 success，见 [23](23-console-completion.md#source-01--来源回执事件时间线) | `WebhookSourceFlowTest` 4 项（真实 HTTP/隔离 PostgreSQL/MQTT）；04 纯文档不触发 workflow；真实 Broker/设备、生产库和第三方发送方未验收 |
+| CONSOLE-30 | 测试消息目标设备 | 软件本地已验证：消息页多选已启用设备（默认不发 `devices`，保持原路由），未知结果冻结设备并随导航恢复、确认后复位；CORE `POST /api/v1/messages` 可选 `devices`（非空、最多 32、须存在且启用，空/未知/停用 400 不落库），同 `eventId` 换集合 409，省略保持原幂等。CORE `3192ce5` / 04 `bf2423e` 已推送，[CORE Docker CI 44519439241](https://github.com/liuyiwuqing/nexus-core/actions/runs/44519439241)、[04 CI 44519457057](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44519457057) 全步骤 success；见 [23](23-console-completion.md#console-30--测试消息目标设备) | `InboxFlowTest` 15 项、消息发送 57 项、筛选 50 项（重跑）通过；未改表/迁移/主题/鉴权；真实 Broker、设备在线/展示/已读与实机未验收 |
 | CONSOLE-29 | 测试消息优先级选择 | 软件本地已验证：消息页新增低/普通/高/紧急（默认普通），未知结果冻结优先级并随导航恢复，确认后回到普通；复用 `POST /api/v1/messages` 既有 `priority`，仍广播所有已启用设备，不改 API/数据库/设备。CORE `2c1177e` / 04 `d3395e7` 已推送，[CORE Docker CI 44512193534](https://github.com/liuyiwuqing/nexus-core/actions/runs/44512193534)、[04 CI 44512629542](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44512629542) 全步骤 success；见 [23](23-console-completion.md#console-29--测试消息优先级选择) | 前端 check/build、消息发送 44 项、筛选 50 项通过；未改后端，无新增 HTTP/数据库测试；真实 Broker、设备 DND/提醒效果与实机未验收 |
 | CONSOLE-02 | 管理台完成度与验收清单 | `65eb2ef` 已推送；已按八导航、原完整规划及真实控制器核对；当前功能/验证/缺项见 [23](23-console-completion.md#console-02--当前实现与完整规划的差距) | 完整规划尚未全部实现；文档核对不算缺项完成。状态筛选已单独交付 CONSOLE-03 |
 | CONSOLE-03 | 消息/投递状态筛选 | CORE `b85f704` / 04 `ff3ce39`、契约补充 `f4c4b7e` 均已推送；HTTP/隔离库 3 项、浏览器新增 63/既有 111 项通过；完整构建 62 通过/5 跳过、JAR 资源一致；见 [23](23-console-completion.md#console-03--消息与投递状态筛选) | [43391298661](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/43391298661) 七个 job 全绿；更多筛选/元数据导出见 CONSOLE-13，取消/时间线见 CONSOLE-04 |
@@ -1346,7 +1347,7 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 [02 §5.2](02-message-hub.md#52-交互设计) 要求测试发送可选择优先级，消息页此前固定提交 `priority: normal`；CORE `POST /api/v1/messages` 与数据库原本已接受 `low|normal|high|critical`，投递按消息优先级执行既有 DND。本次只改前端表单和配套检查，未改后端、迁移或设备协议。
 
 - 表单新增“优先级”，默认“普通”；未知结果时与标题、正文一起冻结并随导航恢复，确认成功后清空并回到“普通”。明确 4xx 拒绝保留可编辑草稿与所选优先级；重试始终使用冻结的逻辑提交。
-- 仍广播到所有已启用设备；不新增设备定向、模板选择、消息 API、路由规则或设备动作。设备定向与模板测试仍由路由页提供。底部说明按设备 DND：低/普通只入队不打扰、高亮屏不发声、紧急正常提醒。
+- 本次仍广播到所有已启用设备；不新增设备定向、模板选择、消息 API、路由规则或设备动作。消息页设备定向后由 CONSOLE-30 补齐，模板测试仍由路由页提供。底部说明按设备 DND：低/普通只入队不打扰、高亮屏不发声、紧急正常提醒。
 - 契约与边界同步到 CORE `docs/console-messages.md` 和 [23](23-console-completion.md#console-29--测试消息优先级选择)。
 
 验证（2026-11-19，本机 macOS）：CORE 前端 `npm run check` 退出 0，`vite build` 通过。`bash tools/ci/test_message_compose_ui.sh` 44 项通过，新增覆盖选择“紧急”时请求携带 `priority=critical`、同一未知提交重试保持同一 ID 与优先级、选择器冻结并保留“高”、导航恢复、确认后新消息回到“普通”；原有拒绝/503/无效确认、退出/401 与 390px 检查保持。`bash tools/ci/test_list_filters_ui.sh` 50 项回归通过。浏览器使用真实 Vue 构建产物与回环 HTTP 夹具，不连接真实 CORE、数据库、Broker 或设备。
@@ -1354,3 +1355,19 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：本次无后端改动，未新增 HTTP/数据库测试，也未重跑完整 Maven 构建；真实 Broker、设备 DND/提醒/展示效果、部署与实机均未验收。
 
 推送与 CI（2026-11-19）：CORE `2c1177e` / 04 `d3395e7` 均已推送并核对远端。CORE `Docker deployment` [#44512193534](https://github.com/liuyiwuqing/nexus-core/actions/runs/44512193534) 全步骤 `success`；04 [Software checks #44512629542](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44512629542) 八个 job 全部 `success`。两项 workflow 都不运行上述浏览器专项，远程 CI 不能替代真实部署、Broker、设备提醒或实机验收。
+
+## CONSOLE-30 · 测试消息目标设备
+
+[02 §5.2](02-message-hub.md#52-交互设计) 要求测试发送可选择设备，消息页此前只能沿用当前路由。CORE `POST /api/v1/messages` 增加可选 `devices`：省略或 `null` 保持既有路由/广播；显式列表只写选定启用设备的投递。未新增表、迁移、MQTT 主题或设备动作，鉴权与投递状态机不变。
+
+- 页面只列出已启用设备并支持多选；不选择时不发送 `devices`，页脚显示“未选择设备时按当前路由发送”；选择后显示“仅发送到 N 台设备：名称”。设备端 DND 规则不变。
+- 显式列表必须非空、最多 32 项，元素沿用 `[a-zA-Z0-9_-]{1,40}` 并在服务端去重。空数组由请求校验返回 400；未知或已停用设备返回 400 `invalid_route`，不写消息与投递。
+- 同一 `connectorId + eventId` 的重放在事件级 advisory lock 内比对原投递设备集合：一致返回原消息和 200；不同返回 409 `idempotency_conflict`，不追加投递。省略 `devices` 的旧请求仍走原有幂等语义。
+- 未知结果时目标设备与标题、正文、优先级一起冻结，切换导航后恢复；确认成功后清空回默认，明确 4xx 拒绝保留可编辑草稿与所选设备。重试沿用冻结集合。
+- 契约与边界同步到 CORE `docs/console-messages.md` 和 [23](23-console-completion.md#console-30--测试消息目标设备)。
+
+验证（2026-11-19，本机 macOS）：CORE 前端 `npm run check` 退出 0，`vite build` 由浏览器专项通过。`mvn -Dtest=InboxFlowTest test` 15 项通过，新用例 `consoleMessageTargetsOnlyChosenEnabledDevicesAndRejectsChangedReplays` 覆盖省略设备仍广播、定向只写选定投递、空/未知/停用列表 400 且不落库、同 `eventId` 改变设备集合 409。`bash tools/ci/test_message_compose_ui.sh` 57 项通过，新增停用设备不出现、页脚范围、未知结果冻结设备、导航恢复、确认后默认复位与请求 `devices`；原有单 ID 重试、回执、退出/401 与 390px 保持。`bash tools/ci/test_list_filters_ui.sh` 50 项在重跑通过；前两次分别在选项打开与 390px 断言处超时，未改产品语义。
+
+边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、数据库、Broker 或设备；CORE 测试使用隔离 PostgreSQL/MQTT，仍不代表生产或真实设备投递。本轮未重跑 `tools/run_local.py build`、JAR 哈希、部署、迁移、烧录或实机。显式设备投递只表示入库，不代表在线、展示或已读。
+
+推送与 CI（2026-11-19）：CORE `3192ce5` / 04 `bf2423e` 均已推送并核对远端。CORE `Docker deployment` [#44519439241](https://github.com/liuyiwuqing/nexus-core/actions/runs/44519439241) 全步骤 `success`；04 [Software checks #44519457057](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44519457057) 八个 job 全部 `success`。两项 workflow 都不运行上述浏览器专项，远程 CI 不能替代真实部署、Broker、设备投递或实机验收。
