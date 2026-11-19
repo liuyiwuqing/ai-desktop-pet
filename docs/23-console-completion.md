@@ -16,7 +16,7 @@
 
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、数据库、Broker 或设备；CORE 测试使用隔离 PostgreSQL/MQTT，仍不代表生产或真实设备投递。未重跑 `tools/run_local.py build`、JAR 哈希、部署、迁移、烧录或实机。
 
-推送与 CI：见 [18 台账](18-requirements-and-progress.md)。
+推送与 CI：CORE `acd253a` / 04 `b8a2f9c` 已推送并核对远端。CORE [Docker CI 44535069975](https://github.com/liuyiwuqing/nexus-core/actions/runs/44535069975) 全步骤 `success`（2m22s）；04 [Software checks 44535150637](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44535150637) 八个 job 全部 `success`。两项 workflow 都运行真实源码/隔离 Compose 或固件检查，但不运行上述浏览器专项；真实部署、Broker、设备与实机仍未验收。
 
 ## CONSOLE-31 · 测试消息模板选择
 
