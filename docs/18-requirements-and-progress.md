@@ -1221,4 +1221,4 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 
 边界：固件版本是读时快照，OTA 安装后要等设备下一次遥测才更新；从未上报遥测的设备不显示该行；未在真实设备、真实部署或生产库验证。
 
-推送与 CI（2026-11-19）：待提交后回填。
+推送与 CI（2026-11-19）：CORE `cfc03d2` / 04 `7f1189e` 已推送，`git ls-remote` 核对远端分支分别指向 `cfc03d2060fefbc6748c7133227a9746dc4dc96d` 与 `7f1189ec5845abce326b3cc2461acb65ffec4cf2`。CI：CORE `Docker deployment` [#44441686006](https://github.com/liuyiwuqing/nexus-core/actions/runs/44441686006) `success`；04 `Software checks` [#44441693524](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44441693524) `success`。两项 workflow 不运行 `DeviceListFlowTest`、完整 Maven 套件与 126 项浏览器专项，这些仍为本地证据；远程 CI 不等于真实部署或实机验证。
