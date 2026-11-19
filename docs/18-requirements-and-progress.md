@@ -1202,4 +1202,4 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 
 边界：计数是读时快照，包含已交给 Broker 但设备未 ACK 的 `sent` 行，不代表设备已展示或已读；接收、失败、取消后要等下一次列表轮询才回退。未在真实 PostgreSQL 生产库、超大投递表或并发写入时压测索引与聚合耗时；未做真实部署或实机验收。
 
-推送与 CI（2026-11-19）：待提交后回填。
+推送与 CI（2026-11-19）：CORE `e2cf780` / 04 `378bba3` 已推送，`git ls-remote` 核对远端分支分别指向 `e2cf78057dbecea007c0631fcf9e3484308405ec` 与 `378bba36325e3cdc5d5aeeca4c9216079f4a8f20`。CI：CORE `Docker deployment` [#44438083599](https://github.com/liuyiwuqing/nexus-core/actions/runs/44438083599) `success`；04 `Software checks` [#44438125030](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44438125030) 八个 job 全部 `success`。两项 workflow 不运行 `DeviceListFlowTest`、完整 Maven 套件与 125 项浏览器专项，这些仍为本地证据；远程 CI 不等于真实部署或生产库验证。
