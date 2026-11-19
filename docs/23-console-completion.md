@@ -14,7 +14,7 @@
 
 边界：浏览器夹具使用真实 Vue 产物和回环 HTTP，不连接真实 CORE、数据库、Broker 或设备；未验证设备实际提醒/展示效果。本次未改后端，没有新增 HTTP/数据库测试，也未重跑完整 Maven 构建；没有部署、迁移或实机操作。
 
-推送与 CI：CORE `2c1177e` 已推送并核对远端；[Docker CI 44512193534](https://github.com/liuyiwuqing/nexus-core/actions/runs/44512193534) 全步骤 `success`。04 配套提交与 CI 见文末。CI 不运行上述浏览器专项，真实部署、Broker、设备提醒与实机仍未验收。
+推送与 CI：CORE `2c1177e` / 04 `d3395e7` 均已推送并核对远端。CORE [Docker CI 44512193534](https://github.com/liuyiwuqing/nexus-core/actions/runs/44512193534) 全步骤 `success`；04 [Software checks 44512629542](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44512629542) 八个 job 全部 `success`。两项 workflow 都不运行上述浏览器专项，真实部署、Broker、设备提醒与实机仍未验收。
 
 ## SOURCE-01 · 来源回执事件时间线
 
