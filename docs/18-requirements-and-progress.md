@@ -1461,9 +1461,10 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 - 新增 `pet_message_display_duration_ms(message_ms, limit_ms)`（[message.h](../firmware/components/contracts/include/pet/message.h) 声明、`message_validate.c` 实现），取二者较小值；`ui_service` 在生成快照时对 nexus 消息应用该上限，不再整体覆盖模板时长。
 - 不改协议、队列、回执、DND、提示音、抖动、渲染回退和配置下发契约；旧协议消息仍保留自己的时长。
 - 主机用例：`test_message_validate` 覆盖 15000→8000、5000→5000、8000→8000；`test_message_presenter` 用 15000 ms 模板与 8000 ms 上限验证 8 秒隐藏而不是 15 秒。
+- 同时校正 [02](02-message-hub.md) 的过期表述：`config` 主题已由服务端下发并由设备回执（QoS 1、非 retained），正文导出已由 CONSOLE-13-B 提供；[23](23-console-completion.md#template-display-01--模板声音与展示时长) 补充设备上限语义。
 
 验证（2026-11-20，本机 macOS）：`LC_ALL=C bash tools/ci/test_host.sh` 全量通过；`PET_HOST_SANITIZE=1 LC_ALL=C bash tools/ci/test_host.sh` 通过；`LC_ALL=C bash tools/ci/test_ui_host.sh` 10/10 通过；`python3 tools/build_matrix.py --profile default --build-root /tmp/pet-build-msgdur --execute --jobs 6` 隔离构建成功并产出 `build-evidence.json`。
 
 边界：主机用例证明时长选择与 presenter 计时，不证明实机观感、刷新负载或长时间展示稳定性；未连接真实 Broker/CORE，未验证模板管理页面到设备的端到端链路，实机时长待验收。设备配置 `message.durationMs` 的取值边界仍由服务端管理与固件校验保证。
 
-推送与 CI（2026-11-20）：待提交后补充。
+推送与 CI（2026-11-20）：04 `61adaa6` 已推送并核对远端（`git ls-remote` 指向 `61adaa660b1acb12421daebdfcc6dba0321f0c66`）；[Software checks #44655766282](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44655766282) 八个 job 全部 `success`，含 default/voice/full/tones/off/duplex 六种固件构建与主机/LVGL 检查。CI 不证明实机观感，也不替代实机时长与模板端到端验收。

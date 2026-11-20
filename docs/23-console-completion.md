@@ -457,7 +457,7 @@ bash tools/ci/test_console_theme_ui.sh
 
 2026-11-19。模板能力从固定“无提示音/8 秒”扩展为 `sound ∈ {none,chime,alert}`、`durationSeconds ∈ [5,30]` 整数。创建投递时随模板版本一起快照声音与毫秒时长（V28 可空列）；只有非缺省组合才在 v1 信封的可选 `payload.display` 中发送 `sound`/`durationMs`，`none`/8000 继续使用旧线格式，不增大既有信封。预览响应增加 `sound`/`durationMs`；页面在模板记录和预览结果中显示实际声音与时长。
 
-设备 nexus v1 解析接受 `display` 对象，复用既有模板、通知与 DND 策略：声音受 DND 约束，`critical` 仍按原规则打断；未知字段、重复字段、空对象、非对象、`sound` 非法值或时长越界仍拒收，整个消息不产生成功回执。模板类型仍由 `eventType` 前缀决定，`display` 不携带模板。
+设备 nexus v1 解析接受 `display` 对象，复用既有模板、通知与 DND 策略：声音受 DND 约束，`critical` 仍按原规则打断；设备配置 `message.durationMs` 作为展示时长上限，模板时长在上限内生效（见 [MSG-02](18-requirements-and-progress.md#msg-02--模板展示时长按设备上限生效)）；未知字段、重复字段、空对象、非对象、`sound` 非法值或时长越界仍拒收，整个消息不产生成功回执。模板类型仍由 `eventType` 前缀决定，`display` 不携带模板。
 
 兼容边界：已部署的旧固件会拒收未知 `display` 字段，因此使用非缺省声音/时长前必须先升级设备；服务端不探测固件版本，也不回退成静默忽略。该字段不改变消息 ID、去重、优先级、回执、路由或正文清理语义；模板的缺省组合保持原设备行为。
 
