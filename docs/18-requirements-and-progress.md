@@ -1671,3 +1671,15 @@ CONSOLE-29 的回执视图只在打开或点击「刷新投递状态」时读一
 边界：筛选选项只来自本次面板会话已见的原因，保留期内但不在最近 20 条的原因需先清空筛选或等样本出现，不能按起止时间或组合原因筛选；浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；未验证真实断线、生产库大保留量或实机。
 
 推送与 CI（2026-11-20）：CORE `d2711f7` / 04 `042ed1f` 已推送并核对远端（`git ls-remote` 分别指向 `d2711f7c39aedd90144b0076738a0e91e952af9a`、`042ed1f2f125e8f1b8ed4b14d0cfc831c4907ab2`）。CORE [Docker CI 44709282509](https://github.com/liuyiwuqing/nexus-core/actions/runs/44709282509) `success`；04 [Software checks 44709297122](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44709297122) 八个 job 全部 `success`。两条 workflow 都不运行该管理台浏览器专项；真实断线与实机仍未验收。
+
+## ACC-01-PLAN-01 · 生产部署与数据库迁移执行计划（2026-11-20，04 `ba8618e`）
+
+ACC-01 一直停在“用户已提供 Debian/1Panel 与域名、尚未连接目标机”。本次只交付可执行计划，不连接服务器、不建库、不迁移、不发送消息、不烧录设备。计划见 [29](29-acc01-production-deployment-plan.md)，并把 27 的过时“补齐到 V20”改为按 Flyway 顺序补齐（当前分支最新 V28）。
+
+计划按门禁组织：G0 冻结发布物（推荐先对当前绿色提交发布新镜像，含 V27/V28；`acc95fb` 已发布 digest 仅作功能冻结回退）、G1 目标机预检（资源、DNS、端口、时间、GHCR 与既有安装判定，含离线四镜像路线）、G2 既有安装备份与隔离恢复演练、G3 首次部署、G4 升级与迁移、G5 迁移验证、G6 代理/HTTPS/SSE/冒烟、24 小时观测与记录模板。关键约束：`/etc/nexus/docker` 已存在时禁止重新初始化；只换 CORE digest 与补 `console-sessions` 卷，不换项目名/卷/CA/设备配置；V27 非并发建索引、V28 扫描 `deliveries` 加 CHECK，需在停写窗口执行且禁止手工预建对象；迁移失败用备份恢复到新 `nexus-rollback` 项目和新卷，保留现场，禁止 `down -v`、`flyway clean` 或手改历史表；1Panel 与命令行只能有一个编排所有者。
+
+验证（2026-11-20，本机 macOS）：仅文档变更；核对相对链接目标存在（`27-1panel-quickstart.md`、`../deployment/1panel/README.md`、`../deployment/server-release.md`、`12-cloud-interop.md`），CORE 外部链接指向 `codex/core-baseline`；计划内 digest、V27/V28、会话卷与证书路径与当前 CORE 源码/编排一致。未执行任何目标机命令，因此没有部署、迁移、备份或恢复结果可记。
+
+边界：本项是计划，不是部署完成；ACC-01 仍需真实服务器、生产库迁移、备份恢复演练、HTTPS/MQTT 与 24 小时观测才能关闭，ACC-02 不受影响。`acc95fb` 与新发布物不能混用代码与镜像。
+
+推送与 CI（2026-11-20）：04 `ba8618e` 已推送并核对远端（`git ls-remote` 指向 `ba8618e95a10451936b5d5691da0909250e3a4a6`）。本次只改 `docs/`，`Software checks` 的 push 路径不含 `docs/**`，未触发运行（`gh run list --commit ba8618e…` 为空），不计作远程 CI 通过。
