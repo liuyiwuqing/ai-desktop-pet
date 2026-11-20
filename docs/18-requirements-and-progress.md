@@ -131,6 +131,7 @@
 | DEVICE-FIRMWARE-01 | 设备卡片最近固件版本 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `firmwareVersion`（最近一条遥测，无遥测为 `null`）；设备卡片在 Wi-Fi 行后显示「固件 <version>」，`null` 不显示；`DeviceListFlowTest` 7 项（新增 1 项）、完整构建 176 项 0 失败/5 条件跳过、前端 check/build、概览浏览器 126 项通过；见文末 | 固件是读时快照，OTA 安装后要等下一次遥测；与 Wi-Fi 分别取样本，可能来自不同时间；未连真实设备或部署；推送与 CI 见文末 |
 | DEVICE-QUEUE-02 | 设备卡片设备未读队列 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `deviceUnread`（最近一条遥测的 `unread`，无遥测为 `null`）；设备卡片在「固件」行后显示「设备未读 N 条」，`null`/0 不显示；`DeviceListFlowTest` 9 项（新增 1 项）、前端 check/build、管理台浏览器 89 项通过；见文末 | 设备未读是心跳快照，最多滞后一个心跳周期，与「待接收」的服务端 pending+sent 是两段链路；不代表已展示/已读；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DEVICE-SORT-01 | 设备列表信号排序 | 软件本地已验证：`GET /api/v1/devices` 接受 `sort=signal`（`order=asc\|desc`），按最近带网络信息的遥测 `wifi_rssi` 排序，无信号设备两个方向都置后、同值按设备 ID；设备页新增「信号：强→弱 / 弱→强」；`DeviceListFlowTest` 10 项（新增 1 项）、概览浏览器 140 项通过；见文末 | 信号是心跳快照，最多滞后一个心跳周期；排序不改变筛选/计数/分页与设备行为，不代表当前在线或趋势；未连真实设备；推送与 CI 见文末 |
+| OVERVIEW-STAT-DRILL-01 | 概览在线/离线计数直达设备筛选 | 软件本地已验证：顶部「设备在线/设备离线」数字改为按钮，复用设备页 `state=online/offline` 筛选，与告警钻取同样清掉单设备选择与顶栏搜索；数字排版不变，只有悬停/聚焦显示下划线，读屏名称带筛选说明；CORE check/build、04 概览浏览器 149 项（新增 8 项）通过；见文末 | 计数仍按整张设备表统计；不新增接口或筛选维度；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
@@ -1592,3 +1593,15 @@ DEVICE-DISCONNECTS-01 让卡片显示了 24 小时断线次数，但要看具体
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；未做真实设备断线、生产库保留期或实机验收。
 
 推送与 CI（2026-11-20）：CORE `99f5864` / 04 `51ce79e` 已推送并核对远端（`git ls-remote` 分别指向 `99f5864c8c245162b5a618d283751921debb1a19`、`51ce79eb3468687a93c4cd213a02b959fbb69bd8`）。CORE [Docker CI 44689862336](https://github.com/liuyiwuqing/nexus-core/actions/runs/44689862336) 第 1 次在 Maven 解析 `spring-boot-starter-parent:4.1.2` 时被 Maven Central 拒绝而失败（同一 POM 的上一次 CI 已通过，属外部依赖瞬时不可用）；第 2 次尝试全步骤 `success`。04 [Software checks 44689876586](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44689876586) 八个 job 全部 `success`。两项 workflow 都不运行该管理台浏览器专项；真实断线、Broker/设备与实机仍未验收。
+
+## OVERVIEW-STAT-DRILL-01 · 概览在线/离线计数直达设备筛选
+
+概览顶部已经显示「设备在线 N 台 / 设备离线 N 台」，但要确认是哪几台设备，仍要先切到设备页再选状态。本次把两个数字本身变成入口：点击后沿用手势和告警按钮同一个 `drill` 事件切到设备页，目标为 `{tab:'devices', status:'online'|'offline'}`，复用 DEVICE-FILTER-01 的状态筛选，不新增接口、查询参数或只读列表。
+
+壳层处理与告警按钮一致：先清掉单设备选择、顶栏未完成的搜索和旧搜索词，状态筛选是替换而不是叠加，然后带 `state` 和第一页参数读一次列表。计数仍是服务端按整张设备表统计的结果，不随筛选、搜索或翻页变化；「今日收件」「投递积压」没有对应筛选，不新增跳转。
+
+数字保持原有大号排版，按钮去掉边框、背景和内边距；只有悬停或键盘聚焦时才显示下划线与强调色，聚焦轮廓沿用全局规则。每个按钮的读屏名称是「N 台，按在线/离线筛选设备」。离线仍按 `enabled && !online` 计算，停用设备不会混入离线列表。
+
+验证（2026-11-20，本机 macOS）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；04 `bash tools/ci/test_overview_ui.sh` 149 项通过（原 141 项 + 新增 8 项），新增断言覆盖数字可点击、在线钻取只出现在线设备且状态筛选命名为「在线」、离线钻取排除停用设备、夹具确认请求分别带 `state=online` / `state=offline` 与第一页参数、从设备页返回概览后刷新按钮可用。既有的告警钻取、390px 布局、轮询与阈值检查保持通过。
+
+边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；只验证在线/离线两个状态入口，未验证真实设备离线、生产库大数据量或实机展示。运行时 390px 布局断言曾出现一次未复现的时序失败；单独探测 390px 下计数、按钮与趋势的右边界均 ≤369px，随后完整运行 149 项通过，未改宽断言或布局。

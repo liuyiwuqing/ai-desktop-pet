@@ -35,16 +35,34 @@ await login();
 await expect("[...document.querySelectorAll('.sidebar nav button')].some(b=>b.textContent.includes('概览'))",'overview navigation exists');
 await navigate('概览');
 await expect("document.querySelector('h1')?.innerText==='运行概览' && document.querySelector('.overview-panel')?.innerText.includes('25.0%')",'overview loads its own authenticated HTTP snapshot');
-await expect("document.querySelector('.overview-panel')?.innerText.includes('2026-11-13 · Asia/Shanghai 当日起算') && document.querySelector('[data-metric=online] dd')?.childNodes[0]?.textContent.trim()==='2' && document.querySelector('[data-metric=offline] dd')?.childNodes[0]?.textContent.trim()==='3'",'the local day and configured zone are explicit rather than a sliced UTC date');
+await expect("document.querySelector('.overview-panel')?.innerText.includes('2026-11-13 · Asia/Shanghai 当日起算') && document.querySelector('[data-stat=online]')?.textContent.trim().startsWith('2') && document.querySelector('[data-stat=offline]')?.textContent.trim().startsWith('3')",'the local day and configured zone are explicit rather than a sliced UTC date');
 await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='7' && document.querySelector('[data-metric=backlog] dd')?.childNodes[0]?.textContent.trim()==='6' && document.querySelector('.overview-panel')?.innerText.includes('停用 1 台')",'message, backlog and overlapping disabled counts are distinct');
 // 告警阈值：安静快照不造告警，但要把服务端阈值说出来；样本不足时条形不染色。
 await expect("!document.querySelector('.overview-alerts') && document.querySelector('.overview-panel')?.innerText.includes('告警阈值：今日失败率 ≥ 10.0%') && document.querySelector('.overview-panel')?.innerText.includes('积压 ≥ 100 条')",'a quiet snapshot states the server thresholds without inventing alerts');
 await expect("!!document.querySelector('.health-bar') && !document.querySelector('.health-bar').classList.contains('health-bar--warn')",'12 deliveries of sample stay below the judgement sample');
 // 今日失败原因：名字要看得懂，计数折行要正好等于今日失败数。
 await expect("document.querySelectorAll('.overview-reason-list li').length===2 && document.querySelector('[data-reason=ack_timeout]')?.innerText.includes('设备确认超时') && document.querySelector('[data-reason=ack_timeout]')?.innerText.includes('2 条') && [...document.querySelectorAll('.overview-reason-count')].reduce((sum,node)=>sum+parseInt(node.innerText,10),0)===3",'failure reasons are named and their counts add up to today\'s failures');
+// 计数钻取：在线数字复用设备页的状态筛选，不新增一个只读列表。
+await expect("!!document.querySelector('[data-stat=online]')",'the online count is clickable');
+await js("document.querySelector('[data-stat=online]').click()");
+await expect("document.querySelector('h1')?.innerText==='设备'",'the online count opens the device page');
+await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-card')?.innerText.includes('回归测试设备') && document.querySelector('.device-state-filter')?.innerText.includes('在线') && document.querySelector('.content .section-heading p')?.innerText.includes('显示 1 / 共 1 台')",'the online count lands on the online devices with the state filter named');
+const statReads=(await fixture({})).deviceRequests.filter(path=>path.includes('state=online'));
+if(!statReads.length||!statReads.every(path=>path.includes('page=1')&&path.includes('size=24')))throw new Error('online stat drill did not carry state=online: '+JSON.stringify(statReads));
+results.push('the online count drill really carries state=online');
+await navigate('概览');
+await expect("(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='刷新概览');return !!b&&!b.disabled;})()",'the overview refresh is ready after the stat drill');
 await fixture({mode:'alerts'});await tap('刷新概览');
 await expect("document.querySelectorAll('.overview-alerts .overview-alert').length===3 && document.querySelector('.overview-alerts [data-alert=devices_online]')?.innerText.includes('低于告警阈值 1 台') && document.querySelector('.overview-alerts [data-alert=delivery_backlog]')?.innerText.includes('120 条') && document.querySelector('.overview-alerts [data-alert=delivery_failure_rate]')?.innerText.includes('22.5%')",'each breached metric becomes its own alert with the threshold it crossed');
 await expect("document.querySelector('.health-bar')?.classList.contains('health-bar--warn')",'a failure rate above the threshold colours the bar');
+// 离线计数同样钻取；停用但不在线的设备不应混进离线列表。
+await expect("!!document.querySelector('[data-stat=offline]')",'the offline count is clickable');
+await js("document.querySelector('[data-stat=offline]').click()");
+await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-card')?.innerText.includes('离线样机') && !document.querySelector('.device-card')?.innerText.includes('停用样机') && document.querySelector('.device-state-filter')?.innerText.includes('离线')",'the offline count lands on only enabled offline devices');
+const statOfflineReads=(await fixture({})).deviceRequests.filter(path=>path.includes('state=offline'));
+if(!statOfflineReads.length||!statOfflineReads.some(path=>path.includes('page=1')))throw new Error('offline stat drill did not carry state=offline: '+JSON.stringify(statOfflineReads));
+results.push('the offline count drill really carries state=offline');
+await navigate('概览');
 // 告警钻取：目标由服务端给出，页面把筛选带过去，而不是只换页签。
 await expect("document.querySelectorAll('.overview-alerts [data-alert-action]').length===3 && document.querySelector('[data-alert-action=delivery_backlog]')?.innerText==='查看等待投递' && document.querySelector('[data-alert-action=devices_online]')?.innerText==='查看设备'",'each actionable alert offers the filter the server points it at');
 // 切页签会重挂面板，按钮要等快照回来才存在；单发 click 会撞上正在加载的窗口。
@@ -223,11 +241,11 @@ const trendClear=(await fixture({})).trendRequests.slice(trendBase);
 if(trendClear.at(-1).includes('reason='))throw new Error('clearing left a reason behind: '+trendClear.at(-1));
 results.push('clearing removes reason from the trend read');
 await fixture({mode:'mqtt_down'});await tap('刷新概览');
-await expect("document.querySelector('.overview-panel [role=status]')?.innerText.includes('MQTT 连接不可用') && document.querySelector('[data-metric=online] dd')?.childNodes[0]?.textContent.trim()==='2' && !document.querySelector('[data-alert=mqtt_connection] [data-alert-action]')",'Broker failure never rewrites the online count and offers no filter it cannot honour');
+await expect("document.querySelector('.overview-panel [role=status]')?.innerText.includes('MQTT 连接不可用') && document.querySelector('[data-stat=online]')?.textContent.trim().startsWith('2') && !document.querySelector('[data-alert=mqtt_connection] [data-alert-action]')",'Broker failure never rewrites the online count and offers no filter it cannot honour');
 await fixture({mode:'error'});await tap('刷新概览');
 await expect("!!document.querySelector('.overview-panel [role=alert]') && !document.querySelector('.overview-panel dl')",'failed read hides stale counts instead of showing empty or healthy');
 await fixture({mode:'empty'});await tap('刷新概览');
-await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='0' && document.querySelector('[data-metric=failure-rate] dd')?.childNodes[0]?.textContent.trim()==='—' && document.querySelector('[data-metric=online] dd')?.childNodes[0]?.textContent.trim()==='0'",'empty snapshot has zero counts and no fabricated zero-percent failure rate');
+await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='0' && document.querySelector('[data-metric=failure-rate] dd')?.childNodes[0]?.textContent.trim()==='—' && document.querySelector('[data-stat=online]')?.textContent.trim().startsWith('0')",'empty snapshot has zero counts and no fabricated zero-percent failure rate');
 await fixture({mode:'success',delay:1});await tap('刷新概览');
 await expect("document.querySelector('.overview-panel [aria-busy=true]')?.innerText==='正在读取概览…' && document.querySelector('.overview-panel button').disabled && !document.querySelector('.overview-panel dl')",'loading and repeat clicks are explicit');
 await expect("document.querySelector('[data-metric=messages] dd')?.childNodes[0]?.textContent.trim()==='7'",'delayed snapshot finishes');await fixture({delay:0});
