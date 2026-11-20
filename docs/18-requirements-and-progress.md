@@ -132,6 +132,7 @@
 | DEVICE-QUEUE-02 | 设备卡片设备未读队列 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `deviceUnread`（最近一条遥测的 `unread`，无遥测为 `null`）；设备卡片在「固件」行后显示「设备未读 N 条」，`null`/0 不显示；`DeviceListFlowTest` 9 项（新增 1 项）、前端 check/build、管理台浏览器 89 项通过；见文末 | 设备未读是心跳快照，最多滞后一个心跳周期，与「待接收」的服务端 pending+sent 是两段链路；不代表已展示/已读；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DEVICE-SORT-01 | 设备列表信号排序 | 软件本地已验证：`GET /api/v1/devices` 接受 `sort=signal`（`order=asc\|desc`），按最近带网络信息的遥测 `wifi_rssi` 排序，无信号设备两个方向都置后、同值按设备 ID；设备页新增「信号：强→弱 / 弱→强」；`DeviceListFlowTest` 10 项（新增 1 项）、概览浏览器 140 项通过；见文末 | 信号是心跳快照，最多滞后一个心跳周期；排序不改变筛选/计数/分页与设备行为，不代表当前在线或趋势；未连真实设备；推送与 CI 见文末 |
 | OVERVIEW-STAT-DRILL-01 | 概览在线/离线计数直达设备筛选 | 软件本地已验证：顶部「设备在线/设备离线」数字改为按钮，复用设备页 `state=online/offline` 筛选，与告警钻取同样清掉单设备选择与顶栏搜索；数字排版不变，只有悬停/聚焦显示下划线，读屏名称带筛选说明；CORE check/build、04 概览浏览器 149 项（新增 8 项）通过；见文末 | 计数仍按整张设备表统计；不新增接口或筛选维度；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
+| OVERVIEW-STAT-DRILL-02 | 概览停用计数直达已停用筛选 | 软件本地已验证：设备总数说明行里的「停用 N 台」改为按钮，钻取设备页 `state=disabled`，与在线/离线计数共用同一套复位和数字样式；停用只按 `!enabled`，不混入启用但离线设备；CORE check/build、04 概览浏览器 157 项通过；见文末 | 计数仍按整张设备表统计；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
@@ -1607,3 +1608,13 @@ DEVICE-DISCONNECTS-01 让卡片显示了 24 小时断线次数，但要看具体
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；只验证在线/离线两个状态入口，未验证真实设备离线、生产库大数据量或实机展示。运行时 390px 布局断言曾出现一次未复现的时序失败；单独探测 390px 下计数、按钮与趋势的右边界均 ≤369px，随后完整运行 149 项通过，未改宽断言或布局。
 
 推送与 CI（2026-11-20）：CORE `12e57f5` / 04 `5fad625` 已推送并核对远端（`git ls-remote` 分别指向 `12e57f5d6aa6f810c9a82fadd7cad44826cc1154`、`5fad62567e9a79106fea7b3065448f9ac92be96b`）。CORE [Docker CI 44693188557](https://github.com/liuyiwuqing/nexus-core/actions/runs/44693188557) 全步骤 `success`；04 [Software checks 44693197785](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44693197785) 八个 job 全部 `success`。两项 workflow 都不运行该管理台浏览器专项；真实设备离线、生产库大数据量与实机展示仍未验收。
+
+## OVERVIEW-STAT-DRILL-02 · 概览停用计数直达已停用筛选
+
+设备总数说明行原本只报告「停用 N 台（可仍在线）」，看到异常计数无法直接核对是哪几台。本次把「停用 N 台」做成与在线/离线计数相同的数字按钮：点击后走同一个 `drill` 事件，目标 `{tab:'devices', status:'disabled'}`，复用设备页已有的 `state=disabled`，不新增接口或筛选维度。
+
+壳层仍先清掉单设备选择、未完成顶栏搜索与旧搜索词，再按第一页读取；计数继续按整张设备表统计。停用口径只按 `!enabled`，启用但离线的设备不会混入；按钮保持说明行的字号与颜色，悬停/键盘聚焦才出现下划线，读屏名称为「停用 N 台，按已停用筛选设备」。
+
+验证（2026-11-20，本机 macOS）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；04 `bash tools/ci/test_overview_ui.sh` 157 项通过（原 149 项 + 新增 8 项：3 项行为断言、1 项刷新就绪和 1 次选择器交互的 4 项检查），新增断言覆盖停用计数可点击、设备页只显示停用样机且筛选命名为「已停用」、请求带 `state=disabled` 与第一页参数。顺带把「筛选后点击刷新」改为先等按钮可用，避免列表加载中的竞态。
+
+边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；未验证真实停用设备、生产库大数据量或实机展示。

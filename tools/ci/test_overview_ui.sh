@@ -100,6 +100,14 @@ async function chooseVisibleOption(label){const found=await js(`(()=>{const o=[.
 async function pickState(label){for(let attempt=0;attempt<3;attempt++){await openSelect('.device-state-filter');await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)}&&o.offsetParent!==null)`,'state option '+label+' is offered');await chooseVisibleOption(label);try{await expect(`document.querySelector('.device-state-filter')?.innerText.includes(${JSON.stringify(label)})`,'state filter shows '+label);return;}catch(e){if(attempt===2)throw e;await wait(.3);}}}
 await pickState('全部');
 await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.device-state-filter')?.innerText.includes('全部')",'switching the state back to all restores every device');
+// 说明行里的停用计数也是入口；停用与启用但离线是两类，不能互相混入。
+await navigate('概览');
+await clickWhenReady('[data-stat=disabled]','the disabled count is clickable');
+await expect("document.querySelectorAll('.device-card').length===1 && document.querySelector('.device-card')?.innerText.includes('停用样机') && !document.querySelector('.device-card')?.innerText.includes('离线样机') && document.querySelector('.device-state-filter')?.innerText.includes('已停用') && document.querySelector('.content .section-heading p')?.innerText.includes('显示 1 / 共 2 台')",'the disabled count lands on only disabled devices with the state filter named');
+const statDisabledReads=(await fixture({})).deviceRequests.filter(path=>path.includes('state=disabled'));
+if(!statDisabledReads.length||!statDisabledReads.some(path=>path.includes('page=1')))throw new Error('disabled stat drill did not carry state=disabled: '+JSON.stringify(statDisabledReads));
+results.push('the disabled count drill really carries state=disabled');
+await pickState('全部');
 // 设备分页：26 台样本由服务端分页，页头写全表总数；外壳下拉仍读未过滤的完整清单。
 await fixture({mode:'many'});
 await navigate('概览');await navigate('设备');
@@ -108,6 +116,7 @@ await tap('下一页');
 await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.device-pagination')?.innerText.includes('2 / 2') && document.querySelector('.device-grid')?.innerText.includes('分页设备 24') && document.querySelector('.device-grid')?.innerText.includes('分页设备 25')",'the next page asks the server for the remaining devices');
 await pickState('离线');
 await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.content .section-heading p')?.innerText.includes('显示 2 / 共 26 台') && !document.querySelector('.device-pagination') && document.querySelector('.device-grid')?.innerText.includes('分页设备 22') && !document.querySelector('.device-grid')?.innerText.includes('分页设备 24')",'a state filter is applied by the server and resets to the first page');
+await expect("(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='刷新');return !!b&&!b.disabled;})()",'the device refresh is ready after the filter load');
 await tap('刷新');
 await expect("document.querySelectorAll('.device-card').length===2 && document.querySelector('.device-state-filter')?.innerText.includes('离线')",'the filtered device page survives a full refresh');
 const deviceReads=await fixture({});
