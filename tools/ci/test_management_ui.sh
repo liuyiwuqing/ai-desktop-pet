@@ -120,6 +120,12 @@ await tap('收起');
 await fixture({queueMode:'error'});await tap('撤销待发…');
 await expect("document.querySelector('#device-queue-panel .console-state--error')?.innerText.includes('HTTP 503') && !document.querySelector('#device-queue-panel').innerText.includes('待接收 3 条')",'queue read failure is explicit');
 await tap('收起');await fixture({queueMode:'normal'});
+// 卡片信号直达网络趋势：设置面板随请求打开，历史展开并选中网络指标。
+await tap('网络趋势');
+await expect("!!document.querySelector('#device-management-panel') && document.querySelector('.telemetry-history .disclosure-toggle')?.getAttribute('aria-expanded')==='true'",'card signal opens the device panel with history expanded');
+await expect("(()=>{const button=[...document.querySelectorAll('.history-metrics button')].find(b=>b.innerText.trim()==='网络');return !!button&&button.className.includes('n-button--primary-type');})()",'card signal selects the network metric');
+await expectState(snapshot=>snapshot.telemetryRequests.some(path=>path.includes('/devices/dodo-ui-fixture/telemetry')&&path.includes('bucket=5m')),'card signal loads the default history range');
+await tap('收起');
 await tap('设置与状态');
 await expect("document.querySelector('#device-management-panel')?.innerText.includes('尚未收到设备状态')",'empty device state');
 await tap('状态历史');
@@ -174,6 +180,8 @@ await expect("!document.querySelector('.chart-reset')",'zoom resets to the full 
 await tap('24 小时');
 await expectState(snapshot=>snapshot.telemetryRequests.some(path=>path.includes('bucket=15m')),'range switch queries a 15m bucket');
 await expect("document.querySelector('.telemetry-history')?.innerText.includes('24 小时 · 15 分钟桶')",'history states active range and bucket');
+await tap('网络趋势');
+await expect("document.querySelector('.chart-legend')?.innerText.includes('Wi-Fi 信号') && document.querySelector('.chart-legend')?.innerText.includes('dBm')",'card signal switches an open panel to the network chart');
 await range(0,60);await fixture({advance:true});await tap('刷新状态');
 await expect("document.body.innerText.includes('你的编辑仍保留') && document.querySelector('.management-form [role=slider]').getAttribute('aria-valuenow')==='60' && document.querySelector('.management-form [role=slider]').getAttribute('aria-disabled')==='true'",'dirty draft survives changed revision');
 await tap('加载设备新设置');
