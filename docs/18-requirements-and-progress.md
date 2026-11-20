@@ -1643,3 +1643,5 @@ CONSOLE-29 的回执视图只在打开或点击「刷新投递状态」时读一
 验证（2026-11-20，本机 macOS）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；04 `bash tools/ci/test_message_compose_ui.sh` 84 项通过（原 82 项 + 新增 2 项），新增断言覆盖未终态时无需点击即在下一轮读到「设备已展示」、全部终态后 3.6 秒内不再发起请求、随后手动刷新仍会重读同一消息。`test_management_ui.sh`、`test_message_batch_ui.sh`、`test_delivery_history_ui.sh` 重跑通过，既有历史回执、批量与投递时间线未回归。`test_console_states_ui.sh` 两次在 `Page.captureScreenshot` 处 CDP 超时，未进入业务断言；该套件不覆盖回执，属本机浏览器环境问题，未计作通过。
 
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；自动刷新只验证了状态推进与停止条件，未验证真实设备回执时延、弱网下 3 秒轮询的负载或长时间开页表现。
+
+推送与 CI（2026-11-20）：CORE `d18f920` / 04 `698beb3` 已推送并核对远端（`git ls-remote` 分别指向 `d18f920433cb7978cce86ce569238dd620a59e9e`、`698beb3776398272371c99e4d776e731736f1b31`）。CORE [Docker CI 44704687640](https://github.com/liuyiwuqing/nexus-core/actions/runs/44704687640) 全步骤 `success`；04 [Software checks 44704698752](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44704698752) 八个 job 全部 `success`。两条 workflow 都不运行该管理台浏览器专项；真实设备回执时延与长时间开页仍未验收。
