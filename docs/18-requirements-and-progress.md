@@ -134,7 +134,7 @@
 | OVERVIEW-STAT-DRILL-01 | 概览在线/离线计数直达设备筛选 | 软件本地已验证：顶部「设备在线/设备离线」数字改为按钮，复用设备页 `state=online/offline` 筛选，与告警钻取同样清掉单设备选择与顶栏搜索；数字排版不变，只有悬停/聚焦显示下划线，读屏名称带筛选说明；CORE check/build、04 概览浏览器 149 项（新增 8 项）通过；见文末 | 计数仍按整张设备表统计；不新增接口或筛选维度；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | OVERVIEW-STAT-DRILL-02 | 概览停用计数直达已停用筛选 | 软件本地已验证：设备总数说明行里的「停用 N 台」改为按钮，钻取设备页 `state=disabled`，与在线/离线计数共用同一套复位和数字样式；停用只按 `!enabled`，不混入启用但离线设备；CORE check/build、04 概览浏览器 157 项通过；见文末 | 计数仍按整张设备表统计；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DEVICE-DISCONNECT-EXPORT-01 | 最近断线导出 CSV | 软件本地已验证：「最近断线」底部新增导出按钮，点击按同一只读接口重取 `limit=100`（列表仍 20 条），浏览器生成含记录时间/断线时刻/原因码/原因名称的 CSV（UTF-8 BOM + CRLF）；读取失败或保留期内无记录时保留列表并提示，不下载空文件；CORE check/build、04 管理台浏览器 102 项（新增 4 项）通过；见文末 | 导出上限 100 条，仍是读时快照；原因名称由管理台映射，未知码写数字；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
-| ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
+| ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C；2026-11-20 已制定[执行计划](29-acc01-production-deployment-plan.md)（发布门禁、预检、备份恢复演练、首次部署、V27/V28 迁移、代理/SSE、回滚与记录模板），计划已制定，尚未连接目标机、未执行部署或迁移，也未配置真实供应商 | [ACC-01 执行计划](29-acc01-production-deployment-plan.md)、[1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
 04 当前版本 `0.4.0-dev`、CORE `0.1.0-SNAPSHOT`，均为开发版本；当前已有可拉取的私有部署镜像发布，尚无目标机生产部署或整机验收结论。误回退的 22 文件已恢复；覆盖来源未查明，见 [17](17-voice-bridge-regression.md)，不把恢复成功写成原因调查完成。

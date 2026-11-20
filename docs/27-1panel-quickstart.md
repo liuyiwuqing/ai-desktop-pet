@@ -44,7 +44,7 @@ docker run --rm --read-only --cap-drop ALL \
 
 ## 已有安装升级
 
-先备份原私有目录与 PostgreSQL 卷/数据库，并在独立库验证恢复。保留原项目名、卷、凭据、CA、设备配置和原编排；只把 CORE 的 image 改为上述 CORE digest，然后拉取/重新创建 CORE。**不再运行初始化镜像，不混用新密码与旧数据库卷。** 新 JAR 会补齐到 V20；旧镜像回退前必须确认数据库兼容，换镜像不等于回退数据库。
+先备份原私有目录与 PostgreSQL 卷/数据库，并在独立库验证恢复。保留原项目名、卷、凭据、CA、设备配置和原编排；只把 CORE 的 image 改为上述 CORE digest，然后拉取/重新创建 CORE。**不再运行初始化镜像，不混用新密码与旧数据库卷。** 新镜像会按 Flyway 顺序补齐缺失迁移（当前分支最新 V28）；升级前核对 `flyway_schema_history`，完整备份、迁移与回滚步骤见 [ACC-01 执行计划](29-acc01-production-deployment-plan.md)。旧镜像回退前必须确认数据库兼容，换镜像不等于回退数据库。
 
 RSS/Atom 和室外天气默认关闭。按 [拉取来源配置](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/pull-connectors.md) 修改私有 `core.env` 的 `NEXUS_PULL_FEEDS_JSON` 后重新创建 CORE，再在接入页测试/启用；单纯 restart 不重新读取 env。Webhook 来源凭据在管理台创建后仅显示一次。Halo/AI/记忆/Bridge/清理/OTA/成长同步仍遵循各自默认开关，不因本次升级自动接入真实服务。
 
