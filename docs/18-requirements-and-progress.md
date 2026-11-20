@@ -1656,4 +1656,4 @@ CONSOLE-29 的回执视图只在打开或点击「刷新投递状态」时读一
 
 边界：`from` 是相对读取时刻的滚动窗口，不支持自定义起止日期或按操作者筛选；`recorded_at` 仍取服务端写入时间，审计行不清理。浏览器夹具使用回环 RAM HTTP，未连接真实 CORE/PostgreSQL，也未验证生产库大审计量下 `recorded_at` 索引的实际执行计划。
 
-推送与 CI：CORE 提交 `pending`、04 提交 `pending`，推送后回填。
+推送与 CI：CORE `2612cf0` / 04 `f2bfe0b` 已推送并核对远端（`git ls-remote` 分别指向 `2612cf0335c5243a73ad5eae5af94930d99cd8c3`、`f2bfe0bed84042c7903694ec634ee49ee19c37d1`）。04 [Software checks 44706724856](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44706724856) 八个 job 全部 `success`。CORE [Docker CI 44706714897](https://github.com/liuyiwuqing/nexus-core/actions/runs/44706714897) 失败，日志显示 `spring-boot-starter-parent:4.1.2` 从 Maven Central 拉取返回 429 Too Many Requests，构建未进入代码编译；本地定向集成测试与前端构建已通过，该失败属外部依赖限流，重跑接口当前无权限，未计作远程 CI 通过。两条 workflow 都不运行概览浏览器专项；生产库大审计量下的实际执行计划未验证。
