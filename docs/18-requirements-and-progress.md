@@ -1451,4 +1451,4 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 
 边界：LVGL 主机渲染只证明布局、文本和位移逻辑；未在实机确认 240×320 屏幕上的抖动观感、边框裁切、刷新负载和长时间稳定性，也未烧录。时间只显示 `HH:MM` 不显示日期，依赖服务端 `sentAt` 与设备配置时区；未连接真实 Broker/设备，不改变消息投递、回执或服务端契约。
 
-推送与 CI（待补）。
+推送与 CI（2026-11-20）：04 `33bb660` / `1c11e8c` 已推送并核对远端（`git ls-remote` 指向 `1c11e8c4b6813631c3c8b739341c78be89ef6b40`）；[Software checks #44653134992](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44653134992) 八个 job 全部 `success`，含 default/voice/full/tones/off/duplex 六种固件构建与主机/LVGL 检查。CI 不证明实机观感，也不替代实机烧录与长期稳定性验收。
