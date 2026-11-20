@@ -1489,7 +1489,7 @@ MSG-02 将设备配置 `message.durationMs` 明确为展示时长上限，但管
 
 MSG-02/CONSOLE-33 后仍有两处语义不一致：管理台“更多设置”的折叠摘要仍显示“8 秒”，容易被读成精确时长；[02 §9](02-message-hub.md#9-验收标准) 离线验收仍写“低优先级被丢弃且有计数”，与 §4 的新协议“队列满拒收新投递、服务端重试”冲突。
 
-- CORE `frontend/src/DeviceManagementPanel.vue` 折叠摘要改为“8 秒上限”，与字段标签、无障碍名称保持一致；不改表单值、校验、提交或配置协议。
+- CORE `frontend/src/DeviceManagementPanel.vue` 折叠摘要改为“N 秒上限”（时长未加载时显示“时长未知”），与字段标签、无障碍名称保持一致；不改表单值、校验、提交或配置协议。
 - [02 §5.1](02-message-hub.md#51-功能清单) 设置项补“消息容量与显示时长上限”；§9 离线验收改为“队列满时设备拒收新投递并由服务端重试，不静默丢弃已接收消息”。
 - [23 · CONSOLE-02](23-console-completion.md#console-02--当前实现与完整规划的差距) 模板行改为“模板时长 5–30 秒且受设备配置 `message.durationMs` 上限约束（MSG-02）”。
 - 04 `tools/ci/test_management_ui.sh` 新增折叠摘要断言，回归检查共 88 项。
@@ -1498,4 +1498,4 @@ MSG-02/CONSOLE-33 后仍有两处语义不一致：管理台“更多设置”�
 
 边界：本轮不改固件、CORE 业务逻辑或协议；管理台回归为本地回环夹具，未连接真实 CORE、PostgreSQL、Broker 或设备；实机时长与模板端到端仍待验收。
 
-推送与 CI（2026-11-20）：待提交后补充。
+推送与 CI（2026-11-20）：CORE `8d543c3`、`5c80b7f` 已推送并核对远端（`git ls-remote` 指向 `5c80b7f4c767d2b019b1e93abfb6e2637137cec5`），[CORE Docker CI 44662462026](https://github.com/liuyiwuqing/nexus-core/actions/runs/44662462026) 全步骤 `success`（2m11s）。首次 `8d543c3` 的 [CI 44661185780](https://github.com/liuyiwuqing/nexus-core/actions/runs/44661185780) 在 Maven 依赖解析阶段被 Maven Central `429 Too Many Requests` 拒绝而失败，属外部依赖限流；`e7cb6ca` 为空提交，不匹配 workflow 路径过滤，未产生运行。04 `7c2ead0` 已推送并核对远端（`git ls-remote` 指向 `7c2ead0fb0651df05bc24f3ee7baffd62e152cdb`），[04 Software checks 44661202516](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44661202516) 八个 job 全部 `success`。88 项管理台回归为本地运行，CI 不执行该浏览器脚本；真实配置下发、Broker/设备与实机仍未验收。
