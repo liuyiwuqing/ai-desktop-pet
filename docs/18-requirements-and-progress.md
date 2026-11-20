@@ -1633,3 +1633,13 @@ TELEMETRY-08 的「最近断线」能在页面上看最近 20 条，但要留证
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；导出只覆盖保留期内已落库的断线事件，最多 100 条，仍是读时快照，不能替代设备日志或长期归档；未验证生产库大保留量、真实断线与实机。
 
 推送与 CI（2026-11-20）：CORE `aefdc88` / 04 `ff279fd` 已推送并核对远端（`git ls-remote` 分别指向 `aefdc8843d0e03340e67d517f388e202c423c4a4`、`ff279fdbad0eed45d87bc41dec39ed911cacfaa4`）。CORE [Docker CI 44700418417](https://github.com/liuyiwuqing/nexus-core/actions/runs/44700418417) 全步骤 `success`；04 [Software checks 44700433101](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44700433101) 八个 job 全部 `success`。两条 workflow 都不运行该管理台浏览器专项；真实断线、生产库大保留量与实机仍未验收。
+
+## RECEIPT-POLL-01 · 刚发送/刚重发的投递回执自动刷新
+
+CONSOLE-29 的回执视图只在打开或点击「刷新投递状态」时读一次，设备稍后展示/已读时页面仍停在 pending，需要人工反复刷新。本次只给刚发送和刚重发的回执开启自动刷新：`counts.pending + counts.sent > 0` 时每 3 秒静默重读，全部进入终态后停止；从消息详情打开的历史回执仍是读时快照，不轮询。
+
+后台重读不显示加载态、不清空已显示数据；页面隐藏时暂停，重新可见后立即补读；连续 3 次后台失败后停止，仍可手动刷新。手动刷新与后台重读共用同一代际保护，旧响应不会覆盖新消息或已卸载视图。接口、数据库和权限不变。
+
+验证（2026-11-20，本机 macOS）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；04 `bash tools/ci/test_message_compose_ui.sh` 84 项通过（原 82 项 + 新增 2 项），新增断言覆盖未终态时无需点击即在下一轮读到「设备已展示」、全部终态后 3.6 秒内不再发起请求、随后手动刷新仍会重读同一消息。`test_management_ui.sh`、`test_message_batch_ui.sh`、`test_delivery_history_ui.sh` 重跑通过，既有历史回执、批量与投递时间线未回归。`test_console_states_ui.sh` 两次在 `Page.captureScreenshot` 处 CDP 超时，未进入业务断言；该套件不覆盖回执，属本机浏览器环境问题，未计作通过。
+
+边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；自动刷新只验证了状态推进与停止条件，未验证真实设备回执时延、弱网下 3 秒轮询的负载或长时间开页表现。

@@ -95,10 +95,21 @@ await expect("document.querySelector('#last-send-receipt')?.innerText.includes('
 observed=await state();
 if(!observed.receiptRequests.at(-1)?.includes('/messages/manual-1/deliveries'))throw new Error('Acknowledged send did not read the new message receipts: '+JSON.stringify(observed.receiptRequests));
 results.push('receipt view reads the acknowledged message');
+await fixture({receiptMode:'catchup'});
+observed=await state();
 const receiptCount=observed.receiptRequests.length;
+for(let i=0;i<80;i++){if((await state()).receiptRequests.length>receiptCount)break;await wait(.1);}
+observed=await state();
+if(observed.receiptRequests.length<=receiptCount)throw new Error('Pending receipts did not refresh automatically: '+JSON.stringify(observed.receiptRequests.slice(-3)));
+await expect("(()=>{const t=document.querySelector('#last-send-receipt')?.innerText||'';return t.includes('设备已展示')&&!t.includes('等待投递');})()",'pending receipts refresh to a terminal state without a manual click');
+observed=await state();
+const settled=observed.receiptRequests.length;
+await wait(3.6);
+if((await state()).receiptRequests.length!==settled)throw new Error('Receipt polling must stop once every delivery is terminal');
+results.push('pending receipts refresh automatically and stop at a terminal state');
 await tap('刷新投递状态');
-for(let i=0;i<20;i++){if((await state()).receiptRequests.length>receiptCount)break;await wait(.1);}
-if((await state()).receiptRequests.length<=receiptCount)throw new Error('Receipt refresh did not re-read the same message');
+for(let i=0;i<20;i++){if((await state()).receiptRequests.length>settled)break;await wait(.1);}
+if((await state()).receiptRequests.length<=settled)throw new Error('Receipt refresh did not re-read the same message');
 results.push('receipt refresh re-reads the same message');
 await draft('下一条有意发送的消息','新的逻辑提交');await expect("document.querySelector('.inline-form .form-footer')?.innerText.includes('未选择设备时按当前路由发送') && document.querySelector('.inline-form .template-select')?.innerText.includes('原始文本')",'a new draft returns to the default target scope and template');await send();await acknowledged('next intentional submission succeeds');
 observed=await state();

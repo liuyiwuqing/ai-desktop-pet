@@ -118,6 +118,9 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                      'nextAttemptAt':stamp,'receivedAt':stamp,'displayedAt':stamp,'readAt':stamp},
                     {'eventId':'receipt-pending','deviceId':'dodo-reading','deviceName':'阅读设备','status':'pending','attempts':0,'lastError':None,
                      'nextAttemptAt':stamp,'receivedAt':None,'displayedAt':None,'readAt':None}]
+                if mode=='catchup' and len(state['receiptRequests'])>1:
+                    # 第一次仍返回 pending，后续请求按设备已展示返回，供自动刷新断言使用。
+                    items[1].update(status='displayed',attempts=1,receivedAt=stamp,displayedAt=stamp,nextAttemptAt=stamp)
                 counts={}
                 for item in items:counts[item['status']]=counts.get(item['status'],0)+1
                 value={'messageId':path.split('/')[4],'total':len(items),'counts':counts,'items':items,'page':1,'size':100}
