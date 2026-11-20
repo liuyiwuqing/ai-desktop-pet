@@ -116,4 +116,6 @@ pet_event_priority_t pet_message_event_priority(pet_message_priority_t priority)
 bool pet_message_expired(const pet_message_view_t *message, uint32_t now_epoch_s);
 pet_message_notify_policy_t pet_message_notify_policy(const pet_message_view_t *message,
                                                       bool dnd_active, bool allow_critical);
+/* 设备配置 message.durationMs 是上限；模板 display.durationMs 在此范围内生效。 */
+uint32_t pet_message_display_duration_ms(uint32_t message_ms, uint32_t limit_ms);
 bool pet_message_ack_transition_allowed(pet_message_ack_state_t from, pet_message_ack_state_t to);

@@ -42,7 +42,7 @@
 | `nexus/v1/devices/{deviceId}/inbox` | 服务端 → 设备 | 1 / false | `inbox.message` 信封 |
 | `nexus/v1/devices/{deviceId}/acks` | 设备 → 服务端 | 1 / false | received/displayed/read 或 rejected |
 | `nexus/v1/devices/{deviceId}/state` | 设备 → 服务端 | 1 / true | schemaVersion/deviceId/online/observedAt；LWT |
-| `nexus/v1/devices/{deviceId}/config` | 服务端 → 设备 | 规划 | 现有服务端尚未提供配置下发契约，设备未应用 |
+| `nexus/v1/devices/{deviceId}/config` | 服务端 → 设备 | 1 / false | 设备配置快照；设备应用后经 `config_acks` 回执 applied/rejected |
 
 `deviceId` 使用服务端的 `[a-zA-Z0-9_-]{1,40}`。收件时校验完整主题、信封目标设备与非 retained 属性；设备只能读写自己的主题，Broker ACL 仍是部署侧的独立防线。
 
@@ -96,7 +96,7 @@
 
 - 全文（标题、正文、原始 payload）保留 7 天；消息 ID、来源、设备、优先级、状态、时间等元数据保留 30 天。
 - CORE 已实现按接收时间计算的保留任务，默认关闭；备份和只读预览后显式启用，默认 UTC 04:00 执行，每批最多清除 200 条正文及删除 200 条元数据。清理审计只记录 actor、时间与计数，不含正文，见 [13](13-operational-software.md)。
-- 管理台已提供按状态/来源或设备/CORE 收件窗口筛选的元数据 CSV，最多 5000 行，不含标题、正文或原始 payload，见 [CONSOLE-13](23-console-completion.md#console-13--更多筛选与元数据-csv)。正文导出授权仍属规划。
+- 管理台已提供按状态/来源或设备/CORE 收件窗口筛选的元数据 CSV，最多 5000 行，不含标题、正文或原始 payload，见 [CONSOLE-13](23-console-completion.md#console-13--更多筛选与元数据-csv)。正文导出由 [CONSOLE-13-B](23-console-completion.md#console-13-b--管理员正文导出) 提供，需管理员显式确认，范围限最近七天且最多 1000 行。
 - 设备未 ACK 的消息在投递有效期内可重投；正文清理将未完成投递标记为 expired。外部模型/OpenViking 副本不由本地清理删除。
 
 ## 4. 设备侧队列与去重
@@ -189,7 +189,7 @@ X-Nexus-Signature: sha256=<64 位小写十六进制 HMAC>
 
 - 单条全屏卡片；正文超出 6 行进入纵向滚动，底部显示页码/进度。
 - 标题最多 2 行，超出省略；正文按 UTF-8 字符换行，避免截断多字节字符。
-- 展示时长：默认 `8000 ms`；模板可经 `display.durationMs` 覆盖为 5000–30000，设备仍以 `message.durationMs` 上限约束。旧固件会拒收未知 `display` 字段，使用非缺省值时需先升级设备。
+- 展示时长：默认 `8000 ms`；模板可经 `display.durationMs` 覆盖为 5000–30000，设备配置 `message.durationMs` 是上限，模板时长超出时按上限显示，短于上限时按模板时长显示。旧固件会拒收未知 `display` 字段，使用非缺省值时需先升级设备。
 - 优先级抢占：`critical` 立即打断当前消息并红色边框抖动；`high` 当前消息结束后优先；`normal` FIFO；`low` 仅在空闲时展示。
 - 消息到达：短提示音 + 惊讶表情；`critical` 使用警报音 + 抖动；DND 下静默。
 - 已读：消息可见时 BOOT 短按；自动滚动到底部不自动已读。

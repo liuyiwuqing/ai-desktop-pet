@@ -134,6 +134,11 @@ pet_message_notify_policy_t pet_message_notify_policy(const pet_message_view_t *
     return policy;
 }
 
+uint32_t pet_message_display_duration_ms(uint32_t message_ms, uint32_t limit_ms)
+{
+    return message_ms < limit_ms ? message_ms : limit_ms;
+}
+
 bool pet_message_ack_transition_allowed(pet_message_ack_state_t from, pet_message_ack_state_t to)
 {
     if ((unsigned)from >= (unsigned)PET_MESSAGE_STATE_COUNT ||

@@ -130,6 +130,10 @@ int main(void)
     policy = pet_message_notify_policy(&message, false, true);
     CHECK(policy.display && !policy.sound && policy.alert_animation);
 
+    CHECK(pet_message_display_duration_ms(15000, 8000) == 8000);
+    CHECK(pet_message_display_duration_ms(5000, 8000) == 5000);
+    CHECK(pet_message_display_duration_ms(8000, 8000) == 8000);
+
     CHECK(pet_message_ack_transition_allowed(PET_MESSAGE_STATE_RECEIVED,
                                              PET_MESSAGE_STATE_DISPLAYED));
     CHECK(pet_message_ack_transition_allowed(PET_MESSAGE_STATE_RECEIVED,

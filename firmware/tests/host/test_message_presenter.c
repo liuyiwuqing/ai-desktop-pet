@@ -84,6 +84,22 @@ static void timeout_keeps_unread_without_endless_popups(void)
     assert(message.state == PET_MESSAGE_STATE_RECEIVED);
 }
 
+static void template_duration_is_capped_by_device_limit(void)
+{
+    pet_message_presenter_t p;
+    pet_message_presenter_init(&p);
+    pet_message_view_t message;
+    message_fixture_init(&message, "msg_capped", PET_MESSAGE_PRIORITY_NORMAL, 100);
+    message.duration_ms = pet_message_display_duration_ms(15000, 8000);
+    pet_message_screen_action_t a =
+        pet_message_presenter_tick(&p, &message, 1, 1000, 101, false, true);
+    assert(pet_message_presenter_rendered(&p, a.generation, true, 1010));
+    assert(pet_message_presenter_tick(&p, &message, 1, 9009, 108, false, true).kind ==
+           PET_MESSAGE_SCREEN_NONE);
+    assert(pet_message_presenter_tick(&p, &message, 1, 9010, 108, false, true).kind ==
+           PET_MESSAGE_SCREEN_HIDE);
+}
+
 static pet_message_screen_action_t click(pet_message_presenter_t *p, uint32_t now)
 {
     pet_message_presenter_button(p, true, now);
@@ -242,6 +258,7 @@ int main(void)
     failed_frame_falls_back_without_ack_and_retries();
     dnd_expiry_and_critical_preemption();
     timeout_keeps_unread_without_endless_popups();
+    template_duration_is_capped_by_device_limit();
     read_is_bound_to_visible_frame_and_short_press();
     boot_held_at_startup_and_long_press_are_ignored();
     idle_click_reopens_timed_out_message_even_in_dnd();

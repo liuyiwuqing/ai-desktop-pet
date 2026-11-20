@@ -40,6 +40,7 @@
 | HW-13 | 配网页“当前状态”概览 | 软件已验证；首屏默认展示家庭 Wi-Fi（名称/状态/IP/掩码/网关/DNS/信号/地址方式/主机名）、设备热点（名称/来源/安全/信道/连接数与上限/剩余时间）和管理台摘要（设备 ID/Broker/TLS/脱敏账号/CA/配置状态），空状态与未连接状态明确标注；见 [28](28-device-web-setup.md#当前状态默认展示) | 新增 `status_helpers` 覆盖 Broker 解析与账号脱敏，修正 Wi-Fi 名称被设备 ID 覆盖的旧缺陷；完整主机测试、10 项 LVGL、隔离构建与双状态浏览器检查通过；实机计数/信道/掉线状态待验收，提交/CI 见末尾 |
 | HW-14 | 播放抖动缓冲扩容 | 软件已验证；起播门限保持 100 ms，预缓冲容量从 2,880 扩到 7,200+480 样本（约 320 ms，仍在 PSRAM），叠加 8 包队列后可吸收约 480 ms 中途断流；见 [01 §5.1](01-ai-agent.md#51-数据流) | 新增 `test_ai_agent::jitter-buffer`（7,200 样本峰值 + 360 ms 断流 0 欠载 + 正常 DRAINED），完整主机/ASan/UBSan、10 项 LVGL 与隔离 default 构建通过；真实长回答欠载计数待实机复测，提交/CI 见末尾 |
 | MSG-01 | 消息卡片来源时间与紧急抖动 | 软件已验证；卡片顶栏按配置时区显示服务端发送时间（HH:MM，未对时/缺失时隐藏），critical 自动展示后 800 ms 内左右抖动并归位，手动浏览与纯文本回退不抖动；见 [02 §7](02-message-hub.md#7-消息渲染逻辑) | 新增 LVGL 用例覆盖 08:01 时间、+5/-5/-3/归位与空闲隐藏；完整主机/ASan/UBSan、10 项 LVGL 与隔离 default 构建通过；实机视觉与抖动效果待验收，提交/CI 见末尾 |
+| MSG-02 | 模板展示时长按设备上限生效 | 软件已验证；固件此前用设备配置 `message.durationMs` 整体覆盖模板 `display.durationMs`，模板 5–30 秒设置实际无效；现改为上限约束，模板短于上限时按模板时长显示；见 [02 §7.2](02-message-hub.md#72-展示规则) | 新增 `pet_message_display_duration_ms` 用例与 15000→8000 ms 的 presenter 集成用例；完整主机/ASan/UBSan、10 项 LVGL 与隔离 default 构建通过；实机时长观感待验收，提交/CI 见末尾 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -1452,3 +1453,17 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：LVGL 主机渲染只证明布局、文本和位移逻辑；未在实机确认 240×320 屏幕上的抖动观感、边框裁切、刷新负载和长时间稳定性，也未烧录。时间只显示 `HH:MM` 不显示日期，依赖服务端 `sentAt` 与设备配置时区；未连接真实 Broker/设备，不改变消息投递、回执或服务端契约。
 
 推送与 CI（2026-11-20）：04 `33bb660` / `1c11e8c` 已推送并核对远端（`git ls-remote` 指向 `1c11e8c4b6813631c3c8b739341c78be89ef6b40`）；[Software checks #44653134992](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44653134992) 八个 job 全部 `success`，含 default/voice/full/tones/off/duplex 六种固件构建与主机/LVGL 检查。CI 不证明实机观感，也不替代实机烧录与长期稳定性验收。
+
+## MSG-02 · 模板展示时长按设备上限生效
+
+[02 §7.2](02-message-hub.md#72-展示规则) 约定模板 `display.durationMs` 可在 5000–30000 ms 内覆盖默认值，设备配置 `message.durationMs` 只是上限；但 `ui_service` 对 nexus 消息一律把展示时长改为设备配置值，模板 5 秒或 15 秒的设置在设备上都会变成配置值（默认 8 秒），`TEMPLATE-DISPLAY-01` 的模板时长实际不生效。
+
+- 新增 `pet_message_display_duration_ms(message_ms, limit_ms)`（[message.h](../firmware/components/contracts/include/pet/message.h) 声明、`message_validate.c` 实现），取二者较小值；`ui_service` 在生成快照时对 nexus 消息应用该上限，不再整体覆盖模板时长。
+- 不改协议、队列、回执、DND、提示音、抖动、渲染回退和配置下发契约；旧协议消息仍保留自己的时长。
+- 主机用例：`test_message_validate` 覆盖 15000→8000、5000→5000、8000→8000；`test_message_presenter` 用 15000 ms 模板与 8000 ms 上限验证 8 秒隐藏而不是 15 秒。
+
+验证（2026-11-20，本机 macOS）：`LC_ALL=C bash tools/ci/test_host.sh` 全量通过；`PET_HOST_SANITIZE=1 LC_ALL=C bash tools/ci/test_host.sh` 通过；`LC_ALL=C bash tools/ci/test_ui_host.sh` 10/10 通过；`python3 tools/build_matrix.py --profile default --build-root /tmp/pet-build-msgdur --execute --jobs 6` 隔离构建成功并产出 `build-evidence.json`。
+
+边界：主机用例证明时长选择与 presenter 计时，不证明实机观感、刷新负载或长时间展示稳定性；未连接真实 Broker/CORE，未验证模板管理页面到设备的端到端链路，实机时长待验收。设备配置 `message.durationMs` 的取值边界仍由服务端管理与固件校验保证。
+
+推送与 CI（2026-11-20）：待提交后补充。

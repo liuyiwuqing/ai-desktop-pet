@@ -568,7 +568,9 @@ static void ui_task(void *arg)
         pet_message_hub_purge_expired(epoch);
         const size_t count = pet_message_hub_snapshot(ui->snapshot, PET_MESSAGE_QUEUE_CAPACITY);
         for (size_t i = 0; i < count; ++i)
-            if (ui->snapshot[i].delivery.event_id[0]) ui->snapshot[i].duration_ms = ui->settings.config.message.duration_ms;
+            if (ui->snapshot[i].delivery.event_id[0])
+                ui->snapshot[i].duration_ms = pet_message_display_duration_ms(
+                    ui->snapshot[i].duration_ms, ui->settings.config.message.duration_ms);
         const bool pressed = ui->button->pressed();
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
         const bool navigation_was_valid = ui->navigation_sample.valid;
