@@ -1618,3 +1618,5 @@ DEVICE-DISCONNECTS-01 让卡片显示了 24 小时断线次数，但要看具体
 验证（2026-11-20，本机 macOS）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；04 `bash tools/ci/test_overview_ui.sh` 157 项通过（原 149 项 + 新增 8 项：3 项行为断言、1 项刷新就绪和 1 次选择器交互的 4 项检查），新增断言覆盖停用计数可点击、设备页只显示停用样机且筛选命名为「已停用」、请求带 `state=disabled` 与第一页参数。顺带把「筛选后点击刷新」改为先等按钮可用，避免列表加载中的竞态。
 
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；未验证真实停用设备、生产库大数据量或实机展示。
+
+推送与 CI（2026-11-20）：CORE `0055fdb` / 04 `bed6aa0` 已推送并核对远端（`git ls-remote` 分别指向 `0055fdbf02631e1ee8abc9508618bbe82fdb4979`、`bed6aa0341cbe631ef9dbdaa8bcf538ef5b28fc2`）。CORE [Docker CI 44697023823](https://github.com/liuyiwuqing/nexus-core/actions/runs/44697023823) 全步骤 `success`；04 [Software checks 44697032918](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44697032918) 八个 job 全部 `success`。两条 workflow 都不运行该管理台浏览器专项；真实停用设备、生产库大数据量与实机展示仍未验收。
