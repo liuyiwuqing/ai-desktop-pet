@@ -102,6 +102,7 @@ results.push('unknown rename never resends automatically');
 await tap('加载当前名称');await tap('取消');
 await expect("document.querySelector('.device-card')?.innerText.includes('HomeLab-2.4G') && document.querySelector('.device-card')?.innerText.includes('192.168.1.20') && document.querySelector('.device-card')?.innerText.includes('-52 dBm')",'device card shows the latest Wi-Fi network, address and signal');
 await expect("[...document.querySelectorAll('.device-card .device-seen')].some(p=>p.innerText.includes('设备未读')&&p.innerText.includes('2 条'))",'device card shows the device-side unread queue');
+await expect("[...document.querySelectorAll('.device-card .device-seen')].some(p=>p.innerText.includes('24 小时断线 2 次'))",'device card shows the 24-hour disconnect count');
 // 设备待发队列：先用计划解释 pending+sent，再用设备名确认撤销尚未开始的行。
 await tap('撤销待发…');
 await expect("document.querySelector('#device-queue-panel')?.innerText.includes('只撤销尚未开始发送的投递') && document.querySelector('#device-queue-panel').innerText.includes('待接收 3 条') && document.querySelector('#device-queue-panel').innerText.includes('可撤销 2 条') && document.querySelector('#device-queue-panel').innerText.includes('保留 1 条')",'queue plan explains waiting, cancellable and retained rows');

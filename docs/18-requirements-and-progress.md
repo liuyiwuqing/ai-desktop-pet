@@ -1568,3 +1568,15 @@ TELEMETRY-06 明确保留“无按信号/离线排序筛选”；设备页此前
 边界：概览夹具使用真实 Vue 产物与回环 RAM HTTP，CORE 测试用隔离 PostgreSQL/MQTT，不连接真实 CORE、Broker 或设备；投递页只读，不代表设备已展示或已读，未做真实部署或实机验收。
 
 推送与 CI（2026-11-20）：CORE `27f25fb` / 04 `1b064a1` 已推送并核对远端。CORE [Docker CI 44684559954](https://github.com/liuyiwuqing/nexus-core/actions/runs/44684559954) 全步骤 `success`；04 [Software checks 44684567042](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44684567042) 八个 job 全部 `success`。两项 workflow 都不运行概览/管理台浏览器专项；真实设备回执与实机展示仍未验收。
+
+## DEVICE-DISCONNECTS-01 · 设备卡片 24 小时断线次数
+
+TELEMETRY-08 保留的「断线次数统计」先做最小切片：`GET /api/v1/devices` 新增只读字段 `wifiDisconnects24h`，按设备统计最近 24 小时内 `wifi_disconnect_reason IS NOT NULL` 的遥测样本。它与「网络趋势」使用同一批历史样本，不改状态机、排序、筛选、分页或保留策略。
+
+设备卡片只在计数大于 0 时于 Wi-Fi 行显示「24 小时断线 N 次」；为 0 或无遥测时不占位，避免日常噪声。判断窗口由数据库 `now()` 计算，计数随旧样本移出窗口自然下降；断线原因与具体时刻仍在状态历史中查看。没有新增接口或前端请求。
+
+验证（2026-11-20，本机 macOS/Docker）：`JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -Dtest=DeviceListFlowTest test` 11 项通过，新增窗口用例覆盖 1 小时前计 1、25 小时前不计、无断线为 0；CORE `npm run check` 与 `npm run build` 通过；04 `bash tools/ci/test_management_ui.sh` 95 项通过（新增断线次数断言），既有名称、信号排序、待发撤销、遥测与凭据检查保持通过。
+
+边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，CORE 测试用隔离 PostgreSQL/MQTT，不连接真实 CORE、Broker 或设备；计数只代表已落库样本，未验证真实弱网、长期保留或实机断线行为，也不构成断线率告警。
+
+推送与 CI（2026-11-20）：CORE `<pending>` / 04 `<pending>` 待推送。
