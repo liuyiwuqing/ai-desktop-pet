@@ -89,7 +89,7 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
                 def device(device_id,name,enabled,online):
                     return {'deviceId':device_id,'name':name,'enabled':enabled,'online':online,'lastSeen':stamp,'wifiIp':'192.168.1.20','wifiRssi':-52,'wifiSsid':'HomeLab-2.4G','telemetryAt':stamp,
-                        'waitingDeliveries':1 if state['queueCancelled'] else state['queueWaiting']}
+                        'deviceUnread':2,'waitingDeliveries':1 if state['queueCancelled'] else state['queueWaiting']}
                 rows=[device('dodo-ui-fixture',state['deviceName'],True,True)]
                 if state['messageDevices']:rows.append(device('dodo-ui-second','第二台设备',True,False));rows.append(device('dodo-ui-paused','已停用设备',False,False))
                 if stateKey=='offline':rows=[]  # 唯一设备在线，离线筛选没有命中

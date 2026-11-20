@@ -129,6 +129,7 @@
 | DEVICE-DELETE-01 | 设备删除与历史保护 | 软件本地已验证：管理员设备卡片新增「删除设备」，确认区必须输入完整设备名称；`DELETE /api/v1/devices/{id}` 对投递/遥测/配置/OTA/成长/凭据历史返回 409 `device_has_history`，对路由/来源引用返回 409 `device_referenced`，未使用设备 204 且重复删除幂等；成功后清除顶栏选择并整表刷新；见文末 | 只能清理登记错误且从未使用的设备，有历史请停用；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DEVICE-QUEUE-01 | 设备卡片待接收投递数 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `waitingDeliveries`（`pending`+`sent` 合计，其余状态不计），V27 部分索引支撑按设备聚合；设备卡片在 Wi-Fi 行后显示「待接收 N 条」，0 不显示；CORE `DeviceListFlowTest` 6 项（新增 1 项）与完整构建 175 项 0 失败/5 条件跳过、前端 check/build、概览浏览器 125 项、角色 43 项与事件 21 项回归通过；见文末 | 计数是读时快照，不代表设备已展示/已读；未连真实 CORE/PostgreSQL/Broker/设备，生产库大数据量与索引效果未压测；推送与 CI 见文末 |
 | DEVICE-FIRMWARE-01 | 设备卡片最近固件版本 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `firmwareVersion`（最近一条遥测，无遥测为 `null`）；设备卡片在 Wi-Fi 行后显示「固件 <version>」，`null` 不显示；`DeviceListFlowTest` 7 项（新增 1 项）、完整构建 176 项 0 失败/5 条件跳过、前端 check/build、概览浏览器 126 项通过；见文末 | 固件是读时快照，OTA 安装后要等下一次遥测；与 Wi-Fi 分别取样本，可能来自不同时间；未连真实设备或部署；推送与 CI 见文末 |
+| DEVICE-QUEUE-02 | 设备卡片设备未读队列 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `deviceUnread`（最近一条遥测的 `unread`，无遥测为 `null`）；设备卡片在「固件」行后显示「设备未读 N 条」，`null`/0 不显示；`DeviceListFlowTest` 9 项（新增 1 项）、前端 check/build、管理台浏览器 89 项通过；见文末 | 设备未读是心跳快照，最多滞后一个心跳周期，与「待接收」的服务端 pending+sent 是两段链路；不代表已展示/已读；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
@@ -1499,3 +1500,17 @@ MSG-02/CONSOLE-33 后仍有两处语义不一致：管理台“更多设置”�
 边界：本轮不改固件、CORE 业务逻辑或协议；管理台回归为本地回环夹具，未连接真实 CORE、PostgreSQL、Broker 或设备；实机时长与模板端到端仍待验收。
 
 推送与 CI（2026-11-20）：CORE `8d543c3`、`5c80b7f` 已推送并核对远端（`git ls-remote` 指向 `5c80b7f4c767d2b019b1e93abfb6e2637137cec5`），[CORE Docker CI 44662462026](https://github.com/liuyiwuqing/nexus-core/actions/runs/44662462026) 全步骤 `success`（2m11s）。首次 `8d543c3` 的 [CI 44661185780](https://github.com/liuyiwuqing/nexus-core/actions/runs/44661185780) 在 Maven 依赖解析阶段被 Maven Central `429 Too Many Requests` 拒绝而失败，属外部依赖限流；`e7cb6ca` 为空提交，不匹配 workflow 路径过滤，未产生运行。04 `7c2ead0` 已推送并核对远端（`git ls-remote` 指向 `7c2ead0fb0651df05bc24f3ee7baffd62e152cdb`），[04 Software checks 44661202516](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44661202516) 八个 job 全部 `success`。88 项管理台回归为本地运行，CI 不执行该浏览器脚本；真实配置下发、Broker/设备与实机仍未验收。
+
+## DEVICE-QUEUE-02 · 设备卡片设备未读队列
+
+TELEMETRY-06 明确保留“列表不显示队列深度”，而 [02 §5.1](02-message-hub.md#51-功能清单) 的设备查看项包含队列。设备卡片此前只有服务端「待接收 N 条」（`pending`+`sent`），看不到设备自身已接收未读的堆积。本次在既有 `GET /api/v1/devices` 追加只读字段，不改表结构、迁移、设备动作或投递状态机。
+
+- 每台设备的 `deviceUnread` 取最近一条遥测样本的 `unread`；无遥测为 `null`，页面在「固件」行后显示「设备未读 N 条」，`null` 与 0 都整行省略。不复用 Wi-Fi 的“最近一条带地址样本”，避免不同链路互相污染。
+- 它与「待接收」是两段链路：待接收是服务端尚未完成（含 sent 未 ACK），设备未读是设备已接收但用户尚未读到；两者可以同时非零，也可以一边为零。
+- 数值是心跳快照，最多滞后一个心跳周期；不轮询、不推算，也不代表消息已展示或来源回执。列表仍一次 `LEFT JOIN LATERAL` 查询，不逐台补查。
+
+验证（2026-11-20，本机 macOS/Docker）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；`DeviceListFlowTest` 9 项通过，新增用例覆盖最近样本取值（5→2）、无遥测为 `null`、最新样本 0 不回退旧值。`bash tools/ci/test_management_ui.sh` 89 项通过，新增断言要求卡片显示「设备未读 2 条」；既有列表、重命名、待发撤销、设置、遥测、凭据与记忆检查保持通过。
+
+边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；CORE 测试用隔离 PostgreSQL/MQTT。未做真实设备心跳、队列深度长期变化或生产库大数据量验证。
+
+推送与 CI：待提交后补充。
