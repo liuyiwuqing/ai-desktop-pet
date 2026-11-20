@@ -739,14 +739,19 @@ static void ui_task(void *arg)
             pet_growth_view_ui_tick(&ui->growth_view, now_ms(), false);
 #endif
             lv_obj_remove_flag(ui->view.root, LV_OBJ_FLAG_HIDDEN);
-            pet_message_view_ui_show(&ui->view, &ui->snapshot[action.index], action.plain_text,
-                                     now_ms());
+            int16_t utc_offset_min = 0;
+            if (pet_config_utc_offset(&ui->settings.config, &utc_offset_min) != ESP_OK)
+                utc_offset_min = 0;
+            const pet_message_view_t *shown = &ui->snapshot[action.index];
+            const bool alert = !action.plain_text && !ui->presenter.manual &&
+                               shown->priority == PET_MESSAGE_PRIORITY_CRITICAL;
+            pet_message_view_ui_show(&ui->view, shown, action.plain_text, now_ms(), utc_offset_min,
+                                     alert);
             privacy_badge(ui);
             const bool rendered = refresh(ui) && ui->strips > 0;
             if (pet_message_presenter_rendered(&ui->presenter, action.generation, rendered,
                                                now_ms())) {
 #if PET_UI_AI
-                const pet_message_view_t *shown=&ui->snapshot[action.index];
                 if (shown->state==PET_MESSAGE_STATE_RECEIVED && !ui->muted && !ui->dnd &&
                     shown->sound!=PET_MESSAGE_SOUND_NONE) (void)pet_ai_agent_notify(shown->sound,
                         shown->priority==PET_MESSAGE_PRIORITY_CRITICAL);
@@ -784,6 +789,7 @@ static void ui_task(void *arg)
         }
         if (ui->presenter.visible) {
             privacy_badge(ui);
+            pet_message_view_ui_tick(&ui->view, now_ms());
             pet_message_view_ui_scroll(&ui->view, now_ms());
             if (!refresh(ui)) {
                 /* 后续滚动失败时撤销“当前可见”，禁止对黑屏发送 read。 */

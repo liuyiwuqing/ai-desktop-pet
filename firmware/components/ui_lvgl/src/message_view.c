@@ -78,7 +78,10 @@ bool pet_message_view_ui_init(pet_message_view_ui_t *v, lv_obj_t *root, lv_font_
     lv_obj_set_style_border_color(root, lv_color_hex(0x334456), 0);
     lv_obj_remove_flag(root, LV_OBJ_FLAG_SCROLLABLE);
     v->mark = label(root, 14, 14, 22, LV_FONT_DEFAULT, 0xA9BDCC);
-    v->kind = label(root, 40, 12, 182, font16, 0xA9BDCC);
+    v->kind = label(root, 40, 12, 112, font16, 0xA9BDCC);
+    v->time = label(root, 152, 12, 74, font16, 0x9FB4C4);
+    lv_obj_set_style_text_align(v->time, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_add_flag(v->time, LV_OBJ_FLAG_HIDDEN);
     v->title = label(root, 14, 40, 208, font24, 0xF2F5F7);
     lv_obj_set_height(v->title, 64);
     lv_label_set_long_mode(v->title, LV_LABEL_LONG_DOT);
@@ -93,12 +96,38 @@ bool pet_message_view_ui_init(pet_message_view_ui_t *v, lv_obj_t *root, lv_font_
     v->body = label(v->body_box, 0, 0, 208, font16, 0xDDE6ED);
     lv_label_set_long_mode(v->body, LV_LABEL_LONG_WRAP);
     v->footer = label(root, 14, 294, 208, font16, 0xBBD1DF);
-    return v->mark != NULL && v->kind != NULL && v->title != NULL && v->source != NULL && v->body_box != NULL &&
-           v->body != NULL && v->footer != NULL;
+    return v->mark != NULL && v->kind != NULL && v->time != NULL && v->title != NULL &&
+           v->source != NULL && v->body_box != NULL && v->body != NULL && v->footer != NULL;
+}
+
+/* 服务端 sentAt 按本机配置时区显示 HH:MM；未对时或时间戳缺失时隐藏，不显示伪造时间。 */
+static void show_time(pet_message_view_ui_t *v, uint32_t epoch_s, int16_t utc_offset_min)
+{
+    const int64_t local = (int64_t)epoch_s + (int64_t)utc_offset_min * 60;
+    if (epoch_s == 0 || local < 0 || utc_offset_min < -720 || utc_offset_min > 840) {
+        lv_label_set_text(v->time, "");
+        lv_obj_add_flag(v->time, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    char text[8];
+    snprintf(text, sizeof(text), "%02u:%02u", (unsigned)((local / 3600) % 24),
+             (unsigned)((local / 60) % 60));
+    lv_label_set_text(v->time, text);
+    lv_obj_remove_flag(v->time, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void reset_shake(pet_message_view_ui_t *v)
+{
+    v->alert_animation = false;
+    if (v->shake_x != 0) {
+        v->shake_x = 0;
+        lv_obj_set_x(v->root, 0);
+    }
 }
 
 void pet_message_view_ui_show(pet_message_view_ui_t *v, const pet_message_view_t *message,
-                              bool plain_text, uint32_t now_ms)
+                              bool plain_text, uint32_t now_ms, int16_t utc_offset_min,
+                              bool alert_animation)
 {
     static const char *const kinds[] = {"消息", "评论", "提醒", "成长", "系统"};
     const unsigned type = (unsigned)message->template_id;
@@ -130,10 +159,13 @@ void pet_message_view_ui_show(pet_message_view_ui_t *v, const pet_message_view_t
               plain_text ? v->font16 : v->font24);
     safe_text(v, v->source, message->source, sizeof(message->source), v->font16);
     safe_text(v, v->body, message->body, sizeof(message->body), v->font16);
+    show_time(v, message->created_at_epoch_s, utc_offset_min);
     lv_obj_scroll_to_y(v->body_box, 0, LV_ANIM_OFF);
     lv_label_set_text(v->footer, "短按 BOOT · 标为已读");
     v->message_visible = true;
     v->read_failed = false;
+    reset_shake(v);
+    v->alert_animation = alert_animation && !plain_text;
     v->shown_ms = v->last_scroll_ms = now_ms;
     lv_obj_invalidate(v->root);
 }
@@ -154,9 +186,30 @@ void pet_message_view_ui_idle(pet_message_view_ui_t *v, uint8_t unread, bool dnd
     lv_label_set_text(v->body, "");
     lv_label_set_text(v->footer, unread ? "短按 BOOT · 查看消息" : "");
     lv_obj_scroll_to_y(v->body_box, 0, LV_ANIM_OFF);
+    lv_label_set_text(v->time, "");
+    lv_obj_add_flag(v->time, LV_OBJ_FLAG_HIDDEN);
     v->message_visible = false;
     v->read_failed = false;
+    reset_shake(v);
     lv_obj_invalidate(v->root);
+}
+
+/* 紧急消息卡片在显示后 800 ms 内快速左右抖动，随后归位；手动浏览与纯文本回退不抖动。 */
+void pet_message_view_ui_tick(pet_message_view_ui_t *v, uint32_t now_ms)
+{
+    if (!v->message_visible || !v->alert_animation)
+        return;
+    static const int8_t offsets[8] = {5, -5, 4, -4, 3, -3, 2, -2};
+    const uint32_t elapsed = now_ms - v->shown_ms;
+    int8_t x = 0;
+    if (elapsed < 800U)
+        x = offsets[elapsed / 100U];
+    else
+        v->alert_animation = false;
+    if (x != v->shake_x) {
+        v->shake_x = x;
+        lv_obj_set_x(v->root, x);
+    }
 }
 
 void pet_message_view_ui_scroll(pet_message_view_ui_t *v, uint32_t now_ms)

@@ -62,6 +62,12 @@ static void screenshot(const char *dir, const char *name, lv_display_t *display)
     fclose(file);
 }
 
+static void view_tick(pet_message_view_ui_t *view, uint32_t now_ms)
+{
+    pet_message_view_ui_tick(view, now_ms);
+    lv_obj_update_layout(view->root);
+}
+
 int main(int argc, char **argv)
 {
     assert(argc == 3);
@@ -86,9 +92,11 @@ int main(int argc, char **argv)
     strcpy(message.body, "这篇 ESP32 "
                          "入门很有帮助！\n请问温湿度传感器如何接线？\n期待下一篇教程。\n\n今天也要"
                          "保持好奇心。\n长消息会自动向下滚动，滚动结束不会自动标为已读。");
-    pet_message_view_ui_show(&view, &message, false, 1000);
+    pet_message_view_ui_show(&view, &message, false, 1000, 480, false);
     assert(view.missing_glyphs == 0);
     assert(strcmp(lv_label_get_text(view.body), message.body) == 0);
+    assert(strcmp(lv_label_get_text(view.time), "08:01") == 0);
+    assert(!lv_obj_has_flag(view.time, LV_OBJ_FLAG_HIDDEN));
     screenshot(argv[2], "message-comment", display);
     assert(lv_obj_get_width(view.root) == 240 && lv_obj_get_height(view.root) == 320);
     for (uint32_t t = 2500; t < 8000; t += 40)
@@ -101,18 +109,31 @@ int main(int argc, char **argv)
     message.priority = PET_MESSAGE_PRIORITY_CRITICAL;
     strcpy(message.title, "室内温度过高");
     strcpy(message.body, "当前温度 35℃，请注意通风。\n设备仍在监测环境变化。");
-    pet_message_view_ui_show(&view, &message, false, 9000);
+    pet_message_view_ui_show(&view, &message, false, 9000, 480, true);
+    view_tick(&view, 9000);
+    assert(lv_obj_get_x(view.root) == 5);
     screenshot(argv[2], "message-critical", display);
+    view_tick(&view, 9100);
+    assert(lv_obj_get_x(view.root) == -5);
+    view_tick(&view, 9500);
+    assert(lv_obj_get_x(view.root) == -3);
+    view_tick(&view, 9800);
+    assert(lv_obj_get_x(view.root) == 0 && !view.alert_animation);
     strcpy(message.body, "中文🚀\xFF\x01尾部");
-    pet_message_view_ui_show(&view, &message, true, 10000);
+    pet_message_view_ui_show(&view, &message, true, 10000, 480, true);
+    view_tick(&view, 10000);
+    assert(lv_obj_get_x(view.root) == 0);
     assert(strcmp(lv_label_get_text(view.body), "中文□□□尾部") == 0);
     assert(view.missing_glyphs == 3);
     memset(message.body, 'x', PET_MESSAGE_BODY_MAX);
     message.body[PET_MESSAGE_BODY_MAX] = 0;
-    pet_message_view_ui_show(&view, &message, false, 10000);
+    pet_message_view_ui_show(&view, &message, false, 10000, 480, false);
     assert(strlen(lv_label_get_text(view.body)) == PET_MESSAGE_BODY_MAX);
+    view_tick(&view, 10000);
+    assert(lv_obj_get_x(view.root) == 0);
     pet_message_view_ui_idle(&view, 3, true);
     assert(strcmp(lv_label_get_text(view.body), "") == 0);
+    assert(lv_obj_has_flag(view.time, LV_OBJ_FLAG_HIDDEN));
     screenshot(argv[2], "message-unread", display);
     lv_obj_clean(lv_display_get_screen_active(display));
     pet_growth_view_ui_t growth;
