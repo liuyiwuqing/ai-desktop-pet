@@ -72,6 +72,7 @@ await expect("document.querySelector('.message-detail')?.innerText.includes('清
 // 消息投递状态：详情读取只读快照，失败/空态不保留旧行。
 await expect("document.querySelector('.message-detail .message-receipts')?.innerText.includes('共 2 条投递') && document.querySelector('.message-detail .message-receipts').innerText.includes('用户已读 1') && document.querySelector('.message-detail .message-receipts').innerText.includes('dodo-ui-fixture')",'message detail shows per-device delivery status');
 await expectState(snapshot=>snapshot.receiptRequests.length===1 && snapshot.receiptRequests[0].includes('/messages/purged-ui-fixture/deliveries'),'message detail reads receipts for the selected message');
+await expect("(()=>{const text=document.querySelector('.message-detail .message-receipts')?.innerText||'';return text.includes('书房伙伴')&&text.includes('阅读设备')&&text.includes('dodo-reading');})()",'message receipts show device names alongside IDs');
 await fixture({receiptMode:'error'});await tap('刷新投递状态');
 await expect("document.querySelector('.message-detail .message-receipts')?.innerText.includes('HTTP 503') && !document.querySelector('.message-detail .message-receipts table')",'receipt read failure clears stale rows');
 await fixture({receiptMode:'empty'});await tap('刷新投递状态');

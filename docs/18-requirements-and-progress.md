@@ -1544,3 +1544,15 @@ TELEMETRY-06 明确保留“无按信号/离线排序筛选”；设备页此前
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；历史为已上报遥测的读时聚合，未验证真实弱网趋势、长期保留或实机表现。
 
 推送与 CI（2026-11-20）：CORE `cce6cdd` / 04 `71be268` 已推送并核对远端。CORE [Docker CI 44678741187](https://github.com/liuyiwuqing/nexus-core/actions/runs/44678741187) 全步骤 `success`；04 [Software checks 44678749109](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44678749109) 八个 job 全部 `success`。两项 workflow 都不运行该管理台浏览器专项；真实弱网趋势、长期保留与实机表现仍未验收。
+
+## RECEIPT-NAME-01 · 投递状态显示设备名称
+
+消息详情与测试发送后的逐设备投递状态此前只显示 `deviceId`，管理员需要跳到设备页对照才能确认是哪台设备。本次在读取时关联设备表，`GET /api/v1/messages/{messageId}/deliveries` 的 `items[]` 新增 `deviceName`；分页、状态计数、鉴权与投递状态机不变，没有新表或迁移。设备删除本就要求无历史，正常路径名称必有值；名称是读取时快照，重命名后下次刷新更新。
+
+管理台把设备名称作为主文本，设备 ID 保留为次要等宽行便于支持排查；缺少名称时回退显示 ID，不出现空单元格。投递页的全量审计列表仍以标题+ID 展示，未扩大到该页或 CSV。
+
+验证（2026-11-20，本机 macOS/Docker）：`JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -Dtest=MessageDeliveryBatchFlowTest test` 通过，新增首行与第二页 `deviceName` 断言；CORE `npm run check` 与 `npm run build` 通过；04 `bash tools/ci/test_management_ui.sh` 94 项通过（新增名称与 ID 同时出现），既有投递读取、失败清空与空态检查保持通过。
+
+边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，CORE 测试用隔离 PostgreSQL/MQTT，不连接真实 CORE、Broker 或设备；只读视图仍不代表设备已展示或已读，未做真实部署或实机验收。
+
+推送与 CI（2026-11-20）：CORE `<pending>` / 04 `<pending>` 待推送。

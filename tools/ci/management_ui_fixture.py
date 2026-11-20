@@ -114,9 +114,9 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                 if mode=='error':return self.json_response(503,{'error':'unavailable'})
                 stamp=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())
                 items=[] if mode=='empty' else [
-                    {'eventId':'receipt-read','deviceId':'dodo-ui-fixture','status':'read','attempts':1,'lastError':None,
+                    {'eventId':'receipt-read','deviceId':'dodo-ui-fixture','deviceName':'书房伙伴','status':'read','attempts':1,'lastError':None,
                      'nextAttemptAt':stamp,'receivedAt':stamp,'displayedAt':stamp,'readAt':stamp},
-                    {'eventId':'receipt-pending','deviceId':'dodo-reading','status':'pending','attempts':0,'lastError':None,
+                    {'eventId':'receipt-pending','deviceId':'dodo-reading','deviceName':'阅读设备','status':'pending','attempts':0,'lastError':None,
                      'nextAttemptAt':stamp,'receivedAt':None,'displayedAt':None,'readAt':None}]
                 counts={}
                 for item in items:counts[item['status']]=counts.get(item['status'],0)+1
