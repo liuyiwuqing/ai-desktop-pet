@@ -1543,4 +1543,4 @@ TELEMETRY-06 明确保留“无按信号/离线排序筛选”；设备页此前
 
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；历史为已上报遥测的读时聚合，未验证真实弱网趋势、长期保留或实机表现。
 
-推送与 CI（2026-11-20）：CORE `<pending>` / 04 `<pending>` 待推送。
+推送与 CI（2026-11-20）：CORE `cce6cdd` / 04 `71be268` 已推送并核对远端。CORE [Docker CI 44678741187](https://github.com/liuyiwuqing/nexus-core/actions/runs/44678741187) 全步骤 `success`；04 [Software checks 44678749109](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44678749109) 八个 job 全部 `success`。两项 workflow 都不运行该管理台浏览器专项；真实弱网趋势、长期保留与实机表现仍未验收。
