@@ -13,20 +13,20 @@ AS_OF = datetime(2026, 11, 13, 10, 0, tzinfo=timezone.utc)
 THRESHOLDS = {'failureRate': 0.1, 'failureRateMinSample': 20, 'backlogPending': 100, 'onlineMin': 1}
 # 钻取后必须看到的一行结果：两类投递各一行，用于证明页面带上了筛选而不是只换了标签页。
 DELIVERY_ROWS = [
-    {'eventId': 'drill-pending', 'messageId': 'drill-message-pending', 'deviceId': 'dodo-ui-fixture',
+    {'eventId': 'drill-pending', 'messageId': 'drill-message-pending', 'deviceId': 'dodo-ui-fixture', 'deviceName': '回归样机',
      'title': '等待投递样本', 'status': 'pending', 'attempts': 0, 'canCancel': True, 'lastError': None,
      'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
-    {'eventId': 'drill-failed', 'messageId': 'drill-message-failed', 'deviceId': 'dodo-ui-fixture',
+    {'eventId': 'drill-failed', 'messageId': 'drill-message-failed', 'deviceId': 'dodo-ui-fixture', 'deviceName': '回归样机',
      'title': '失败投递样本', 'status': 'failed', 'attempts': 3, 'canCancel': False, 'lastError': 'ack_timeout',
      'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
-    {'eventId': 'drill-broker', 'messageId': 'drill-message-broker', 'deviceId': 'dodo-ui-fixture',
+    {'eventId': 'drill-broker', 'messageId': 'drill-message-broker', 'deviceId': 'dodo-ui-fixture', 'deviceName': '回归样机',
      'title': 'Broker 失败样本', 'status': 'failed', 'attempts': 2, 'canCancel': False,
      'lastError': 'broker_unavailable', 'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
     # 设备卡片「待接收 2 条」的样本：一台离线设备的两条 pending/sent，正好与卡片计数对齐。
-    {'eventId': 'drill-waiting-pending', 'messageId': 'drill-message-waiting-pending', 'deviceId': 'dodo-ui-offline',
+    {'eventId': 'drill-waiting-pending', 'messageId': 'drill-message-waiting-pending', 'deviceId': 'dodo-ui-offline', 'deviceName': '离线样机',
      'title': '离线样机待发送', 'status': 'pending', 'attempts': 0, 'canCancel': True, 'lastError': None,
      'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
-    {'eventId': 'drill-waiting-sent', 'messageId': 'drill-message-waiting-sent', 'deviceId': 'dodo-ui-offline',
+    {'eventId': 'drill-waiting-sent', 'messageId': 'drill-message-waiting-sent', 'deviceId': 'dodo-ui-offline', 'deviceName': '离线样机',
      'title': '离线样机已发送', 'status': 'sent', 'attempts': 1, 'canCancel': False, 'lastError': None,
      'nextAttemptAt': AS_OF.strftime('%Y-%m-%dT%H:%M:%SZ'), 'readAt': None},
 ]

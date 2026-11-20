@@ -53,6 +53,7 @@ const drillBase=(await fixture({})).deliveryRequests.length;
 await clickWhenReady('[data-alert-action=delivery_backlog]','the backlog alert is clickable');
 await expect("document.querySelector('h1')?.innerText==='投递'",'the backlog alert opens the delivery page');
 await expect("document.querySelector('.table-shell tbody')?.innerText.includes('等待投递样本') && !document.querySelector('.table-shell tbody')?.innerText.includes('失败投递样本')",'the drill lands on a filtered list instead of the whole table');
+await expect("document.querySelector('.table-shell tbody')?.innerText.includes('回归样机') && document.querySelector('.table-shell tbody')?.innerText.includes('dodo-ui-fixture')",'delivery rows show the device name and keep the id');
 const drillRequests=(await fixture({})).deliveryRequests.slice(drillBase);
 if(!drillRequests.length||!drillRequests.every(path=>path.includes('status=pending')))throw new Error('drill did not carry status=pending: '+JSON.stringify(drillRequests));
 results.push('the filtered read really carried status=pending');
