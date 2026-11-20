@@ -1567,4 +1567,4 @@ TELEMETRY-06 明确保留“无按信号/离线排序筛选”；设备页此前
 
 边界：概览夹具使用真实 Vue 产物与回环 RAM HTTP，CORE 测试用隔离 PostgreSQL/MQTT，不连接真实 CORE、Broker 或设备；投递页只读，不代表设备已展示或已读，未做真实部署或实机验收。
 
-推送与 CI（2026-11-20）：CORE `<pending>` / 04 `<pending>` 待推送。
+推送与 CI（2026-11-20）：CORE `27f25fb` / 04 `1b064a1` 已推送并核对远端。CORE [Docker CI 44684559954](https://github.com/liuyiwuqing/nexus-core/actions/runs/44684559954) 全步骤 `success`；04 [Software checks 44684567042](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44684567042) 八个 job 全部 `success`。两项 workflow 都不运行概览/管理台浏览器专项；真实设备回执与实机展示仍未验收。
