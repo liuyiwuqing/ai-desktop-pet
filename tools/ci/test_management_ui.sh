@@ -155,6 +155,15 @@ await expect("!document.querySelector('#device-management-panel') && document.qu
 await tap('24 小时断线 2 次');
 await expect("!!document.querySelector('#device-management-panel') && document.querySelector('.disconnect-history .disclosure-toggle')?.getAttribute('aria-expanded')==='true' && document.querySelector('#device-disconnects-dodo-ui-fixture')?.getAttribute('aria-expanded')==='true'",'disconnect count reopens the panel with the records expanded');
 await expect("document.querySelectorAll('.disconnect-history .management-record').length===3",'disconnect entry lists the recorded events');
+// 断线导出：按同一只读接口重取 100 条，在浏览器生成 CSV，不改变当前列表。
+await js("(()=>{window.__csv=null;window.__csvName='';window.__csvText='';const original=URL.createObjectURL;URL.createObjectURL=blob=>{window.__csv=blob;return original.call(URL,blob);};HTMLAnchorElement.prototype.click=function(){window.__csvName=this.download;};return true;})()");
+await js("(()=>{const b=document.querySelector('.disconnect-history .disconnect-export');if(!b||b.disabled)return false;b.click();return true;})()");
+await expect("window.__csvName.startsWith('disconnects-dodo-ui-fixture-') && window.__csvName.endsWith('.csv') && window.__csv?.size>0",'disconnect export downloads a CSV');
+await js("(()=>{window.__csv.text().then(text=>{window.__csvText=text;});return true;})()");
+await expect("window.__csvText.includes('记录时间,断线时刻,原因码,原因名称') && window.__csvText.includes('201 找不到目标 AP') && window.__csvText.includes('202 认证失败') && window.__csvText.includes('原因 777') && window.__csvText.split('\\r\\n').length===4",'disconnect CSV names reasons and keeps one row per event');
+await expectState(snapshot=>snapshot.disconnectRequests.some(path=>path.includes('/devices/dodo-ui-fixture/telemetry/disconnects')&&path.includes('limit=100')),'disconnect export reads up to 100 events');
+await expect("document.querySelectorAll('.disconnect-history .management-record').length===3",'the visible list stays at its own limit after export');
+await js("(()=>{delete HTMLAnchorElement.prototype.click;return true;})()");
 await tap('状态历史');
 await tap('音量');
 await expect("document.querySelector('.chart-legend')?.innerText.includes('音量') && document.querySelector('.chart-legend')?.innerText.includes('%') && !document.querySelector('.telemetry-chart .series-secondary')",'volume metric draws a single percent series');

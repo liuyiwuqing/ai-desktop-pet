@@ -133,6 +133,7 @@
 | DEVICE-SORT-01 | 设备列表信号排序 | 软件本地已验证：`GET /api/v1/devices` 接受 `sort=signal`（`order=asc\|desc`），按最近带网络信息的遥测 `wifi_rssi` 排序，无信号设备两个方向都置后、同值按设备 ID；设备页新增「信号：强→弱 / 弱→强」；`DeviceListFlowTest` 10 项（新增 1 项）、概览浏览器 140 项通过；见文末 | 信号是心跳快照，最多滞后一个心跳周期；排序不改变筛选/计数/分页与设备行为，不代表当前在线或趋势；未连真实设备；推送与 CI 见文末 |
 | OVERVIEW-STAT-DRILL-01 | 概览在线/离线计数直达设备筛选 | 软件本地已验证：顶部「设备在线/设备离线」数字改为按钮，复用设备页 `state=online/offline` 筛选，与告警钻取同样清掉单设备选择与顶栏搜索；数字排版不变，只有悬停/聚焦显示下划线，读屏名称带筛选说明；CORE check/build、04 概览浏览器 149 项（新增 8 项）通过；见文末 | 计数仍按整张设备表统计；不新增接口或筛选维度；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | OVERVIEW-STAT-DRILL-02 | 概览停用计数直达已停用筛选 | 软件本地已验证：设备总数说明行里的「停用 N 台」改为按钮，钻取设备页 `state=disabled`，与在线/离线计数共用同一套复位和数字样式；停用只按 `!enabled`，不混入启用但离线设备；CORE check/build、04 概览浏览器 157 项通过；见文末 | 计数仍按整张设备表统计；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
+| DEVICE-DISCONNECT-EXPORT-01 | 最近断线导出 CSV | 软件本地已验证：「最近断线」底部新增导出按钮，点击按同一只读接口重取 `limit=100`（列表仍 20 条），浏览器生成含记录时间/断线时刻/原因码/原因名称的 CSV（UTF-8 BOM + CRLF）；读取失败或保留期内无记录时保留列表并提示，不下载空文件；CORE check/build、04 管理台浏览器 102 项（新增 4 项）通过；见文末 | 导出上限 100 条，仍是读时快照；原因名称由管理台映射，未知码写数字；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
@@ -1620,3 +1621,13 @@ DEVICE-DISCONNECTS-01 让卡片显示了 24 小时断线次数，但要看具体
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；未验证真实停用设备、生产库大数据量或实机展示。
 
 推送与 CI（2026-11-20）：CORE `0055fdb` / 04 `bed6aa0` 已推送并核对远端（`git ls-remote` 分别指向 `0055fdbf02631e1ee8abc9508618bbe82fdb4979`、`bed6aa0341cbe631ef9dbdaa8bcf538ef5b28fc2`）。CORE [Docker CI 44697023823](https://github.com/liuyiwuqing/nexus-core/actions/runs/44697023823) 全步骤 `success`；04 [Software checks 44697032918](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44697032918) 八个 job 全部 `success`。两条 workflow 都不运行该管理台浏览器专项；真实停用设备、生产库大数据量与实机展示仍未验收。
+
+## DEVICE-DISCONNECT-EXPORT-01 · 最近断线导出 CSV
+
+TELEMETRY-08 的「最近断线」能在页面上看最近 20 条，但要留证据仍只能截图或手抄。本次在列表底部增加「导出 CSV」：点击后按同一只读接口重新读取 `limit=100`，在浏览器生成 UTF-8 BOM + CRLF 的四列文件（记录时间、断线时刻、原因码、原因名称），不新增服务端导出接口、不写服务端文件，也不改变列表当前 20 条。
+
+导出是显式动作，失败不会清空已经显示的记录：读取失败或保留期内没有记录时在列表下方提示，不下载只有表头的空文件；请求中按钮显示「正在导出…」并禁用，重复点击不会并发下载。原因名称沿用管理台的 ESP-IDF 映射，未收录的码仍写数字，避免臆造含义。
+
+验证（2026-11-20，本机 macOS）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；04 `bash tools/ci/test_management_ui.sh` 102 项通过（原 98 项 + 新增 4 项），新增断言覆盖导出按钮可见可点、文件名 `disconnects-<设备>-<UTC 时间>.csv`、CSV 表头与三个原因（含未知码 `原因 777`）逐条成行、夹具收到 `limit=100` 请求，以及导出后页面列表仍保持 3 条。既有的遥测导出、断线入口、设置与凭据检查保持通过。
+
+边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；导出只覆盖保留期内已落库的断线事件，最多 100 条，仍是读时快照，不能替代设备日志或长期归档；未验证生产库大保留量、真实断线与实机。
