@@ -1631,3 +1631,5 @@ TELEMETRY-08 的「最近断线」能在页面上看最近 20 条，但要留证
 验证（2026-11-20，本机 macOS）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；04 `bash tools/ci/test_management_ui.sh` 102 项通过（原 98 项 + 新增 4 项），新增断言覆盖导出按钮可见可点、文件名 `disconnects-<设备>-<UTC 时间>.csv`、CSV 表头与三个原因（含未知码 `原因 777`）逐条成行、夹具收到 `limit=100` 请求，以及导出后页面列表仍保持 3 条。既有的遥测导出、断线入口、设置与凭据检查保持通过。
 
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；导出只覆盖保留期内已落库的断线事件，最多 100 条，仍是读时快照，不能替代设备日志或长期归档；未验证生产库大保留量、真实断线与实机。
+
+推送与 CI（2026-11-20）：CORE `aefdc88` / 04 `ff279fd` 已推送并核对远端（`git ls-remote` 分别指向 `aefdc8843d0e03340e67d517f388e202c423c4a4`、`ff279fdbad0eed45d87bc41dec39ed911cacfaa4`）。CORE [Docker CI 44700418417](https://github.com/liuyiwuqing/nexus-core/actions/runs/44700418417) 全步骤 `success`；04 [Software checks 44700433101](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44700433101) 八个 job 全部 `success`。两条 workflow 都不运行该管理台浏览器专项；真实断线、生产库大保留量与实机仍未验收。
