@@ -1605,3 +1605,5 @@ DEVICE-DISCONNECTS-01 让卡片显示了 24 小时断线次数，但要看具体
 验证（2026-11-20，本机 macOS）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；04 `bash tools/ci/test_overview_ui.sh` 149 项通过（原 141 项 + 新增 8 项），新增断言覆盖数字可点击、在线钻取只出现在线设备且状态筛选命名为「在线」、离线钻取排除停用设备、夹具确认请求分别带 `state=online` / `state=offline` 与第一页参数、从设备页返回概览后刷新按钮可用。既有的告警钻取、390px 布局、轮询与阈值检查保持通过。
 
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；只验证在线/离线两个状态入口，未验证真实设备离线、生产库大数据量或实机展示。运行时 390px 布局断言曾出现一次未复现的时序失败；单独探测 390px 下计数、按钮与趋势的右边界均 ≤369px，随后完整运行 149 项通过，未改宽断言或布局。
+
+推送与 CI（2026-11-20）：CORE `12e57f5` / 04 `5fad625` 已推送并核对远端（`git ls-remote` 分别指向 `12e57f5d6aa6f810c9a82fadd7cad44826cc1154`、`5fad62567e9a79106fea7b3065448f9ac92be96b`）。CORE [Docker CI 44693188557](https://github.com/liuyiwuqing/nexus-core/actions/runs/44693188557) 全步骤 `success`；04 [Software checks 44693197785](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44693197785) 八个 job 全部 `success`。两项 workflow 都不运行该管理台浏览器专项；真实设备离线、生产库大数据量与实机展示仍未验收。
