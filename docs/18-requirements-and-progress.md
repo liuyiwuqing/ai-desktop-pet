@@ -1590,3 +1590,5 @@ DEVICE-DISCONNECTS-01 让卡片显示了 24 小时断线次数，但要看具体
 验证（2026-11-20，本机 macOS/Docker）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；04 `bash tools/ci/test_management_ui.sh` 98 项通过，新增 3 项断言覆盖关闭面板后入口复位、点击断线次数重新打开面板并展开记录、记录条数保持 3 条；既有网络趋势、待发撤销、设置、遥测、凭据与记忆检查保持通过。
 
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；未做真实设备断线、生产库保留期或实机验收。
+
+推送与 CI（2026-11-20）：CORE `99f5864` / 04 `51ce79e` 已推送并核对远端（`git ls-remote` 分别指向 `99f5864c8c245162b5a618d283751921debb1a19`、`51ce79eb3468687a93c4cd213a02b959fbb69bd8`）。CORE [Docker CI 44689862336](https://github.com/liuyiwuqing/nexus-core/actions/runs/44689862336) 第 1 次在 Maven 解析 `spring-boot-starter-parent:4.1.2` 时被 Maven Central 拒绝而失败（同一 POM 的上一次 CI 已通过，属外部依赖瞬时不可用）；第 2 次尝试全步骤 `success`。04 [Software checks 44689876586](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44689876586) 八个 job 全部 `success`。两项 workflow 都不运行该管理台浏览器专项；真实断线、Broker/设备与实机仍未验收。
