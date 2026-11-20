@@ -1513,4 +1513,4 @@ TELEMETRY-06 明确保留“列表不显示队列深度”，而 [02 §5.1](02-m
 
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；CORE 测试用隔离 PostgreSQL/MQTT。未做真实设备心跳、队列深度长期变化或生产库大数据量验证。
 
-推送与 CI：待提交后补充。
+推送与 CI（2026-11-20）：CORE `bc41cf6` / 04 `2a11773` 已推送并核对远端。CORE [Docker CI 44668862660](https://github.com/liuyiwuqing/nexus-core/actions/runs/44668862660) 全步骤 `success`；04 [Software checks 44668879496](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44668879496) 八个 job 全部 `success`。两项 workflow 都不运行管理台浏览器专项，真实心跳、Broker/设备与实机仍未验收。
