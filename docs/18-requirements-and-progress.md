@@ -1657,3 +1657,17 @@ CONSOLE-29 的回执视图只在打开或点击「刷新投递状态」时读一
 边界：`from` 是相对读取时刻的滚动窗口，不支持自定义起止日期或按操作者筛选；`recorded_at` 仍取服务端写入时间，审计行不清理。浏览器夹具使用回环 RAM HTTP，未连接真实 CORE/PostgreSQL，也未验证生产库大审计量下 `recorded_at` 索引的实际执行计划。
 
 推送与 CI：CORE `2612cf0` / 04 `f2bfe0b` 已推送并核对远端（`git ls-remote` 分别指向 `2612cf0335c5243a73ad5eae5af94930d99cd8c3`、`f2bfe0bed84042c7903694ec634ee49ee19c37d1`）。04 [Software checks 44706724856](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44706724856) 八个 job 全部 `success`。CORE [Docker CI 44706714897](https://github.com/liuyiwuqing/nexus-core/actions/runs/44706714897) 失败，日志显示 `spring-boot-starter-parent:4.1.2` 从 Maven Central 拉取返回 429 Too Many Requests，构建未进入代码编译；本地定向集成测试与前端构建已通过，该失败属外部依赖限流，重跑接口当前无权限，未计作远程 CI 通过。两条 workflow 都不运行概览浏览器专项；生产库大审计量下的实际执行计划未验证。
+
+## DISCONNECT-FILTER-01 · 断线历史按原因筛选
+
+「最近断线」只能顺序看最近 20 条，排查“认证失败还是找不到 AP”仍要逐条读原因。断线接口新增可选 `reason`（0–65535 整数，非整数/越界返回 400 `invalid_disconnect_reason`），响应回显 `reason`（未筛选为 `null`）；`limit` 作用于过滤后的结果。判定仍是“先按相邻样本识别事件、再按原因过滤”，避免筛掉其他原因后把两条同原因事件误合并。
+
+管理台在断线列表上方新增原因下拉，列表与 CSV 导出共用同一原因参数。选项只来自本次打开面板后历史中出现过的原因和「全部原因」，筛选后保留已见原因以便直接切换；设备切换或重开面板重置。筛选为空时保留区块和下拉并说明「该原因下没有断线记录」，导出提示「该原因下没有可导出的断线记录」且不下载空文件。未改表、索引、权限或结果条数上限。
+
+实现中发现并修正两点：Naive UI 下拉需 `mousedown` 才展开，自动化改为派发真实鼠标事件；若把全部已知 ESP-IDF 原因都放进选项，虚拟列表不会挂载排在后面的目标项，且用户会看到大量无记录的原因，故收敛为“历史中出现过 + 全部原因”。
+
+验证（2026-11-20，本机 macOS）：`JAVA_HOME=…/jbr-21.0.11/Contents/Home mvn -q -Dtest=DeviceManagementFlowTest test` 通过，13 项测试 0 失败、1 跳过；新增用例覆盖无筛选时 `reason` 为 `null`、`reason=202` 与 `reason=201` 的条数、未知原因 0 条、`limit=1&reason=202` 仍只取 1 条，以及 `-1/65536/abc` 均返回 400。CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过。04 `bash tools/ci/test_management_ui.sh` 116 项通过（新增 9 项），覆盖原因选项、`limit=20&reason=202` 请求、筛选后 1 条与「已筛选」、筛选 CSV 只含 202、切换已见原因 777、设备样本清空后保留筛选与空态/空导出提示、刷新恢复、清空筛选恢复 3 条并去掉 `reason`；原有导出、历史与凭据检查保持通过。
+
+边界：筛选选项只来自本次面板会话已见的原因，保留期内但不在最近 20 条的原因需先清空筛选或等样本出现，不能按起止时间或组合原因筛选；浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；未验证真实断线、生产库大保留量或实机。
+
+推送与 CI（2026-11-20）：CORE `d2711f7` / 04 `042ed1f` 已推送并核对远端（`git ls-remote` 分别指向 `d2711f7c39aedd90144b0076738a0e91e952af9a`、`042ed1f2f125e8f1b8ed4b14d0cfc831c4907ab2`）。CORE [Docker CI 44709282509](https://github.com/liuyiwuqing/nexus-core/actions/runs/44709282509) `success`；04 [Software checks 44709297122](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44709297122) 八个 job 全部 `success`。两条 workflow 都不运行该管理台浏览器专项；真实断线与实机仍未验收。
