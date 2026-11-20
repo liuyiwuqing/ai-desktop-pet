@@ -155,6 +155,34 @@ await expect("!document.querySelector('#device-management-panel') && document.qu
 await tap('24 小时断线 2 次');
 await expect("!!document.querySelector('#device-management-panel') && document.querySelector('.disconnect-history .disclosure-toggle')?.getAttribute('aria-expanded')==='true' && document.querySelector('#device-disconnects-dodo-ui-fixture')?.getAttribute('aria-expanded')==='true'",'disconnect count reopens the panel with the records expanded');
 await expect("document.querySelectorAll('.disconnect-history .management-record').length===3",'disconnect entry lists the recorded events');
+// 断线原因筛选：列表与导出共用原因参数；筛选后仍能直接切换到本次见过的其他原因。
+async function pickDisconnectReason(label) {
+  await js("(()=>{const s=document.querySelector('.disconnect-filter .n-base-selection');if(!s)return false;s.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));s.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));s.click();return true;})()");
+  await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)}&&o.offsetParent!==null)`,'disconnect reason option '+label+' is offered');
+  await js(`[...document.querySelectorAll('.n-base-select-option')].filter(o=>o.offsetParent!==null).find(o=>o.innerText.trim()===${JSON.stringify(label)})?.click()`);
+}
+await pickDisconnectReason('202 认证失败');
+await expect("document.querySelectorAll('.disconnect-history .management-record').length===1 && document.querySelector('.disconnect-history').innerText.includes('202 认证失败') && document.querySelector('.disconnect-history').innerText.includes('已筛选')",'reason filter keeps only the chosen reason');
+await expectState(snapshot=>snapshot.disconnectRequests.some(path=>path.includes('/telemetry/disconnects')&&path.includes('limit=20')&&path.includes('reason=202')),'reason filter is sent to the read-only endpoint');
+await js("(()=>{window.__csv=null;window.__csvName='';window.__csvText='';const original=URL.createObjectURL;URL.createObjectURL=blob=>{window.__csv=blob;return original.call(URL,blob);};HTMLAnchorElement.prototype.click=function(){window.__csvName=this.download;};return true;})()");
+await js("(()=>{const b=document.querySelector('.disconnect-history .disconnect-export');if(!b||b.disabled)return false;b.click();return true;})()");
+await expect("window.__csvName.startsWith('disconnects-dodo-ui-fixture-') && window.__csv?.size>0",'filtered disconnect export downloads a CSV');
+await js("(()=>{window.__csv.text().then(text=>{window.__csvText=text;});return true;})()");
+await expect("window.__csvText.includes('202 认证失败') && !window.__csvText.includes('201 找不到目标 AP') && window.__csvText.split('\\r\\n').length===2",'filtered CSV contains only the chosen reason');
+await expectState(snapshot=>snapshot.disconnectRequests.some(path=>path.includes('/telemetry/disconnects')&&path.includes('limit=100')&&path.includes('reason=202')),'filtered export carries the reason');
+await pickDisconnectReason('原因 777');
+await expect("document.querySelectorAll('.disconnect-history .management-record').length===1 && document.querySelector('.disconnect-history').innerText.includes('原因 777')",'previously observed reasons stay selectable after filtering');
+// 设备侧样本清空后，已选筛选仍保留入口并说明为空，而不是整段消失。
+await fixture({mode:'empty'});await tap('刷新状态');
+await expect("document.querySelector('.disconnect-history .console-state')?.innerText.includes('该原因下没有断线记录') && !document.querySelector('.disconnect-history .management-record') && !!document.querySelector('.disconnect-filter')",'empty filtered result keeps the filter for clearing');
+await js("(()=>{window.__csvName='';window.__csv=null;const b=document.querySelector('.disconnect-history .disconnect-export');if(!b||b.disabled)return false;b.click();return true;})()");
+await expect("document.querySelector('.disconnect-history').innerText.includes('该原因下没有可导出的断线记录') && !window.__csv",'empty filtered export explains why there is no file');
+await js("(()=>{delete HTMLAnchorElement.prototype.click;return true;})()");
+await fixture({mode:'fresh'});await tap('刷新状态');
+await expect("document.querySelectorAll('.disconnect-history .management-record').length===1",'refreshing restores the filtered rows');
+await pickDisconnectReason('全部原因');
+await expect("document.querySelectorAll('.disconnect-history .management-record').length===3 && !document.querySelector('.disconnect-history').innerText.includes('已筛选')",'clearing the reason filter restores every event');
+await expectState(snapshot=>{const paths=snapshot.disconnectRequests;const last=paths[paths.length-1]||'';return last.includes('/telemetry/disconnects')&&last.includes('limit=20')&&!last.includes('reason=');},'clearing the filter drops the reason parameter');
 // 断线导出：按同一只读接口重取 100 条，在浏览器生成 CSV，不改变当前列表。
 await js("(()=>{window.__csv=null;window.__csvName='';window.__csvText='';const original=URL.createObjectURL;URL.createObjectURL=blob=>{window.__csv=blob;return original.call(URL,blob);};HTMLAnchorElement.prototype.click=function(){window.__csvName=this.download;};return true;})()");
 await js("(()=>{const b=document.querySelector('.disconnect-history .disconnect-export');if(!b||b.disabled)return false;b.click();return true;})()");

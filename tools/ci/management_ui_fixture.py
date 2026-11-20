@@ -155,11 +155,20 @@ class Fixture(http.server.SimpleHTTPRequestHandler):
                     'canReboot':mode=='pending_reboot','observation':observation,'deployments':requests}
             elif path.endswith('/telemetry/disconnects'):
                 state['disconnectRequests'].append(self.path)
+                query=parse_qs(urlparse(self.path).query)
+                reason=query.get('reason',[''])[0]
+                if reason:
+                    # 与 CORE 契约一致：原因码只接受 0–65535 的整数。
+                    try:reason_code=int(reason)
+                    except ValueError:return self.json_response(400,{'error':'invalid_disconnect_reason'})
+                    if reason_code<0 or reason_code>65535:return self.json_response(400,{'error':'invalid_disconnect_reason'})
+                else:reason_code=None
                 items=[] if mode=='empty' else [
                     {'observedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(now-3300)),'reason':202,'disconnectedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(now-3600))},
                     {'observedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(now-7200)),'reason':201,'disconnectedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(now-7500))},
                     {'observedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime(now-10800)),'reason':777,'disconnectedAt':None}]
-                value={'deviceId':'dodo-ui-fixture','limit':int(parse_qs(urlparse(self.path).query).get('limit',['20'])[0]),
+                if reason_code is not None:items=[item for item in items if item['reason']==reason_code]
+                value={'deviceId':'dodo-ui-fixture','limit':int(query.get('limit',['20'])[0]),'reason':reason_code,
                     'retentionDays':30,'items':items}
             elif path.endswith('/telemetry'):
                 query=parse_qs(urlparse(self.path).query);bucket=query.get('bucket',['5m'])[0]
