@@ -125,6 +125,8 @@ await tap('状态历史');
 await expect("document.querySelector('.telemetry-history .console-state--empty')?.innerText.includes('没有采样点') && !document.querySelector('.telemetry-chart')",'history empty state is explicit');
 await fixture({mode:'fresh'});await tap('刷新状态');
 await expect("document.querySelectorAll('.management-form [role=slider]').length===2",'fresh readback is editable');
+await tap('更多设置');
+await expect("document.body.innerText.includes('消息显示时长上限（秒）')",'duration field states the device cap');
 await expect("document.querySelector('.telemetry-history')?.innerText.includes('状态历史') && document.querySelector('.telemetry-history')?.innerText.includes('来自设备已上报的遥测')",'history section explains its source');
 await expect("!!document.querySelector('.telemetry-chart .series-primary') && !!document.querySelector('.telemetry-chart .series-secondary') && document.querySelector('.chart-legend')?.innerText.includes('可用内存') && document.querySelector('.chart-legend')?.innerText.includes('启动以来最小')",'history chart renders both series and legend');
 await expectState(snapshot=>snapshot.telemetryRequests.some(path=>path.includes('/devices/dodo-ui-fixture/telemetry') && path.includes('bucket=5m')),'default range queries a 5m bucket');

@@ -84,6 +84,7 @@
 | CONSOLE-28 | 最近错误筛选独立可用 | 软件本地已验证：原因筛选在任意状态可用、只发 `lastError`，`unknown` 仅失败状态；投递空列表可回消息页。CORE `4c13ed4` / 04 `cc42d2b` 已推送，[Docker CI 44505125474](https://github.com/liuyiwuqing/nexus-core/actions/runs/44505125474) 全步骤 success，[04 CI 44505145934](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44505145934) 八个 job success | 本地新增筛选 50 项、相关回归 475 项、完整构建 178 通过/5 条件跳过、JAR 资源一致；真实数据库/Broker/设备未验收 |
 | SOURCE-01 | 来源回执事件时间线 | 软件本地已验证：`GET /api/v1/hooks/{id}/messages/{message}` 追加 `events`（按设备/发生顺序，含 kind/previousStatus/status/recordedAt 与当时回执时间），不含 `lastError`/下次尝试，500 条截断；既有 `deliveries` 与鉴权不变。CORE `e3e2660` 已推送，[Docker CI 44507910931](https://github.com/liuyiwuqing/nexus-core/actions/runs/44507910931) 全步骤 success，见 [23](23-console-completion.md#source-01--来源回执事件时间线) | `WebhookSourceFlowTest` 4 项（真实 HTTP/隔离 PostgreSQL/MQTT）；04 纯文档不触发 workflow；真实 Broker/设备、生产库和第三方发送方未验收 |
 | SOURCE-02 | 来源最近事件 | 软件本地已验证：`GET /api/v1/sources` 每来源追加 `recentEvents`（最多 3 条，按接收时间倒序；来自 webhook_receipts，排除测试来源；含 messageId/eventType/title/priority/receivedAt/contentPurgedAt）；管理台来源卡片展示时间/标题、空状态与“正文已清理”。CORE `e8d192a` / 04 `eb5aa43` 已推送并核对远端，[CORE Docker CI 44549049557](https://github.com/liuyiwuqing/nexus-core/actions/runs/44549049557) 全步骤 success、[04 CI 44549079109](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44549079109) 八个 job success；见 [23](23-console-completion.md#source-02--来源最近事件) | `WebhookSourceFlowTest` 5 项、来源浏览器 42 项、前端 check/build 通过；无新端点/迁移/表/鉴权变更；真实第三方发送方、Broker/设备与生产库未验收 |
+| CONSOLE-33 | 设备设置时长标签改为上限语义 | 软件已验证；MSG-02 后设备配置 `message.durationMs` 是展示上限，管理台字段仍写“消息显示时长”，易被理解为固定时长；字段标签与无障碍名称改为“消息显示时长上限（秒）”，CORE 文档同步模板时长规则 | 管理台浏览器回归 87 项通过（含新增 `duration field states the device cap`）；CORE `npm run check`/`build` 通过；真实配置下发与模板时长端到端待验收，提交/CI 见末尾 |
 | CONSOLE-32 | 消息重发 | 软件本地已验证：消息详情“重发…”二次确认后调用 `POST /api/v1/messages/{id}/resend`，新建 `manual`/`internal` 消息并复制逐设备渲染快照；只写仍启用的原目标设备，停用设备跳过并返回计数；同 `eventId` 重放 200 同消息，跨原消息 409；未知消息/无投递/全停用/正文清理分别 404/409 且不落库；页面未知结果跨导航复用编号，明确 4xx 释放。CORE `acd253a` / 04 `b8a2f9c` 已推送并核对远端，[CORE Docker CI 44535069975](https://github.com/liuyiwuqing/nexus-core/actions/runs/44535069975) 全步骤 success、[04 CI 44535150637](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44535150637) 八个 job success；见 [23](23-console-completion.md#console-32--消息重发) | `InboxFlowTest` 17 项、消息发送 82 项、筛选 50 项通过；未改表/迁移/主题/鉴权；真实 CORE 部署、Broker、设备投递/展示与实机未验收 |
 | CONSOLE-31 | 测试消息模板选择 | 软件本地已验证：消息页可选未删除模板（默认原始文本），未知结果冻结模板并随导航恢复、确认后复位；CORE `POST /api/v1/messages` 可选 `templateId`（存在且未删除，否则 400 不落库），与显式设备/现有路由独立组合，创建时渲染快照，同 `eventId` 换模板 409，省略保持原文。CORE `04ddc65` / 04 `596fbfa` 已推送，[CORE Docker CI 44522219247](https://github.com/liuyiwuqing/nexus-core/actions/runs/44522219247)、[04 CI 44522238577](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44522238577) 全步骤 success；见 [23](23-console-completion.md#console-31--测试消息模板选择) | `InboxFlowTest` 16 项、消息发送 67 项、筛选 50 项通过；未改表/迁移/主题/鉴权；真实 Broker、设备展示/已读与实机未验收 |
 | CONSOLE-30 | 测试消息目标设备 | 软件本地已验证：消息页多选已启用设备（默认不发 `devices`，保持原路由），未知结果冻结设备并随导航恢复、确认后复位；CORE `POST /api/v1/messages` 可选 `devices`（非空、最多 32、须存在且启用，空/未知/停用 400 不落库），同 `eventId` 换集合 409，省略保持原幂等。CORE `3192ce5` / 04 `bf2423e` 已推送，[CORE Docker CI 44519439241](https://github.com/liuyiwuqing/nexus-core/actions/runs/44519439241)、[04 CI 44519457057](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44519457057) 全步骤 success；见 [23](23-console-completion.md#console-30--测试消息目标设备) | `InboxFlowTest` 15 项、消息发送 57 项、筛选 50 项（重跑）通过；未改表/迁移/主题/鉴权；真实 Broker、设备在线/展示/已读与实机未验收 |
@@ -1468,3 +1469,17 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 边界：主机用例证明时长选择与 presenter 计时，不证明实机观感、刷新负载或长时间展示稳定性；未连接真实 Broker/CORE，未验证模板管理页面到设备的端到端链路，实机时长待验收。设备配置 `message.durationMs` 的取值边界仍由服务端管理与固件校验保证。
 
 推送与 CI（2026-11-20）：04 `61adaa6` 已推送并核对远端（`git ls-remote` 指向 `61adaa660b1acb12421daebdfcc6dba0321f0c66`）；[Software checks #44655766282](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44655766282) 八个 job 全部 `success`，含 default/voice/full/tones/off/duplex 六种固件构建与主机/LVGL 检查。CI 不证明实机观感，也不替代实机时长与模板端到端验收。
+
+## CONSOLE-33 · 设备设置时长标签改为上限语义
+
+MSG-02 将设备配置 `message.durationMs` 明确为展示时长上限，但管理台设备设置的字段仍叫“消息显示时长（秒）”；管理员会把它理解成所有消息的固定时长，与模板 `display.durationMs` 的语义冲突。
+
+- CORE `frontend/src/DeviceManagementPanel.vue` 的字段标签与 `aria-label` 改为“消息显示时长上限（秒）”，不改表单值、校验、提交、配置协议或设备行为。
+- CORE `docs/console-ui.md` 设备设置行改为“消息容量与显示时长上限”；`docs/message-templates.md` 明确模板时长在设备上限内生效、超出按上限显示，并把预览接口的“设备上限”改为“设备软件能力约束”，避免与每设备配置上限混淆。
+- 04 `tools/ci/test_management_ui.sh` 在展开“更多设置”后断言新标签，防止文案回退。
+
+验证（2026-11-20，本机 macOS）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；`bash tools/ci/test_management_ui.sh` 87 项通过，覆盖真实 Vue 产物与隔离 HTTP 边界夹具，包含新增标签断言；未连接真实 CORE、PostgreSQL、Broker 或设备，未执行真实配置下发。
+
+边界：标签文案与无障碍名称可验证；实际设备展示时长、模板管理页到设备的端到端链路仍待实机验收。跨仓配套：CORE 提交 `e8a37f7` 负责面板与文档，04 提交负责 UI 断言与台账。
+
+推送与 CI（2026-11-20）：CORE `e8a37f7` 已推送并核对远端（`git ls-remote` 指向 `e8a37f7a3f87ef28f501494984fc8a6d989fbd9c`）；04 提交与 CI 待补充。
