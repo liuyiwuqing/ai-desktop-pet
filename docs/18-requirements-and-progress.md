@@ -1482,4 +1482,4 @@ MSG-02 将设备配置 `message.durationMs` 明确为展示时长上限，但管
 
 边界：标签文案与无障碍名称可验证；实际设备展示时长、模板管理页到设备的端到端链路仍待实机验收。跨仓配套：CORE 提交 `e8a37f7` 负责面板与文档，04 提交负责 UI 断言与台账。
 
-推送与 CI（2026-11-20）：CORE `e8a37f7` 已推送并核对远端（`git ls-remote` 指向 `e8a37f7a3f87ef28f501494984fc8a6d989fbd9c`）；04 提交与 CI 待补充。
+推送与 CI（2026-11-20）：CORE `e8a37f7` 已推送并核对远端（`git ls-remote` 指向 `e8a37f7a3f87ef28f501494984fc8a6d989fbd9c`），[CORE Docker CI 44658093976](https://github.com/liuyiwuqing/nexus-core/actions/runs/44658093976) 全步骤 `success`；04 `d19386f` 已推送并核对远端（`git ls-remote` 指向 `d19386f44712a10ba23018afc8fef54b16478848`），[04 Software checks 44658217129](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44658217129) 八个 job 全部 `success`。87 项管理台回归为本地 `tools/ci/test_management_ui.sh` 运行，CI 不执行该浏览器脚本；真实配置下发、Broker/设备与实机仍未验收。
