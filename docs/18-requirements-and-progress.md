@@ -39,6 +39,7 @@
 | HW-12 | 家庭网络地址与主机名设置 | 软件已验证；`net` 分组扩展 `ip_mode/ip/netmask/gateway/dns/hostname`，共享规则 `pet/netcfg.h`，固定地址经 `pet_netif_apply_ip` 在设置态与正常启动都生效；配网页第 1 节新增“家庭网络高级设置”与只读当前地址；见 [28](28-device-web-setup.md#家庭网络高级设置可选) | `test_setup_portal::netcfg` 与 `test_config_service` 新增地址用例，完整主机测试、10 项 LVGL、隔离固件构建通过；真实路由器连通与断网恢复待验收，提交/CI 见末尾 |
 | HW-13 | 配网页“当前状态”概览 | 软件已验证；首屏默认展示家庭 Wi-Fi（名称/状态/IP/掩码/网关/DNS/信号/地址方式/主机名）、设备热点（名称/来源/安全/信道/连接数与上限/剩余时间）和管理台摘要（设备 ID/Broker/TLS/脱敏账号/CA/配置状态），空状态与未连接状态明确标注；见 [28](28-device-web-setup.md#当前状态默认展示) | 新增 `status_helpers` 覆盖 Broker 解析与账号脱敏，修正 Wi-Fi 名称被设备 ID 覆盖的旧缺陷；完整主机测试、10 项 LVGL、隔离构建与双状态浏览器检查通过；实机计数/信道/掉线状态待验收，提交/CI 见末尾 |
 | HW-14 | 播放抖动缓冲扩容 | 软件已验证；起播门限保持 100 ms，预缓冲容量从 2,880 扩到 7,200+480 样本（约 320 ms，仍在 PSRAM），叠加 8 包队列后可吸收约 480 ms 中途断流；见 [01 §5.1](01-ai-agent.md#51-数据流) | 新增 `test_ai_agent::jitter-buffer`（7,200 样本峰值 + 360 ms 断流 0 欠载 + 正常 DRAINED），完整主机/ASan/UBSan、10 项 LVGL 与隔离 default 构建通过；真实长回答欠载计数待实机复测，提交/CI 见末尾 |
+| MSG-01 | 消息卡片来源时间与紧急抖动 | 软件已验证；卡片顶栏按配置时区显示服务端发送时间（HH:MM，未对时/缺失时隐藏），critical 自动展示后 800 ms 内左右抖动并归位，手动浏览与纯文本回退不抖动；见 [02 §7](02-message-hub.md#7-消息渲染逻辑) | 新增 LVGL 用例覆盖 08:01 时间、+5/-5/-3/归位与空闲隐藏；完整主机/ASan/UBSan、10 项 LVGL 与隔离 default 构建通过；实机视觉与抖动效果待验收，提交/CI 见末尾 |
 | SW-01 | 设备首版与远程配置 | 软件已验证；设备提交 `959a4a4`，14 项设备切片及管理闭环见 [09](09-software-delivery.md)/[11](11-product-software-closure.md) | 保留硬件验收，不重新列为待编码 |
 | SW-02 | 运行维护、恢复、更名、保留策略 | 软件已验证；见 [13](13-operational-software.md)/[14](14-recovery-and-device-names.md) | 真实库未迁移/清理，崩溃采集与恢复待实机 |
 | SW-03 | 公开记忆及语音桥接 | 本地契约与 TLS 全链已验证；见 [15](15-memory-lifecycle.md)–[17](17-voice-bridge-regression.md) | 真实 Halo/OpenViking/供应商采用待验收 |
@@ -1437,3 +1438,17 @@ REG-01 记录 events/operations 连跑不稳定。后续用「概览→事件→
 验证（2026-11-19，本机 macOS）：`LC_ALL=C bash tools/ci/test_host.sh` 退出 0（全部主机测试，含新增场景）；`PET_HOST_SANITIZE=1 LC_ALL=C bash tools/ci/test_host.sh` ASan/UBSan 通过；`LC_ALL=C bash tools/ci/test_ui_host.sh` 10/10 通过；`python3 tools/build_matrix.py --profile default --build-root /tmp/pet-build-jitter --execute --jobs 6` 隔离 default 构建成功并产出 `build-evidence.json`。`test_host.sh` 在中文 Git 环境下会因 `test_build_matrix.py` 断言英文 `dubious ownership` 而失败，改用 `LC_ALL=C` 后通过；未改测试。
 
 推送与 CI（2026-11-19）：04 `940ee30` 已推送并核对远端（`git ls-remote` 指向 `940ee30197cd0e693f1694ada353e1ff854cff80`）；[Software checks #44553087742](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44553087742) 八个 job 全部 `success`（约 7m45s），含 default/voice/full/tones/off/duplex 六种固件构建。CI 不运行上述隔离 `default` 构建证据与实机复测；真实长回答欠载计数、PSRAM 带宽与长期稳定性仍未验收。
+
+## MSG-01 · 消息卡片来源时间与紧急抖动
+
+[02 §7.1](02-message-hub.md#71-模板) 的文本卡要求“来源/时间”，§7.2 要求 critical 卡片“红色边框抖动”，但此前卡片只显示来源，critical 也没有抖动；通知策略虽计算 `alert_animation`，窗口并未消费。本次在窗口层按优先级实现抖动，通知策略与提示音保持原样，不改消息协议、队列、回执或服务端。
+
+- 顶栏拆成图标、类型和右侧时间：时间取信封 `sentAt`（本地存为 `created_at_epoch_s`），加 `pet_config_utc_offset` 得到的配置时区后显示 `HH:MM`；时间戳为 0、本地时间落负或偏移超出 -12:00～+14:00 时隐藏，空闲态也隐藏，不伪造时间。
+- 仅自动展示且 `priority=critical` 时启用抖动：显示后 800 ms 内按 100 ms 步进 `+5/-5/+4/-4/+3/-3/+2/-2` 移动卡片根对象，结束归零；手动浏览和纯文本回退不抖动。时间标签在抖动期间保持显示。
+- 不新增字体、图片、内存池或持久化；不改变 BOOT 已读、自动滚动、渲染超时/回退、消息抢占、提示音和回执状态机。
+
+验证（2026-11-20，本机 macOS）：`LC_ALL=C bash tools/ci/test_ui_host.sh` 10/10 通过；`test_message_view` 新增断言：北京时间 08:01、critical 在 0/100/500/800 ms 的位置 5/-5/-3/0、纯文本 critical 不位移、空闲态隐藏时间；`LC_ALL=C bash tools/ci/test_host.sh` 与 `PET_HOST_SANITIZE=1 LC_ALL=C bash tools/ci/test_host.sh` 全量通过；`python3 tools/build_matrix.py --profile default --build-root /tmp/pet-build-msgui --execute --jobs 6` 隔离构建成功并产出 `build-evidence.json`。
+
+边界：LVGL 主机渲染只证明布局、文本和位移逻辑；未在实机确认 240×320 屏幕上的抖动观感、边框裁切、刷新负载和长时间稳定性，也未烧录。时间只显示 `HH:MM` 不显示日期，依赖服务端 `sentAt` 与设备配置时区；未连接真实 Broker/设备，不改变消息投递、回执或服务端契约。
+
+推送与 CI（待补）。
