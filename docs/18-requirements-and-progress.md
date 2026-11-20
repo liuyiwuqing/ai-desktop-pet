@@ -1645,3 +1645,15 @@ CONSOLE-29 的回执视图只在打开或点击「刷新投递状态」时读一
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；自动刷新只验证了状态推进与停止条件，未验证真实设备回执时延、弱网下 3 秒轮询的负载或长时间开页表现。
 
 推送与 CI（2026-11-20）：CORE `d18f920` / 04 `698beb3` 已推送并核对远端（`git ls-remote` 分别指向 `d18f920433cb7978cce86ce569238dd620a59e9e`、`698beb3776398272371c99e4d776e731736f1b31`）。CORE [Docker CI 44704687640](https://github.com/liuyiwuqing/nexus-core/actions/runs/44704687640) 全步骤 `success`；04 [Software checks 44704698752](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44704698752) 八个 job 全部 `success`。两条 workflow 都不运行该管理台浏览器专项；真实设备回执时延与长时间开页仍未验收。
+
+## AUDIT-RANGE-01 · 阈值变更审计按时间范围筛选
+
+阈值审计此前只能按 `sequence` 向前翻页，页面想回答“最近一天/一周改过什么”仍要逐页翻。audit 接口新增可选 `from`（ISO-8601，含），服务端只返回 `recorded_at >= from` 的行，`total` 与 `hasMore` 都按该范围计算；`before` 游标与 `from` 可组合，翻页不会越过范围或重复。非法 `from` 返回 400 `invalid_request`，省略/留空表示不限时间。
+
+管理台在审计标题右侧新增「全部时间 / 近 24 小时 / 近 7 天 / 近 30 天」选择，切换后按前端当前时刻计算 `from` 并重读第一页，标题总数随范围变化，空范围显示“该时间范围内还没有变更记录。”；切回全部时间恢复全局首屏。保存阈值后若仍选了范围，会在保存结果之外再按范围重读，避免标题与行数不一致。未新增表、索引或权限，操作者筛选、删除与导出仍不在本轮范围。
+
+验证（2026-11-20，本机 macOS）：`JAVA_HOME=…/jbr-21.0.11/Contents/Home mvn -q -Dtest=ConsoleOverviewFlowTest test` 通过，12 个测试全绿；新增用例覆盖 0/1/3 天与 10/40 天记录在近 7 天范围下的 3 条总数、`from+size/before` 组合的 2+1 翻页与 `hasMore`、起点晚于全部记录时 total/items 为空、非法 `from` 400。CORE `npm run check`、`npm run build` 与 04 `bash tools/ci/test_overview_ui.sh` 163 项通过（原 161 项 + 新增 2 项），断言覆盖切到近 24 小时显示 0 条且请求带 `from`、切回全部恢复 20/25 条。夹具按真实响应时间过滤，不使用前端假数据。
+
+边界：`from` 是相对读取时刻的滚动窗口，不支持自定义起止日期或按操作者筛选；`recorded_at` 仍取服务端写入时间，审计行不清理。浏览器夹具使用回环 RAM HTTP，未连接真实 CORE/PostgreSQL，也未验证生产库大审计量下 `recorded_at` 索引的实际执行计划。
+
+推送与 CI：CORE 提交 `pending`、04 提交 `pending`，推送后回填。

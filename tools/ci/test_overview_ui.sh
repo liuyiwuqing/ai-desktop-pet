@@ -291,6 +291,20 @@ await expect("document.querySelectorAll('.threshold-audit li').length===25 && do
 const auditCalls=(await fixture({})).auditRequests;
 if(!auditCalls.length||!auditCalls.at(-1).includes('before=6'))throw new Error('audit pagination did not use the oldest loaded cursor: '+JSON.stringify(auditCalls));
 results.push('audit pagination requested before=6');
+// 时间范围：固定夹具记录在 2026-11-13，近 24 小时应为空；切回全部恢复首屏。
+const auditCountBefore=(await fixture({})).auditRequests.length;
+await js("document.querySelector('.audit-range .n-base-selection')?.click()");
+await expect("[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()==='近 24 小时')",'audit range options open');
+await js("[...document.querySelectorAll('.n-base-select-option')].find(o=>o.innerText.trim()==='近 24 小时')?.click()");
+await expect("document.querySelector('.threshold-audit')?.innerText.includes('已显示 0 / 共 0 条') && document.querySelector('.threshold-audit')?.innerText.includes('该时间范围内还没有变更记录。')",'a time range with no matches shows zero rather than the global total');
+const rangeCalls=(await fixture({})).auditRequests;
+if(rangeCalls.length<=auditCountBefore||!rangeCalls.at(-1).includes('from='))throw new Error('audit range did not send from: '+JSON.stringify(rangeCalls.slice(-2)));
+results.push('audit range is sent to the server and the total follows it');
+await js("document.querySelector('.audit-range .n-base-selection')?.click()");
+await expect("[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()==='全部时间')",'audit range options reopen');
+await js("[...document.querySelectorAll('.n-base-select-option')].find(o=>o.innerText.trim()==='全部时间')?.click()");
+await expect("document.querySelector('.threshold-audit')?.innerText.includes('已显示 20 / 共 25 条') && document.querySelectorAll('.threshold-audit li').length===20",'clearing the range restores the global audit page');
+results.push('clearing the audit range restores the unfiltered page');
 await tap('取消');
 await fixture({mode:'empty',delay:1});await tap('刷新概览');await tap('退出登录');await wait(1.2);
 await expect("!!document.querySelector('.login-card') && !document.querySelector('.overview-panel') && document.querySelector('.token-label input').value===''",'logout discards delayed snapshot and token');

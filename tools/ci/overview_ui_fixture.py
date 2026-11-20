@@ -227,14 +227,23 @@ class OverviewFixture(Fixture):
             try:
                 before = int(query['before'][0]) if 'before' in query else None
                 size = int(query.get('size', ['20'])[0])
+                since = None
+                raw_from = query.get('from', [''])[0]
+                if raw_from:
+                    since = datetime.fromisoformat(raw_from.replace('Z', '+00:00'))
+                    if since.tzinfo is None:
+                        since = since.replace(tzinfo=timezone.utc)
             except ValueError:
                 return self.json_response(400, {'error': 'invalid_request'})
             with self.lock:
                 cls = type(self)
                 cls.audit_requests.append(self.path)
-                rows = [row for row in cls.threshold_history if before is None or row['sequence'] < before]
+                def stamp_of(row):
+                    return datetime.fromisoformat(row['recordedAt'].replace('Z', '+00:00'))
+                matched = [row for row in cls.threshold_history if since is None or stamp_of(row) >= since]
+                rows = [row for row in matched if before is None or row['sequence'] < before]
                 items = rows[:max(size, 1)]
-                return self.json_response(200, {'items': items, 'total': len(cls.threshold_history),
+                return self.json_response(200, {'items': items, 'total': len(matched),
                                                 'hasMore': len(rows) > len(items)})
         if path == '/api/v1/overview/thresholds':
             if self.headers.get('Authorization') != 'Bearer ' + TOKEN:
