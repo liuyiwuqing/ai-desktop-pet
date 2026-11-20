@@ -1528,4 +1528,4 @@ TELEMETRY-06 明确保留“无按信号/离线排序筛选”；设备页此前
 
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL 或设备；CORE 测试使用隔离 PostgreSQL/MQTT。信号为心跳快照，未验证长期弱网、漫游或真实设备排序。
 
-推送与 CI：待提交后补充。
+推送与 CI（2026-11-20）：CORE `6228bd8` / 04 `c8b97b7` 已推送并核对远端。CORE [Docker CI 44676834321](https://github.com/liuyiwuqing/nexus-core/actions/runs/44676834321) 全步骤 `success`；04 [Software checks 44676852192](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44676852192) 八个 job 全部 `success`。两项 workflow 都不运行概览浏览器专项；真实弱网、Broker/设备与实机仍未验收。
