@@ -112,6 +112,7 @@
 | MSG-BATCH-01 | 单条消息的投递批量撤销与重试 | 软件本地已验证：`POST /api/v1/messages/{id}/deliveries/{cancel,retry}`（`dryRun` 只读预演、确认令牌写入、单条 `UPDATE … RETURNING`、500 条上限拒绝对截断）、跳过原因按单条判定条件的否定归并、消息详情新增批量折叠区；CORE 145 项 0 失败/5 条件跳过（新增 4 项）、前端 check/build、消息批量 16 项浏览器检查与既有筛选 44/发送 33 项回归通过；见 [契约](../../nexus-core/docs/message-delivery-batch.md) | 跨消息范围已由 MSG-BATCH-02 补上；不能撤回设备已保存/展示的内容；真实 Broker、设备回执竞态与生产库未验收；推送与 CI 见文末 |
 | MSG-BATCH-02 | 跨消息批量撤销与重试 | 软件本地已验证：新增 `POST /api/v1/deliveries/batch-{cancel,retry}`（`messageIds`、`dryRun`、批确认令牌）；≤20 条消息且合计 ≤500 条投递，整单一个事务，任一消息不可读 404 且不写入；逐消息复用单条判定与 `delivery_history`；管理台当前页多选、20 条上限、两个预演、写入后重新预演、整单拒绝清空旧计划；CORE 新增 4 项 HTTP、完整构建 168 项 0 失败/5 跳过、前端 check/build、消息批量 30 项浏览器检查与筛选/导出/组合/表单/空态 125 项/管理台/主题/概览/事件回归通过；见文末 | 未验证接近上限耗时、多管理员并发与真实 Broker/设备；换页清空选择，筛选后选择收敛到仍可见消息；推送与 CI 见文末 |
 | REG-01 | 全量软件回归与文档一致性核对 | 本轮不加功能：CORE `mvn verify` 145 项 0 失败/5 条件跳过、24 个管理台浏览器脚本共 1131 项检查（20 个首跑通过、2 个单跑通过、2 个真缺陷修复后通过）、契约与交付类检查通过；修掉 1 处过期选择器（`.management-record` 被断线与凭据区块抢先匹配）与 1 处 390px 竞态；`docs/18` 补 15 行缺失台账、CORE README 补 3 条接口与 3 段说明；114 条相对链接、149 个提交哈希可解析；见本节 | `test_events_ui.sh`/`test_operations_ui.sh` 连跑不稳定（单跑通过），根因与修复见 REG-02；`test_server_release.py` 4 项受沙箱 mkdir 代理限制、同提交 CI 通过；未烧录、未连真实设备、无目标服务器与生产库操作；推送与 CI 见文末 |
+| REG-03 | 时长上限语义与文档一致性收口 | 软件已验证；管理台设备设置折叠摘要由“8 秒”改为“8 秒上限”，与字段“消息显示时长上限（秒）”一致；docs/02 §5.1 补“消息容量与显示时长上限”，§9 离线验收改为“队列满拒收新投递、服务端重试，不静默丢弃已接收消息”，docs/23 CONSOLE-02 模板行补模板时长受设备上限约束 | 88 项管理台回归、CORE `npm run check`/`build`、04 主机/LVGL/隔离 default 构建通过；未连真实 CORE/DB/Broker/设备；提交/CI 见文末 |
 | REG-02 | 管理台浏览器夹具连跑稳定性 | 软件本地已验证：定位到登录后全量刷新突发连接超过 Python 夹具默认 backlog 5，偶发拒绝新连接并被浏览器报成 `TypeError: Failed to fetch`；共享 `FixtureServer` 将 backlog 提到 128 并启用守护线程，16 个 UI 夹具统一使用；修复前角色脚本 3 次中 1 次失败、诊断 30 次登录复现于 `GET /api/v1/devices`，修复后诊断 30 次登录、角色脚本 5 次、概览→事件→操作→角色 4 套连跑 2 轮全部通过；见文末 | 只影响本地回环夹具，不改真实 CORE/Broker/设备行为；浏览器套件仍不进入远程 CI，远程 CI 只验证源码与打包；未在 CI 或真实高并发场景压测 backlog 上限；推送与 CI 见文末 |
 | OVERVIEW-ALERT-01 | 概览告警阈值与站内提示 | 软件本地已验证：`GET /api/v1/overview` 新增 `alerts`（`mqtt_connection`/`devices_online`/`delivery_backlog`/`delivery_failure_rate`，各带 `threshold`/`comparison`/`unit`）与 `thresholds`；阈值为代码常量（失败率 ≥10% 且样本 ≥20 条、`pending` 积压 ≥100、启用设备在线 <1），失败率条形改由服务端阈值染色；CORE 153 项 0 失败/5 条件跳过（新增 2 项 HTTP + 6 项纯函数）、前端 check/build、概览页 32 项浏览器检查（新增 8 项）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警阈值--overview-alert-01) | 告警是读时派生状态：不落库、不写审计、不推送、没有持续时间；阈值不可配置（改阈值需改代码发版）；真实 Broker 断开、生产库与实机未验收；推送与 CI 见文末 |
 | ALERT-DRILL-01 | 概览告警钻取到已筛选列表 | 软件本地已验证：`alerts[].target{tab,status}` 由服务端下发（积压→投递 `status=pending`、失败率→`failed`、无在线设备→设备页、传输不可用为 `null` 且不给按钮）；跳转前清空旧搜索、状态筛选取代叠加，先备条件再切页签只读一次；CORE 154 项 0 失败/5 条件跳过（新增 1 项纯函数）、前端 check/build、概览 40 项浏览器检查（新增 8 项，含夹具核对请求真带 `status`）通过；见 [CORE 契约](../../nexus-core/docs/console-overview.md#告警钻取--alert-drill-01) | 交付时只跳现存筛选：设备页没有离线筛选，故只打开页面而不筛（已由 DEVICE-FILTER-01 补上）；投递页只能按状态筛；未连真实 CORE/Broker/设备；推送与 CI 见文末 |
@@ -1483,3 +1484,18 @@ MSG-02 将设备配置 `message.durationMs` 明确为展示时长上限，但管
 边界：标签文案与无障碍名称可验证；实际设备展示时长、模板管理页到设备的端到端链路仍待实机验收。跨仓配套：CORE 提交 `e8a37f7` 负责面板与文档，04 提交负责 UI 断言与台账。
 
 推送与 CI（2026-11-20）：CORE `e8a37f7` 已推送并核对远端（`git ls-remote` 指向 `e8a37f7a3f87ef28f501494984fc8a6d989fbd9c`），[CORE Docker CI 44658093976](https://github.com/liuyiwuqing/nexus-core/actions/runs/44658093976) 全步骤 `success`；04 `d19386f` 已推送并核对远端（`git ls-remote` 指向 `d19386f44712a10ba23018afc8fef54b16478848`），[04 Software checks 44658217129](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44658217129) 八个 job 全部 `success`。87 项管理台回归为本地 `tools/ci/test_management_ui.sh` 运行，CI 不执行该浏览器脚本；真实配置下发、Broker/设备与实机仍未验收。
+
+## REG-03 · 时长上限语义与文档一致性收口（2026-11-20）
+
+MSG-02/CONSOLE-33 后仍有两处语义不一致：管理台“更多设置”的折叠摘要仍显示“8 秒”，容易被读成精确时长；[02 §9](02-message-hub.md#9-验收标准) 离线验收仍写“低优先级被丢弃且有计数”，与 §4 的新协议“队列满拒收新投递、服务端重试”冲突。
+
+- CORE `frontend/src/DeviceManagementPanel.vue` 折叠摘要改为“8 秒上限”，与字段标签、无障碍名称保持一致；不改表单值、校验、提交或配置协议。
+- [02 §5.1](02-message-hub.md#51-功能清单) 设置项补“消息容量与显示时长上限”；§9 离线验收改为“队列满时设备拒收新投递并由服务端重试，不静默丢弃已接收消息”。
+- [23 · CONSOLE-02](23-console-completion.md#console-02--当前实现与完整规划的差距) 模板行改为“模板时长 5–30 秒且受设备配置 `message.durationMs` 上限约束（MSG-02）”。
+- 04 `tools/ci/test_management_ui.sh` 新增折叠摘要断言，回归检查共 88 项。
+
+验证（2026-11-20，本机 macOS）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；`bash tools/ci/test_management_ui.sh` 88 项通过；04 `LC_ALL=C bash tools/ci/test_host.sh` 全量通过、`LC_ALL=C bash tools/ci/test_ui_host.sh` 10/10、`python3 tools/build_matrix.py --profile default --build-root /tmp/pet-build-reg03 --execute --jobs 6` 隔离构建成功并产出 `build-evidence.json`。
+
+边界：本轮不改固件、CORE 业务逻辑或协议；管理台回归为本地回环夹具，未连接真实 CORE、PostgreSQL、Broker 或设备；实机时长与模板端到端仍待验收。
+
+推送与 CI（2026-11-20）：待提交后补充。
