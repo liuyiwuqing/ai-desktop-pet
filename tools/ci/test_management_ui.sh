@@ -149,6 +149,13 @@ await expect("document.querySelector('.management-metrics')?.innerText.includes(
 await tap('最近断线');
 await expect("document.querySelectorAll('.disconnect-history .management-record').length===3 && document.querySelector('.disconnect-history').innerText.includes('202 认证失败') && document.querySelector('.disconnect-history').innerText.includes('201 找不到目标 AP') && document.querySelector('.disconnect-history').innerText.includes('原因 777') && document.querySelector('.disconnect-history')?.innerText.includes('尚未对时')",'disconnect history lists every recorded event with reason names');
 await expectState(snapshot=>snapshot.disconnectRequests.some(path=>path.includes('/devices/dodo-ui-fixture/telemetry/disconnects') && path.includes('limit=20')),'disconnect history reads the read-only endpoint');
+// 卡片断线次数是“最近断线”的直达入口：面板收起后仍能重新打开并展开记录。
+await tap('收起');
+await expect("!document.querySelector('#device-management-panel') && document.querySelector('#device-disconnects-dodo-ui-fixture')?.getAttribute('aria-expanded')==='false'",'closing the panel clears the disconnect trigger state');
+await tap('24 小时断线 2 次');
+await expect("!!document.querySelector('#device-management-panel') && document.querySelector('.disconnect-history .disclosure-toggle')?.getAttribute('aria-expanded')==='true' && document.querySelector('#device-disconnects-dodo-ui-fixture')?.getAttribute('aria-expanded')==='true'",'disconnect count reopens the panel with the records expanded');
+await expect("document.querySelectorAll('.disconnect-history .management-record').length===3",'disconnect entry lists the recorded events');
+await tap('状态历史');
 await tap('音量');
 await expect("document.querySelector('.chart-legend')?.innerText.includes('音量') && document.querySelector('.chart-legend')?.innerText.includes('%') && !document.querySelector('.telemetry-chart .series-secondary')",'volume metric draws a single percent series');
 await hover(0.55);

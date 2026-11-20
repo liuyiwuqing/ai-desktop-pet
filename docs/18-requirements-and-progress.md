@@ -1580,3 +1580,13 @@ TELEMETRY-08 保留的「断线次数统计」先做最小切片：`GET /api/v1/
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，CORE 测试用隔离 PostgreSQL/MQTT，不连接真实 CORE、Broker 或设备；计数只代表已落库样本，未验证真实弱网、长期保留或实机断线行为，也不构成断线率告警。
 
 推送与 CI（2026-11-20）：CORE `8b1b7ec` / 04 `5a21816` 已推送并核对远端。CORE [Docker CI 44685766272](https://github.com/liuyiwuqing/nexus-core/actions/runs/44685766272) 全步骤 `success`；04 [Software checks 44685774942](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44685774942) 八个 job 全部 `success`。两项 workflow 都不运行该管理台浏览器专项；真实弱网、长期保留与实机断线仍待验收。
+
+## DEVICE-DISCONNECT-ENTRY-01 · 设备卡片断线次数直达最近断线
+
+DEVICE-DISCONNECTS-01 让卡片显示了 24 小时断线次数，但要看具体原因仍要「设置与状态 → 状态历史 → 最近断线」三步。本次把「24 小时断线 N 次」改为按钮：点击展开该设备的设置面板并直接展开「最近断线」记录；面板已展开时只切换区块，不重挂组件，也不丢弃未提交的设置草稿。没有断线计数的设备不显示入口。
+
+内部把「网络趋势」的 `historyFocus` 泛化为 `focus`（目标区块 + 可选指标 + 请求序号），两种卡片入口共用同一设置面板与序号；正常设置、升级、待发撤销、删除和关闭面板都会清空请求。断线记录在数据到达后按 `post` 时机只展开一次，之后仍可手动收起，3 秒快照轮询不会重新弹出；入口的 `aria-expanded` 只在对应区块由卡片打开时为真，关闭面板后复位。接口、查询与断线口径不变。
+
+验证（2026-11-20，本机 macOS/Docker）：CORE `npm run check`（`vue-tsc` + 74 个样式 token）与 `npm run build` 通过；04 `bash tools/ci/test_management_ui.sh` 98 项通过，新增 3 项断言覆盖关闭面板后入口复位、点击断线次数重新打开面板并展开记录、记录条数保持 3 条；既有网络趋势、待发撤销、设置、遥测、凭据与记忆检查保持通过。
+
+边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；未做真实设备断线、生产库保留期或实机验收。
