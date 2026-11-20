@@ -1579,4 +1579,4 @@ TELEMETRY-08 保留的「断线次数统计」先做最小切片：`GET /api/v1/
 
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，CORE 测试用隔离 PostgreSQL/MQTT，不连接真实 CORE、Broker 或设备；计数只代表已落库样本，未验证真实弱网、长期保留或实机断线行为，也不构成断线率告警。
 
-推送与 CI（2026-11-20）：CORE `<pending>` / 04 `<pending>` 待推送。
+推送与 CI（2026-11-20）：CORE `8b1b7ec` / 04 `5a21816` 已推送并核对远端。CORE [Docker CI 44685766272](https://github.com/liuyiwuqing/nexus-core/actions/runs/44685766272) 全步骤 `success`；04 [Software checks 44685774942](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44685774942) 八个 job 全部 `success`。两项 workflow 都不运行该管理台浏览器专项；真实弱网、长期保留与实机断线仍待验收。
