@@ -47,7 +47,8 @@ MANY_DEVICES = [
     {'deviceId': 'dodo-many-%02d' % index, 'name': '分页设备 %02d' % index,
      'enabled': index < 24, 'online': index < 22,
      'lastSeen': '2026-11-13T09:58:00Z' if index < 22 else None,
-     'wifiIp': None, 'wifiRssi': None, 'wifiSsid': None, 'telemetryAt': None,
+     'wifiIp': None, 'wifiRssi': -40 if index == 1 else (-80 if index == 2 else None),
+     'wifiSsid': None, 'telemetryAt': None,
      'firmwareVersion': None, 'waitingDeliveries': 0}
     for index in range(26)
 ]
@@ -158,6 +159,11 @@ class OverviewFixture(Fixture):
             dated = [row for row in rows if row['lastSeen']]
             undated = [row for row in rows if not row['lastSeen']]
             rows = sorted(dated, key=lambda row: row['lastSeen'], reverse=order == 'desc') + undated
+        elif sort == 'signal':
+            # 与后端一致：没有信号值的设备在两个方向都排在最后。
+            scored = [row for row in rows if row['wifiRssi'] is not None]
+            unscored = [row for row in rows if row['wifiRssi'] is None]
+            rows = sorted(scored, key=lambda row: (row['wifiRssi'], row['deviceId']), reverse=order == 'desc') + unscored
         elif order == 'desc':
             rows = list(reversed(rows))
         groups = {'online': [row for row in rows if online(row)],

@@ -107,11 +107,17 @@ await pickFilter('.device-sort-filter','名称：Z→A');
 await expect("document.querySelectorAll('.device-card').length===24 && document.querySelector('.device-card')?.innerText.includes('分页设备 25') && !document.querySelector('.device-grid')?.innerText.includes('分页设备 01')",'sorting is applied by the server');
 await pickFilter('.device-size-filter','每页 12 台');
 await expect("document.querySelectorAll('.device-card').length===12 && document.querySelector('.device-pagination')?.innerText.includes('1 / 3')",'the chosen page size is applied by the server');
+await pickFilter('.device-sort-filter','信号：强→弱');
+await expect("document.querySelectorAll('.device-card').length===12 && document.querySelector('.device-card')?.innerText.includes('分页设备 01')",'signal sorting is applied by the server');
 const queryReads=await fixture({});
 if(!queryReads.deviceRequests.some(path=>/[?&]q=25(&|$)/.test(path)))throw new Error('device search did not reach the server: '+JSON.stringify(queryReads.deviceRequests));
 if(!queryReads.deviceRequests.some(path=>path.includes('sort=name')&&path.includes('order=desc')))throw new Error('device sort did not reach the server: '+JSON.stringify(queryReads.deviceRequests));
+if(!queryReads.deviceRequests.some(path=>path.includes('sort=signal')&&path.includes('order=desc')))throw new Error('signal sort did not reach the server: '+JSON.stringify(queryReads.deviceRequests));
 if(!queryReads.deviceRequests.some(path=>path.includes('size=12')&&path.includes('page=1')))throw new Error('device page size did not reach the server: '+JSON.stringify(queryReads.deviceRequests));
-results.push('device search, sort and page size are server-side and reset to page 1');
+results.push('device search, name/signal sort and page size are server-side and reset to page 1');
+// 恢复名称倒序，后续删除样本仍落在第一页。
+await pickFilter('.device-sort-filter','名称：Z→A');
+await expect("document.querySelector('.device-card')?.innerText.includes('分页设备 25')",'name sorting restores the first page');
 // 顶栏设备选择器：输入按名称/ID 走服务端搜索，选中后进入单设备视图；搜索本身不改设备页。
 async function pickViewInput(value){await openSelect('.device-view');await fillInput('.device-view input',value);}
 async function pickViewOption(label){await expect(`[...document.querySelectorAll('.n-base-select-option')].some(o=>o.innerText.trim()===${JSON.stringify(label)}&&o.offsetParent!==null)`,'device view option '+label+' is offered');await chooseVisibleOption(label);}

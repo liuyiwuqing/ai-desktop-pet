@@ -130,6 +130,7 @@
 | DEVICE-QUEUE-01 | 设备卡片待接收投递数 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `waitingDeliveries`（`pending`+`sent` 合计，其余状态不计），V27 部分索引支撑按设备聚合；设备卡片在 Wi-Fi 行后显示「待接收 N 条」，0 不显示；CORE `DeviceListFlowTest` 6 项（新增 1 项）与完整构建 175 项 0 失败/5 条件跳过、前端 check/build、概览浏览器 125 项、角色 43 项与事件 21 项回归通过；见文末 | 计数是读时快照，不代表设备已展示/已读；未连真实 CORE/PostgreSQL/Broker/设备，生产库大数据量与索引效果未压测；推送与 CI 见文末 |
 | DEVICE-FIRMWARE-01 | 设备卡片最近固件版本 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `firmwareVersion`（最近一条遥测，无遥测为 `null`）；设备卡片在 Wi-Fi 行后显示「固件 <version>」，`null` 不显示；`DeviceListFlowTest` 7 项（新增 1 项）、完整构建 176 项 0 失败/5 条件跳过、前端 check/build、概览浏览器 126 项通过；见文末 | 固件是读时快照，OTA 安装后要等下一次遥测；与 Wi-Fi 分别取样本，可能来自不同时间；未连真实设备或部署；推送与 CI 见文末 |
 | DEVICE-QUEUE-02 | 设备卡片设备未读队列 | 软件本地已验证：`GET /api/v1/devices` 每台设备新增 `deviceUnread`（最近一条遥测的 `unread`，无遥测为 `null`）；设备卡片在「固件」行后显示「设备未读 N 条」，`null`/0 不显示；`DeviceListFlowTest` 9 项（新增 1 项）、前端 check/build、管理台浏览器 89 项通过；见文末 | 设备未读是心跳快照，最多滞后一个心跳周期，与「待接收」的服务端 pending+sent 是两段链路；不代表已展示/已读；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
+| DEVICE-SORT-01 | 设备列表信号排序 | 软件本地已验证：`GET /api/v1/devices` 接受 `sort=signal`（`order=asc\|desc`），按最近带网络信息的遥测 `wifi_rssi` 排序，无信号设备两个方向都置后、同值按设备 ID；设备页新增「信号：强→弱 / 弱→强」；`DeviceListFlowTest` 10 项（新增 1 项）、概览浏览器 140 项通过；见文末 | 信号是心跳快照，最多滞后一个心跳周期；排序不改变筛选/计数/分页与设备行为，不代表当前在线或趋势；未连真实设备；推送与 CI 见文末 |
 | ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C，尚未连接目标机或配置真实供应商 | [1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
@@ -1514,3 +1515,17 @@ TELEMETRY-06 明确保留“列表不显示队列深度”，而 [02 §5.1](02-m
 边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL、Broker 或设备；CORE 测试用隔离 PostgreSQL/MQTT。未做真实设备心跳、队列深度长期变化或生产库大数据量验证。
 
 推送与 CI（2026-11-20）：CORE `bc41cf6` / 04 `2a11773` 已推送并核对远端。CORE [Docker CI 44668862660](https://github.com/liuyiwuqing/nexus-core/actions/runs/44668862660) 全步骤 `success`；04 [Software checks 44668879496](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/44668879496) 八个 job 全部 `success`。两项 workflow 都不运行管理台浏览器专项，真实心跳、Broker/设备与实机仍未验收。
+
+## DEVICE-SORT-01 · 设备列表信号排序
+
+TELEMETRY-06 明确保留“无按信号/离线排序筛选”；设备页此前只能按创建时间、名称和最近连接排序，排查弱网设备要逐张卡片看 RSSI。本次在既有列表查询上增加信号排序，不改表、迁移、索引、设备动作或协议。
+
+- `sort=signal` 按最近一条带网络信息的遥测 `wifi_rssi` 排序，`order=asc` 为弱→强、`desc` 为强→弱；没有网络样本或信号为空的设备在两个方向都排在最后，同值按设备 ID 兜底。
+- 设备页排序下拉新增「信号：强→弱 / 弱→强」；排序只改变返回顺序，状态筛选、搜索、计数、分页、设备卡片与投递链路不变，条件变化仍回到第一页。
+- 未知排序值仍由参数校验返回 400；不新增轮询或逐台补查，列表仍一次 `LEFT JOIN LATERAL` 查询。
+
+验证（2026-11-20，本机 macOS/Docker）：`DeviceListFlowTest` 10 项通过，新增用例覆盖两条遥测取最新信号、强弱两向排序、无信号设备置后；原“未知排序 400”用例改用 `sort=uptime`，并断言 `sort=signal` 返回 200。概览浏览器 140 项通过，新增「信号：强→弱」选项、服务端请求 `sort=signal&order=desc` 与首卡顺序断言；`npm run check` 与 `npm run build` 由该脚本执行并通过。
+
+边界：浏览器夹具使用真实 Vue 产物与回环 RAM HTTP，不连接真实 CORE、PostgreSQL 或设备；CORE 测试使用隔离 PostgreSQL/MQTT。信号为心跳快照，未验证长期弱网、漫游或真实设备排序。
+
+推送与 CI：待提交后补充。
