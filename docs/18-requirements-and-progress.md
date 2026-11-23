@@ -1795,3 +1795,7 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 - 交互反馈：专注开始（“专注开始，宠物陪你值守”）/暂停/继续/取消反馈文案区分，失败提示保留原对时检查文案。
 
 验证（2026-11-23，本机 macOS）：`LC_ALL=C bash tools/ci/test_host.sh` 全部通过（含既有 `test_focus` 引擎回归）、`test_ui_host.sh` 10/10、`test_config_host.sh`、`test_board_codegen.py` 通过；`ui_service.c` 已用本地 stub 在双 sdkconfig 下 `-fsyntax-only -Wall -Wextra -Werror` 核查通过。未执行 ESP-IDF 目标编译；实机值守亮度观感、普通消息静音与紧急消息仍响、专注奖励结算联动待实机验收。
+
+### INT-01 远程 CI 补记（2026-11-23）
+
+切片 S3/S4/S5 推送后的远程 CI 在 default/full/voice/tones/duplex 五预设失败（off 通过）：根因是 S3 起 `ui_service.c` 在 `CONFIG_PET_MODULE_UI_ENABLED` 下新增 `#include "esp_app_desc.h"`，但 `ui_lvgl` 组件 CMakeLists 未声明 `esp_app_format` 依赖；主机 stub 语法检查覆盖不到 CMake include 路径，off 预设关闭 UI 因此未暴露。修复 `76400e5`（`PRIV_REQUIRES` 增加 `esp_app_format`）推送后，远程 CI [45172746240](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/45172746240) 八个 job 全部成功；本机亦以 ESP-IDF v6.1 完成全部六预设构建（build-evidence 各目录）。教训：涉及组件依赖或新头文件的改动，推送前应本机跑至少一个含 UI 的目标预设构建，stub 语法检查不能替代。S3/S4/S5 的失败运行（45157984021/45163257944/45164745714）仅因该依赖缺失，主机测试结论不变。
