@@ -134,10 +134,10 @@
 | OVERVIEW-STAT-DRILL-01 | 概览在线/离线计数直达设备筛选 | 软件本地已验证：顶部「设备在线/设备离线」数字改为按钮，复用设备页 `state=online/offline` 筛选，与告警钻取同样清掉单设备选择与顶栏搜索；数字排版不变，只有悬停/聚焦显示下划线，读屏名称带筛选说明；CORE check/build、04 概览浏览器 149 项（新增 8 项）通过；见文末 | 计数仍按整张设备表统计；不新增接口或筛选维度；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | OVERVIEW-STAT-DRILL-02 | 概览停用计数直达已停用筛选 | 软件本地已验证：设备总数说明行里的「停用 N 台」改为按钮，钻取设备页 `state=disabled`，与在线/离线计数共用同一套复位和数字样式；停用只按 `!enabled`，不混入启用但离线设备；CORE check/build、04 概览浏览器 157 项通过；见文末 | 计数仍按整张设备表统计；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DEVICE-DISCONNECT-EXPORT-01 | 最近断线导出 CSV | 软件本地已验证：「最近断线」底部新增导出按钮，点击按同一只读接口重取 `limit=100`（列表仍 20 条），浏览器生成含记录时间/断线时刻/原因码/原因名称的 CSV（UTF-8 BOM + CRLF）；读取失败或保留期内无记录时保留列表并提示，不下载空文件；CORE check/build、04 管理台浏览器 102 项（新增 4 项）通过；见文末 | 导出上限 100 条，仍是读时快照；原因名称由管理台映射，未知码写数字；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
-| ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C；2026-11-20 制定[执行计划](29-acc01-production-deployment-plan.md)，2026-11-23 执行 G0 并发布成功；随后 G1 只读盘点确认现有 `nexus-production`（CORE `230c809`、PostgreSQL 17、Mosquitto 2.0.22）运行中，数据库已到 V23、待 V24–V28，活动编排在 1Panel `/data/1panel/docker/compose/nexus-production/docker-compose.yml`；`mqtt.muyin.site` 暂无 A 记录；尚未换新镜像、未迁移、未发送消息 | [ACC-01 执行计划](29-acc01-production-deployment-plan.md)、[1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
+| ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C；2026-11-20 制定[执行计划](29-acc01-production-deployment-plan.md)，2026-11-23 执行 G0 并发布成功；G1 只读盘点确认现有 `nexus-production`（CORE `230c809`、PostgreSQL 17、Mosquitto 2.0.22）运行中，数据库已到 V23、待 V24–V28，活动编排在 1Panel `/data/1panel/docker/compose/nexus-production/docker-compose.yml`；MQTT 决定统一使用 `pet.muyin.site:8883`；G2 备份（94,826 B）与隔离恢复（6/146 行一致）通过；尚未换新镜像、未迁移、未发送消息 | [ACC-01 执行计划](29-acc01-production-deployment-plan.md)、[1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
-04 当前版本 `0.4.0-dev`、CORE `0.1.0-SNAPSHOT`，均为开发版本；当前已有可拉取的私有部署镜像发布，尚无目标机生产部署或整机验收结论。误回退的 22 文件已恢复；覆盖来源未查明，见 [17](17-voice-bridge-regression.md)，不把恢复成功写成原因调查完成。
+04 当前版本 `0.4.0-dev`、CORE `0.1.0-SNAPSHOT`，均为开发版本；目标机已有私有镜像部署（`nexus-production`，CORE `230c809`），本次新镜像尚未部署，整机验收仍无结论。误回退的 22 文件已恢复；覆盖来源未查明，见 [17](17-voice-bridge-regression.md)，不把恢复成功写成原因调查完成。
 
 ## 每项工作必须闭环
 
@@ -1698,6 +1698,14 @@ ACC-01 一直停在“用户已提供 Debian/1Panel 与域名、尚未连接目�
 
 按 [29 计划](29-acc01-production-deployment-plan.md) 第 5 节登录目标机，只执行查询。现有安装为 `nexus-production`：CORE `ghcr.io/liuyiwuqing/nexus-core:sha-230c809…`（healthy，非根、只读根、1 GiB、`cap_drop: ALL`），PostgreSQL `17-alpine@sha256:18cfe3ef…`（healthy，卷 `nexus-production_postgres-data`，库约 9.4 MB），Mosquitto `2.0.22@sha256:81a6193a…`（`0.0.0.0:8883`）。活动编排位于 `/data/1panel/docker/compose/nexus-production/docker-compose.yml`，不是计划中示例的 `/etc/nexus/docker/compose.1panel.yml`；该目录与 `/etc/nexus/docker` 均为 root-only。
 
-数据库 `flyway_schema_history` 最新 V23 且全部 success，待执行 V24–V28；`deliveries` 6 行、`device_telemetry_samples` 146 行，迁移锁风险很小。`pet.muyin.site` 经 OpenResty 返回 CORE `401`，证书有效至 2027-02-13；`mqtt.muyin.site` 在目标机无 A 记录，但 Broker 证书 SAN 已包含 `mqtt.muyin.site`，补记录或改用 `pet.muyin.site:8883` 均可。CORE 未挂载 `console-sessions`，旧镜像也没有 `NEXUS_AUTH_SESSION_DIRECTORY`，升级时需按 8.3 补卷。现有 env 中 Halo、成长同步、OTA 开启，AI、记忆、清理、桥接关闭，升级应保留。
+数据库 `flyway_schema_history` 最新 V23 且全部 success，待执行 V24–V28；`deliveries` 6 行、`device_telemetry_samples` 146 行，迁移锁风险很小。`pet.muyin.site` 经 OpenResty 返回 CORE `401`，证书有效至 2027-02-13；`mqtt.muyin.site` 在目标机无 A 记录；2026-11-23 决定统一使用 `pet.muyin.site:8883`，证书 SAN 已覆盖，不新增 `mqtt` A 记录。CORE 未挂载 `console-sessions`，旧镜像也没有 `NEXUS_AUTH_SESSION_DIRECTORY`，升级时需按 8.3 补卷。现有 env 中 Halo、成长同步、OTA 开启，AI、记忆、清理、桥接关闭，升级应保留。
 
 验证边界：G1 为只读，未停止/重建容器、未执行备份或迁移、未改 DNS/防火墙/编排，未发送消息。`nexus-deploy` 无免密 sudo，活动编排与 `/etc/nexus` 内容尚未读取；G2 的私有目录 tar 与 8.3 的编排修改需 root 或 1Panel 终端。SSH 账号的 `/home/nexus-deploy` 仅用于公钥与临时备份，不是部署目录。
+
+## ACC-01-G2-01 · 备份与隔离恢复（2026-11-23）
+
+使用 `docker exec nexus-production-postgres-1 pg_dump -U nexus -d nexus -Fc` 生成逻辑备份：`/home/nexus-deploy/nexus-backups/nexus-20261123T071328Z.dump`，94,826 B，SHA-256 `bb7070ca1fbc580c5ced70d6851bed92b7428afeda1140e984f48c51651299e8`。副本已复制到执行机 `~/nexus-backups/`，权限 600，哈希一致。
+
+隔离恢复使用临时卷与 `--network none` 的 PostgreSQL 17 容器，`pg_restore --no-owner --exit-on-error` 退出 0；`deliveries` 6 行、`device_telemetry_samples` 146 行、库 9,166 kB，与生产一致；临时容器和卷已删除。Flyway 最新版本按 `installed_rank` 排序确认为 V23，不能使用 `max(version)`（varchar 字典序会误得 9）。
+
+资源现状：CORE 145.5 MiB/1 GiB、PostgreSQL 41.8 MiB、Mosquitto 4.7 MiB；宿主 available 约 940 MiB、swap 可用约 1.7 GiB。G2 未停止生产容器、未改编排、未迁移、未发送消息；编排修改与私有目录打包仍需 root 或 1Panel 终端。

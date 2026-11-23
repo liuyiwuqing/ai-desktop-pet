@@ -28,11 +28,11 @@ ACC-01 只有在真实服务器完成部署、数据库迁移与备份恢复验�
 | 项 | 事实 |
 | --- | --- |
 | CORE 代码 | `d2711f7`，最新迁移 `V28__delivery_display.sql`；V27、V28 在 `acc95fb` 之后加入 |
-| 最近已发布镜像 | CORE `acc95fb`，发布运行 [44270541149](https://github.com/liuyiwuqing/nexus-core/actions/runs/44270541149) `success`，包含 V1–V26 |
-| 已发布 CORE digest | `ghcr.io/liuyiwuqing/nexus-core@sha256:e52c214aabe6edb603930a29a89be53885b78299a27ecc26abbf51fd007760d8` |
-| 已发布 init digest | `ghcr.io/liuyiwuqing/nexus-core-init@sha256:7cfaf917ad0a0794ac3d2f3934c5d978e205b4d3d8c722f56f32ef772d20280e` |
-| 域名/设备 | `pet.muyin.site`、`mqtt.muyin.site`、设备 `dodo-1`，均为用户已提供值，执行前再确认 |
-| 目标机 | Debian/1Panel，尚未连接；是否存在旧安装未知，G1 判定 |
+| 最近已发布镜像 | CORE `d2711f7`，发布运行 [45103288550](https://github.com/liuyiwuqing/nexus-core/actions/runs/45103288550) `success`，包含 V1–V28 |
+| 已发布 CORE digest | `ghcr.io/liuyiwuqing/nexus-core@sha256:bcf7f6191d61e2f1cd93592ff4e4f9c44eaa42e07688d7cb243254800049a037` |
+| 已发布 init digest | `ghcr.io/liuyiwuqing/nexus-core-init@sha256:70d178fb6236b68939438a5f22b151deb374bc72968c78efa2793216237c8055` |
+| 域名/设备 | `pet.muyin.site`、设备 `dodo-1`；MQTT 统一使用 `pet.muyin.site:8883`（2026-11-23 决定） |
+| 目标机 | Debian 12/1Panel，已通过 SSH 只读连接；现有 `nexus-production`，G1/G2 已记录，升级路径 |
 | 镜像路线 | 优先按 digest 在线拉取；GHCR 不可达时使用离线导入，必须同时导入 CORE、init、PostgreSQL、Mosquitto |
 
 **关键差异**：直接部署 `acc95fb` 是已发布且已做镜像冒烟的组合，但不含 V27/V28 与 11-18 之后的管理台修复。推荐先对当前绿色提交执行发布门禁（G0），用新产物部署；只有明确接受功能冻结时才使用 `acc95fb`。G0 已于 2026-11-23 执行，产物见 3.4。
@@ -248,9 +248,9 @@ G1 结论与待办：
 - 走第 8 节升级路径；保留项目名、卷、CA、设备配置与现有 env（Halo/成长同步/OTA 已开启，AI/记忆/清理/桥接关闭）。
 - 活动编排不是 `/etc/nexus/docker/compose.1panel.yml`；修改必须在 1Panel 编排编辑器或用 root 对该实际文件操作，不能另建第二份编排。
 - 升级时补 `console-sessions` 卷；新镜像已内置 `NEXUS_AUTH_SESSION_DIRECTORY=/var/lib/nexus/sessions`，空卷会继承镜像目录属主。
-- `mqtt.muyin.site` 缺 A 记录；证书 SAN 已覆盖，需决定新增 A 记录或把设备 Broker 改为 `pet.muyin.site:8883`。
+- `mqtt.muyin.site` 缺 A 记录；2026-11-23 决定统一使用 `pet.muyin.site:8883`（证书 SAN 已覆盖），不新增 `mqtt` A 记录；设备配网页 Broker 填 `pet.muyin.site`。
 - 迁移量很小（V24 涉及 146 行，V27/V28 各 6 行），但仍按第 6 节备份并在维护窗口停 CORE 写入。
-- 目标机可用内存约 860 MB，重启 CORE 前需释放内存或扩容，避免 1 GiB 限额与同机服务争抢。
+- 目标机 available 约 940 MB；CORE 当前占用 145.5 MiB/1 GiB，重启预计可容纳，但需在窗口内观察。
 
 ## 6. G2 既有安装备份与恢复演练
 
@@ -335,6 +335,13 @@ docker volume rm "$RESTORE_VOLUME"
 
 通过标准：`pg_restore` 退出 0；迁移历史最后一条与升级前一致；关键表行数与备份前一致。失败则终止升级，不启动新镜像。
 
+### 6.2 G2 执行记录（2026-11-23）
+
+- 备份：`/home/nexus-deploy/nexus-backups/nexus-20261123T071328Z.dump`，94,826 B，SHA-256 `bb7070ca…99e8`；已复制到执行机 `~/nexus-backups/`，权限 600，哈希一致。
+- 隔离恢复：临时卷/容器 `nexus-restore-check-20261123T071328Z`，`--network none`，`pg_restore --no-owner --exit-on-error` 退出 0；`deliveries` 6 行、`device_telemetry_samples` 146 行、库 9,166 kB，与生产一致；临时资源已删除。
+- 更正：不要用 `max(version)` 判断 Flyway 版本（varchar 字典序会得到 9），必须按 `installed_rank` 排序；生产最新为 V23。
+- 资源：CORE 145.5 MiB/1 GiB，PG 41.8 MiB，MQTT 4.7 MiB；宿主 available 约 940 MiB、swap 可用约 1.7 GiB，重启 CORE 预计可容纳，但仍需在窗口内观察。
+
 ## 7. G3 首次部署（无既有目录）
 
 只有在 `test ! -e /etc/nexus/docker` 成立时执行。已有目录时跳到第 8 节，**绝不覆盖或重新初始化**。
@@ -352,7 +359,7 @@ docker run --rm --read-only --cap-drop ALL \
   "$NEXUS_INIT_IMAGE" \
   --data-dir /etc/nexus/docker \
   --domain pet.muyin.site \
-  --mqtt-host mqtt.muyin.site \
+  --mqtt-host pet.muyin.site \
   --device dodo-1 \
   --image "$NEXUS_CORE_IMAGE"
 ```
@@ -550,7 +557,7 @@ test -n "$CORE_ID" && test -n "$PG_ID"
 | 会话目录 | `docker exec "$CORE_ID" ls -ldn /var/lib/nexus/sessions` | `65534:65534`、`700` |
 | 端口 | `ss -lntp \| grep -E ':(18088\|5432)\b'` | 18088 仅 `127.0.0.1`；无 5432 公网监听 |
 | HTTPS | `curl -sS -o /dev/null -w '%{http_code} %{ssl_verify_result}\n' https://pet.muyin.site/` | `200 0` |
-| MQTT TLS | `openssl s_client -connect 127.0.0.1:8883 -servername mqtt.muyin.site -verify_hostname mqtt.muyin.site -CAfile /etc/nexus/docker/mosquitto/certs/ca.crt -verify_return_error </dev/null` | `Verify return code: 0 (ok)` |
+| MQTT TLS | `openssl s_client -connect 127.0.0.1:8883 -servername pet.muyin.site -verify_hostname pet.muyin.site -CAfile /etc/nexus/docker/mosquitto/certs/ca.crt -verify_return_error </dev/null` | `Verify return code: 0 (ok)` |
 | SSE | `timeout 5 curl -sSi -H "Authorization: Bearer $TOKEN" https://pet.muyin.site/api/v1/events \| sed -n '1,12p'` | `200`、`text/event-stream`、`X-Accel-Buffering: no`；超时退出 124 属正常 |
 | 登录 | 浏览器打开 HTTPS，管理员令牌登录 | 进入管理台；不把令牌写进 URL/本地存储 |
 | 权限 | “权限”页签发 operator/viewer（按需） | 新令牌可用，旧令牌按策略失效 |
