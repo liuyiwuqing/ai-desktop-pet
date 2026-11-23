@@ -1761,3 +1761,16 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 - 设计偏差记录：按键事件暂走 ui 轮询（与 BOOT/摇杆一致），不改事件总线契约（EVT_KEY_EVENT 未加）；若后续多订阅者需要再迁移。
 
 验证（2026-11-23，本机 macOS）：`bash tools/ci/test_host.sh` 全部 C 测试通过，含新增 `test_key_input`（tracker 阈值/组合/抑制/空指针/容量溢出 + 映射矩阵）与 5 变体 `test_bsp_input`（三键配置/采集/空指针安全）；`tools/ci/test_board_codegen.py` 通过；`bash tools/ci/test_ui_host.sh` 10/10 通过。`test_build_matrix.py` 仍因本机中文 git 输出断言失败（既有 locale 问题，与本切片无关）。未执行 ESP-IDF 目标编译；未接线，三键实物按压、消抖与组合手感未验收，接线测试须按 [27](27-hardware-and-input.md) 基础接线表与 [30 §3.3](30-interaction-feature-expansion-plan.md) 矩阵逐场景人工执行。
+
+## INT-01-S3 · 菜单表驱动重构 + 三键接入 ui_service（2026-11-23，仅主机测试）
+
+落地 [30 §4.1](30-interaction-feature-expansion-plan.md) 菜单体系与 [30 §3.3](30-interaction-feature-expansion-plan.md) 映射接入，并补齐 INT-01-S2 推迟的 ui_service 状态机回归：
+
+- 菜单表：新增 `ui_lvgl/src/menu_def.h/.c`，两级静态表（ROOT 8 分类：互动/状态/环境/消息/AI 对话/设置/网络/系统 + 返回主页叶子），`pet_menu_item_t{action,page,label}`/`pet_menu_page_t`，深度恒为 2；菜单动作枚举自 `growth_input.h` 迁入 `menu_def.h` 并扩展（MESSAGES_BROWSE、VOLUME/BRIGHTNESS/SFX ±、SCREEN_TIMEOUT 循环、IDLE_BRIGHTNESS、ABOUT）。
+- 输入模型：`growth_input` 由单层平铺改为页模型（`page`+页内 `selection`），新 API `selected_action/open_menu/move/activate/menu_expired`；可用性按动作 id 门控（AI 项需语音、环境需温湿度、网络需网络模块、成长/成就/专注受 voice_only 抑制），分类内全部不可用时整类跳过；左键=子页回 ROOT/ROOT 关菜单；激活叶子返回动作 id（ACHIEVEMENTS 仅预览返回 -1，AI_TALK 仅按住 PTT 触发）；进入子页刷新 30s 无操作计时，超时自动关菜单。
+- 渲染：`growth_view` 菜单分支改查 `menu_def` 表（页标题+条目标签），冷却/任务/成就预览逻辑按动作 id 保留；`ai_view` 选中项比较改用 `selected_action`；`ui_service` voice_menu 判定改为 `page == PET_MENU_AI`。
+- 分发统一：ui_service 抽出 `handle_selection`（BOOT 与三键共用）处理网络/气候/专注/AI 指令/成长请求/消息浏览/ABOUT；新增 `adjust_setting`（音量/亮度/提示音 ±5、息屏时长循环 0→30→60→300→600、待机亮度，本地立即生效+异步 `pet_config_submit`）。
+- 三键接入：`key_scene`（息屏>消息>AI 对话>TTS 播放>菜单>主页）+ `key_dispatch` 完成场景×动作到状态机的落地：菜单开/确认/上下级/直达分类（A+B、B+C、B 长按快捷设置）、PTT 起止、静音、打断 TTS（`interrupt_latch` 播放期间保持 interrupted、停播自动解除）、音量、息屏/唤醒、重启提示、未读浏览与消息已读；BOOT 初始化 `keys_init` 并每循环 `keys_read`+tracker 更新。
+- 边界：睡眠场景暂按主页场景处理，矩阵中睡眠专属动作与消息详情/清除、上一条、重播未接线；数值连发未实现；成长总览/环境历史/网络状态页属后续切片（[30 §4.1](30-interaction-feature-expansion-plan.md) 已记录差异）。
+
+验证（2026-11-23，本机 macOS）：`bash tools/ci/test_host.sh` 全部 C 测试通过，含新增 `test_menu_def`（页表结构/叶子动作/深度约束/动作唯一性）与按页模型重写的 `test_growth_input`（ROOT 门控跳过、子页进出与返回、RETURN/ABOUT/设置激活、30s 超时与计时刷新、voice_only 直达 AI 页、PTT 起止与取消、阻塞抢占、开机按住不执行）；`bash tools/ci/test_ui_host.sh` 10/10 通过（`test_message_view` 同步改为页索引并链接 menu_def/growth_input）；`tools/ci/test_config_host.sh` 通过。`ui_service.c`/`growth_view.c`/`ai_view.c`/`key_actions.c` 未被主机测试编译，已用本地 stub 头在“全功能开启（growth/AI/climate/setup/设备控制/三键）”与“仅 UI 最小配置”两种 sdkconfig 下 `-fsyntax-only -Wall -Wextra -Werror` 逐文件核查通过。未执行 ESP-IDF 目标编译；三键实体未接线，实机菜单导航与按键手感待接线后按 [27](27-hardware-and-input.md) 验收。

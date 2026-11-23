@@ -108,16 +108,17 @@ void pet_ai_view_ui_show(pet_ai_view_ui_t *v, const pet_ai_screen_t *m,
     const char *detail="";
     char formatted[48];
     if (input->menu) {
+        const uint8_t choice = pet_growth_input_selected_action(input);
         title="语音与隐私";
         if (m->available && m->ready && !m->faulted && !m->pending && !private)
             status=m->capture_active ?
-                              "麦克风已开启" : input->selection == PET_GROWTH_MENU_AI_TALK ?
+                              "麦克风已开启" : choice == PET_GROWTH_MENU_AI_TALK ?
                               "看到“正在听”再说话" : "语音就绪";
-        detail=input->selection == PET_GROWTH_MENU_AI_TALK ?
+        detail=choice == PET_GROWTH_MENU_AI_TALK ?
                 (private ? "先关闭静音和免打扰" : !m->ready || m->faulted ? "语音暂不可用" : "按住说话") :
-            input->selection == PET_GROWTH_MENU_AI_MUTE ? (m->muted ? "解除静音" : "静音") :
-            input->selection == PET_GROWTH_MENU_AI_CLEAR ? "清除本地对话" :
-            input->selection == PET_GROWTH_MENU_AI_DND ? (m->dnd ? "关闭免打扰" : "开启免打扰") : "返回主页";
+            choice == PET_GROWTH_MENU_AI_MUTE ? (m->muted ? "解除静音" : "静音") :
+            choice == PET_GROWTH_MENU_AI_CLEAR ? "清除本地对话" :
+            choice == PET_GROWTH_MENU_AI_DND ? (m->dnd ? "关闭免打扰" : "开启免打扰") : "返回主页";
     } else if (m->feedback) detail=m->feedback;
     else if (!private && m->reply && m->reply[0] && !listening) detail=m->reply;
     else if (!private && m->transcript && m->transcript[0]) detail=m->transcript;
@@ -125,9 +126,10 @@ void pet_ai_view_ui_show(pet_ai_view_ui_t *v, const pet_ai_screen_t *m,
     else if (m->unread) {lv_snprintf(formatted,sizeof(formatted),"%u 条未读",m->unread);detail=formatted;}
     set_text(v->title,title);set_text(v->status,status);set_text(v->detail,detail);
     set_text(v->footer, input->navigation_enabled && input->menu ?
-        (input->selection == PET_GROWTH_MENU_AI_TALK ? "上下选择 · 按住中键说话" : "上下选择 · 右确认 · 左返回") :
+        (pet_growth_input_selected_action(input) == PET_GROWTH_MENU_AI_TALK ?
+            "上下选择 · 按住中键说话" : "上下选择 · 右确认 · 左返回") :
         input->menu ?
-        (input->selection == PET_GROWTH_MENU_AI_TALK ? "短按切换 · 按住说话" : "短按切换 · 长按执行") :
+        (pet_growth_input_selected_action(input) == PET_GROWTH_MENU_AI_TALK ? "短按切换 · 按住说话" : "短按切换 · 长按执行") :
         m->faulted ? "短按返回 · 长按菜单" :
         listening && m->session.push_to_talk ? "松开发送" :
         listening ? "安静片刻后发送" :

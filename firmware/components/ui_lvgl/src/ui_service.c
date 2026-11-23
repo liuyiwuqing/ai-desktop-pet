@@ -6,6 +6,7 @@
 
 #if CONFIG_PET_MODULE_UI_ENABLED
 #include <inttypes.h>
+#include <stdio.h>
 #include <string.h>
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -18,6 +19,10 @@
 #include "message_view.h"
 #include "ui_owner.h"
 #include "svc_focus/api.h"
+#include "esp_app_desc.h"
+#if CONFIG_PET_INPUT_TRIPLE
+#include "key_actions.h"
+#endif
 #if CONFIG_PET_EXT_LIGHT_SENSOR
 #include "pet/hal/ambient_light.h"
 #endif
@@ -95,11 +100,17 @@ typedef struct {
     pet_navigation_filter_t navigation_filter;
     pet_navigation_sample_t navigation_sample;
     bool navigation_available;
+    char text[48]; /* ABOUT/设置调整的反馈文本；单 UI 线程独占。 */
+#endif
+#if CONFIG_PET_INPUT_TRIPLE
+    pet_key_tracker_t key_tracker;
+    bool keys_available;
 #endif
 #if PET_UI_AI
     pet_ai_view_ui_t ai_view;
     pet_ai_agent_snapshot_t ai_snapshot;
     bool ai_available, policy_attached, muted, voice_panel, dismiss_pending, reset_gesture;
+    bool interrupt_latch; /* 按键打断 TTS：播放期间保持 interrupted，播完自动解除。 */
 #endif
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
     pet_growth_view_ui_t growth_view;
@@ -213,7 +224,7 @@ static bool refresh(ui_context_t *ui)
     return true;
 }
 
-#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
+#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI || CONFIG_PET_INPUT_TRIPLE
 static void feedback(ui_context_t *ui, const char *text, bool voice)
 {
     ui->feedback = text;
@@ -429,6 +440,243 @@ static bool control_modal(ui_context_t *ui,bool pressed,const pet_message_view_t
     return !urgent;
 }
 #endif
+#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
+static uint8_t clamp_step(int value, int delta, int min)
+{
+    value += delta;
+    return (uint8_t)(value < min ? min : value > 100 ? 100 : value);
+}
+
+/* 设置分类的数值调整项：本地立即生效并异步保存；返回 true 表示动作已消费。 */
+static bool adjust_setting(ui_context_t *ui, int action)
+{
+    if (ui->settings_token) { feedback(ui, "正在保存设置", false); return true; }
+    pet_config_t candidate = ui->settings.config;
+    int value = 0;
+    const char *fmt = NULL;
+    switch (action) {
+    case PET_MENU_VOLUME_UP:
+    case PET_MENU_VOLUME_DOWN:
+        candidate.volume = clamp_step(candidate.volume, action == PET_MENU_VOLUME_UP ? 5 : -5, 0);
+        value = candidate.volume; fmt = "音量 %u"; break;
+    case PET_MENU_BRIGHTNESS_UP:
+    case PET_MENU_BRIGHTNESS_DOWN:
+        /* 亮度 0 会被 refresh 视为显示故障，下限保留 10。 */
+        candidate.brightness = clamp_step(candidate.brightness,
+            action == PET_MENU_BRIGHTNESS_UP ? 5 : -5, 10);
+        value = candidate.brightness; fmt = "亮度 %u"; break;
+    case PET_MENU_SFX_UP:
+    case PET_MENU_SFX_DOWN:
+        candidate.sfx_volume = clamp_step(candidate.sfx_volume,
+            action == PET_MENU_SFX_UP ? 5 : -5, 0);
+        value = candidate.sfx_volume; fmt = "提示音 %u"; break;
+    case PET_MENU_IDLE_BRIGHTNESS:
+        candidate.screen.idle_brightness = clamp_step(candidate.screen.idle_brightness, 5, 1);
+        value = candidate.screen.idle_brightness; fmt = "待机亮度 %u"; break;
+    case PET_MENU_SCREEN_TIMEOUT: {
+        static const uint16_t steps[] = {0, 30, 60, 300, 600};
+        const unsigned count = sizeof(steps) / sizeof(steps[0]);
+        unsigned index = 0;
+        for (unsigned i = 0; i < count; ++i)
+            if (steps[i] == candidate.screen.timeout_s) index = i;
+        candidate.screen.timeout_s = steps[(index + 1) % count];
+        value = candidate.screen.timeout_s;
+        fmt = value ? "息屏 %u 秒" : "息屏 关闭";
+        break;
+    }
+    default:
+        return false;
+    }
+    ui->settings.config = candidate; /* 保存失败也保留本次开机的用户调整。 */
+    (void)pet_config_submit(&candidate, ui->settings.revision, &ui->settings_token);
+    snprintf(ui->text, sizeof(ui->text), fmt, (unsigned)value);
+    feedback(ui, ui->text, false);
+    return true;
+}
+
+/* 菜单叶子动作统一分发：BOOT 与三键路径共用。 */
+static void handle_selection(ui_context_t *ui, int selected, uint32_t epoch)
+{
+    if (selected < 0) return;
+#if PET_UI_AI
+    if (selected == PET_GROWTH_INPUT_AI_RELEASE || selected == PET_GROWTH_INPUT_AI_CANCEL ||
+        (selected >= PET_GROWTH_MENU_AI_TALK && selected <= PET_GROWTH_MENU_AI_CLEAR)) {
+        ai_command(ui, selected);
+        return;
+    }
+#endif
+    if (selected == PET_GROWTH_MENU_RETURN) {
+#if PET_UI_AI
+        ui->voice_panel = false;
+#endif
+        return;
+    }
+#if CONFIG_PET_SETUP_PORTAL_ENABLED
+    if (selected == PET_GROWTH_MENU_NETWORK) {
+        esp_err_t setup = pet_setup_request();
+        feedback(ui, setup == ESP_OK ? "正在打开网络设置…" : "网络设置未完成，请重试", false);
+        return;
+    }
+#endif
+#if CONFIG_PET_MODULE_CLIMATE_ENABLED
+    if (selected == PET_GROWTH_MENU_CLIMATE) {
+        ui->climate_panel = true;
+        return;
+    }
+#endif
+    if (selected >= PET_GROWTH_MENU_FOCUS && selected <= PET_GROWTH_MENU_FOCUS_CANCEL) {
+        esp_err_t focus = selected == PET_GROWTH_MENU_FOCUS ? pet_focus_begin(epoch) :
+            selected == PET_GROWTH_MENU_FOCUS_PAUSE ? pet_focus_pause() :
+            selected == PET_GROWTH_MENU_FOCUS_RESUME ? pet_focus_resume() : pet_focus_stop();
+        feedback(ui, focus == ESP_OK ? "专注状态已更新" : "操作未完成，请检查计时和对时", false);
+        return;
+    }
+    if (selected == PET_MENU_MESSAGES_BROWSE) {
+        ui->presenter.browse_requested = true;
+        return;
+    }
+    if (adjust_setting(ui, selected)) return;
+    if (selected == PET_MENU_ABOUT) {
+        snprintf(ui->text, sizeof(ui->text), "版本 %s", esp_app_get_description()->version);
+        feedback(ui, ui->text, false);
+        return;
+    }
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+    if (selected >= 0 && selected < PET_GROWTH_ACTION_COUNT) {
+        pet_growth_view_t snapshot;
+        pet_growth_result_t result = pet_growth_get_snapshot(&snapshot);
+        if (result == PET_GROWTH_OK && snapshot.time_ready && snapshot.storage_ready) {
+            pet_growth_request_t request = {snapshot.next_request_id,
+                (uint64_t)esp_timer_get_time() / 1000, (pet_growth_action_t)selected, snapshot.task_day};
+            ui->growth_pending = xQueueSend(ui->growth_requests, &request, 0) == pdTRUE;
+            if (!ui->growth_pending) result = PET_GROWTH_NOT_READY;
+        } else if (result == PET_GROWTH_OK) {
+            result = snapshot.storage_ready ? PET_GROWTH_TIME_UNAVAILABLE : PET_GROWTH_STORAGE_UNCERTAIN;
+        }
+        if (!ui->growth_pending) feedback(ui, pet_growth_feedback(result), false);
+    }
+#endif
+}
+#endif
+
+#if CONFIG_PET_INPUT_TRIPLE
+/* 三键场景判定（优先级从高到低）：息屏 > 消息 > AI 对话 > 播报 > 菜单 > 主页。 */
+static pet_ui_scene_t key_scene(const ui_context_t *ui)
+{
+    if (ui->screen_off) return PET_UI_SCENE_SCREEN_OFF;
+    if (ui->presenter.id[0] != '\0') return PET_UI_SCENE_MESSAGE;
+#if PET_UI_AI
+    if (ui->ai_available && ui->ai_snapshot.capture_active &&
+        ui->ai_snapshot.view.state == PET_AI_LISTENING) return PET_UI_SCENE_AI_TALK;
+    if (ui->ai_available && ui->ai_snapshot.playback_active) return PET_UI_SCENE_TTS_PLAYBACK;
+#endif
+#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
+    if (ui->growth_input.menu) return PET_UI_SCENE_MENU;
+#endif
+    return PET_UI_SCENE_HOME;
+}
+
+static void key_dispatch(ui_context_t *ui, const pet_key_event_t *event, uint32_t epoch)
+{
+    const pet_ui_scene_t scene = key_scene(ui);
+    const pet_ui_action_t action =
+        pet_ui_key_action(scene, (pet_key_event_kind_t)event->kind, (pet_key_id_t)event->key);
+    if (action == PET_UI_ACTION_NONE) return;
+    screen_activity(ui);
+    const uint32_t now = now_ms();
+    switch (action) {
+#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
+    case PET_UI_ACTION_OPEN_MENU:
+        pet_growth_input_open_menu(&ui->growth_input, now);
+        break;
+    case PET_UI_ACTION_CONFIRM:
+        if (scene == PET_UI_SCENE_MENU)
+            handle_selection(ui, pet_growth_input_activate(&ui->growth_input, now), epoch);
+        /* 消息场景的确认已读复用 BOOT 路径语义，直接回执；主页由循环末尾 idle 重绘。 */
+        else if (scene == PET_UI_SCENE_MESSAGE && ui->presenter.visible &&
+                 pet_message_hub_ack(ui->presenter.id, PET_MESSAGE_STATE_READ) == PET_MESSAGE_OK)
+            (void)pet_message_presenter_read_complete(&ui->presenter, ui->presenter.generation);
+        break;
+    case PET_UI_ACTION_NEXT:
+        if (scene == PET_UI_SCENE_MENU) pet_growth_input_move(&ui->growth_input, false, now);
+        break;
+    case PET_UI_ACTION_BACK:
+    case PET_UI_ACTION_QUIT_MENU: {
+        const bool quit = action == PET_UI_ACTION_QUIT_MENU;
+        do {
+            const int cancelled =
+                pet_growth_input_navigate(&ui->growth_input, PET_NAV_LEFT, false, now);
+#if PET_UI_AI
+            if (cancelled == PET_GROWTH_INPUT_AI_CANCEL) ai_command(ui, cancelled);
+#endif
+        } while (quit && ui->growth_input.menu);
+        break;
+    }
+    case PET_UI_ACTION_MENU_CATEGORY_INTERACT:
+    case PET_UI_ACTION_MENU_CATEGORY_SETTINGS:
+        if (ui->growth_input.menu) {
+            ui->growth_input.page = action == PET_UI_ACTION_MENU_CATEGORY_INTERACT ?
+                (uint8_t)PET_MENU_INTERACT : (uint8_t)PET_MENU_SETTINGS;
+            ui->growth_input.selection = 0;
+            ui->growth_input.last_menu_ms = now;
+        }
+        break;
+#endif
+#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
+    case PET_UI_ACTION_QUICK_SETTINGS:
+        if (!ui->growth_input.menu) { /* 待机长按 B 直达设置分类 */
+            pet_growth_input_open_menu(&ui->growth_input, now);
+            ui->growth_input.page = (uint8_t)PET_MENU_SETTINGS;
+            ui->growth_input.selection = 0;
+            ui->growth_input.last_menu_ms = now;
+        }
+        break;
+#endif
+    case PET_UI_ACTION_PAGE_NEXT:
+        ui->presenter.browse_requested = true; /* 主页翻页与消息下一条复用消息浏览 */
+        break;
+#if PET_UI_AI
+    case PET_UI_ACTION_START_TALK:
+    case PET_UI_ACTION_WAKE_TALK:
+        ai_command(ui, PET_GROWTH_MENU_AI_TALK);
+        break;
+    case PET_UI_ACTION_END_TALK:
+        ai_command(ui, PET_GROWTH_INPUT_AI_CANCEL);
+        break;
+    case PET_UI_ACTION_MUTE_TOGGLE:
+        ai_command(ui, PET_GROWTH_MENU_AI_MUTE);
+        break;
+    case PET_UI_ACTION_INTERRUPT_TTS:
+    case PET_UI_ACTION_SKIP:
+        ui->interrupt_latch = true; /* 播放期间保持打断；停播后 ai_policy 自动解除 */
+        break;
+#endif
+#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
+    case PET_UI_ACTION_VOLUME_UP:
+        (void)adjust_setting(ui, PET_MENU_VOLUME_UP);
+        break;
+    case PET_UI_ACTION_VOLUME_DOWN:
+        (void)adjust_setting(ui, PET_MENU_VOLUME_DOWN);
+        break;
+#endif
+    case PET_UI_ACTION_SCREEN_OFF:
+        ui->screen_off = true;
+        break;
+    case PET_UI_ACTION_SCREEN_TOGGLE:
+        if (!ui->screen_off) ui->screen_off = true; /* 息屏中按键已由 screen_activity 唤醒 */
+        break;
+    case PET_UI_ACTION_REBOOT_PROMPT:
+        feedback(ui, "重启请使用维护模式", false);
+        break;
+    case PET_UI_ACTION_MESSAGE_READ:
+        feedback(ui, "语音播报开发中", false);
+        break;
+    default:
+        break;
+    }
+}
+#endif
+
 static void idle(ui_context_t *ui, uint8_t count)
 {
     lv_obj_add_flag(ui->view.root, LV_OBJ_FLAG_HIDDEN);
@@ -452,7 +700,7 @@ static void idle(ui_context_t *ui, uint8_t count)
 #endif
 #if PET_UI_AI
     const bool voice_menu = ui->growth_input.menu &&
-        ui->growth_input.selection >= PET_GROWTH_MENU_AI_TALK;
+        ui->growth_input.page == PET_MENU_AI;
     const bool voice = voice_menu || (!ui->growth_input.menu && ui->voice_panel) ||
         !CONFIG_PET_MODULE_GROWTH_ENABLED;
     if (voice) {
@@ -521,6 +769,14 @@ static void ui_task(void *arg)
         ui->navigation_available = ui->button->navigation_init() == ESP_OK;
         if (!ui->navigation_available) ESP_LOGW(TAG, "joystick unavailable; using BOOT");
     }
+#endif
+#if CONFIG_PET_INPUT_TRIPLE
+    ui->keys_available = ui->button->keys_init != NULL && ui->button->keys_read != NULL &&
+        ui->button->keys_init() == ESP_OK;
+    if (!ui->keys_available)
+        ESP_LOGW(TAG, "triple keys unavailable; BOOT-only input");
+    else
+        pet_key_tracker_init(&ui->key_tracker);
 #endif
     lv_init();
     lv_tick_set_cb(now_ms);
@@ -646,11 +902,23 @@ static void ui_task(void *arg)
 #else
         const bool voice_focused = false;
 #endif
+#if CONFIG_PET_INPUT_TRIPLE
+        if (ui->keys_available) {
+            bool key_pressed[PET_KEY_COUNT] = {false};
+            ui->button->keys_read(key_pressed);
+            pet_key_event_t key_events[PET_KEY_COUNT];
+            const unsigned key_count = pet_key_tracker_update(&ui->key_tracker,
+                key_pressed, now_ms(), key_events, PET_KEY_COUNT);
+            for (unsigned i = 0; i < key_count; ++i)
+                key_dispatch(ui, &key_events[i], epoch);
+        }
+#endif
         pet_message_screen_action_t input =
             pet_message_presenter_button(&ui->presenter, pressed, now_ms());
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
         const bool was_menu = ui->growth_input.menu;
         const uint8_t was_selection = ui->growth_input.selection;
+        const uint8_t was_page = ui->growth_input.page;
         bool interaction_pending = false;
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
         interaction_pending = ui->growth_pending;
@@ -683,7 +951,10 @@ static void ui_task(void *arg)
             if (strcmp(ui->presenter.id, ui->snapshot[i].id) == 0 &&
                 ui->snapshot[i].priority == PET_MESSAGE_PRIORITY_CRITICAL) critical = true;
         }
-        ai_policy(ui, critical || !ui->display_healthy);
+        /* 按键打断：播放期间保持 interrupted，停播后自动解除。 */
+        const bool manual_interrupt = ui->interrupt_latch && ui->ai_snapshot.playback_active;
+        ai_policy(ui, critical || !ui->display_healthy || manual_interrupt);
+        if (!manual_interrupt) ui->interrupt_latch = false;
         if (critical) ui->voice_panel = false;
 #endif
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
@@ -717,27 +988,15 @@ static void ui_task(void *arg)
             selected = pet_growth_input_navigate(&ui->growth_input, direction, navigation_blocked, now_ms());
         if (menu_pressed || direction != PET_NAV_NONE || selected >= 0) screen_activity(ui);
 #if CONFIG_PET_SETUP_PORTAL_ENABLED
-        if (selected==PET_GROWTH_MENU_NETWORK) {
-            esp_err_t setup=pet_setup_request();
-            feedback(ui,setup==ESP_OK?"正在打开网络设置…":"网络设置未完成，请重试",false);
-        }
         if(pet_setup_request_failed()) feedback(ui,"保存失败，请重试",false);
 #endif
+        handle_selection(ui, selected, epoch);
+        /* 菜单 30s 无操作自动返回主页。 */
+        if (ui->growth_input.menu && pet_growth_input_menu_expired(&ui->growth_input, now_ms())) {
 #if PET_UI_AI
-        if (was_menu && !ui->growth_input.menu && ui->growth_input.selection == PET_GROWTH_MENU_RETURN)
-            ui->voice_panel = false;
-        if (selected >= PET_GROWTH_MENU_AI_TALK) ai_command(ui, selected);
+            if (was_page == PET_MENU_AI) ui->voice_panel = false;
 #endif
-#endif
-#if CONFIG_PET_MODULE_CLIMATE_ENABLED && (CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI)
-        if (selected==PET_GROWTH_MENU_CLIMATE) ui->climate_panel=true;
-#endif
-#if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
-        if (selected>=PET_GROWTH_MENU_FOCUS && selected<=PET_GROWTH_MENU_FOCUS_CANCEL) {
-            esp_err_t focus=selected==PET_GROWTH_MENU_FOCUS?pet_focus_begin(epoch):
-                selected==PET_GROWTH_MENU_FOCUS_PAUSE?pet_focus_pause():
-                selected==PET_GROWTH_MENU_FOCUS_RESUME?pet_focus_resume():pet_focus_stop();
-            feedback(ui,focus==ESP_OK?"专注状态已更新":"操作未完成，请检查计时和对时",false);
+            ui->home_rendered = false;
         }
 #endif
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
@@ -745,21 +1004,6 @@ static void ui_task(void *arg)
         if (xQueueReceive(ui->growth_results, &completed, 0) == pdTRUE) {
             ui->growth_pending = false;
             feedback(ui, pet_growth_feedback(completed), false);
-        }
-        if (selected >= 0 && selected < PET_GROWTH_ACTION_COUNT) {
-            pet_growth_view_t snapshot;
-            pet_growth_result_t result = pet_growth_get_snapshot(&snapshot);
-            if (result == PET_GROWTH_OK && snapshot.time_ready && snapshot.storage_ready) {
-                pet_growth_request_t request = {snapshot.next_request_id,
-                    (uint64_t)esp_timer_get_time() / 1000, (pet_growth_action_t)selected, snapshot.task_day};
-                ui->growth_pending = xQueueSend(ui->growth_requests, &request, 0) == pdTRUE;
-                if (!ui->growth_pending) result = PET_GROWTH_NOT_READY;
-            } else if (result == PET_GROWTH_OK) {
-                result = snapshot.storage_ready ? PET_GROWTH_TIME_UNAVAILABLE : PET_GROWTH_STORAGE_UNCERTAIN;
-            }
-            if (!ui->growth_pending) {
-                feedback(ui, pet_growth_feedback(result), false);
-            }
         }
 #endif
         if (action.kind == PET_MESSAGE_SCREEN_SHOW) {
@@ -838,7 +1082,8 @@ static void ui_task(void *arg)
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
         if (ui->presenter.id[0] == '\0' && !ui->screen_off &&
             (now_ms() - ui->home_updated_ms >= (voice_focused ? 100u : 200u) ||
-             was_menu != ui->growth_input.menu || was_selection != ui->growth_input.selection || selected >= 0))
+             was_menu != ui->growth_input.menu || was_page != ui->growth_input.page ||
+             was_selection != ui->growth_input.selection || selected >= 0))
             idle(ui, (uint8_t)count);
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
         else if (!ui->screen_off &&

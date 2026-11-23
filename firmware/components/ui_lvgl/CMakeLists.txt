@@ -18,7 +18,7 @@ if(CONFIG_PET_MODULE_UI_ENABLED)
     endif()
     if(CONFIG_PET_MODULE_GROWTH_ENABLED OR
        (CONFIG_PET_MODULE_AI_ENABLED AND CONFIG_PET_MODULE_AUDIO_ENABLED AND NOT CONFIG_PET_AUDIO_DIAGNOSTIC_ON_BOOT))
-        list(APPEND ui_sources "src/growth_input.c" "src/pet_avatar.c")
+        list(APPEND ui_sources "src/menu_def.c" "src/growth_input.c" "src/pet_avatar.c")
     endif()
     if(CONFIG_PET_MODULE_AI_ENABLED AND CONFIG_PET_MODULE_AUDIO_ENABLED AND NOT CONFIG_PET_AUDIO_DIAGNOSTIC_ON_BOOT)
         list(APPEND ui_sources "src/ai_view.c")

@@ -84,13 +84,17 @@ idf.py -C firmware -B "$PWD/firmware/build-hardware" \
 
 ## 默认按键
 
-主页短按 BOOT 查看消息，长按至少 800 ms 后松开进入菜单；菜单短按选择下一项，长按执行，选择“返回主页”退出。语音菜单“按住说话”在持续按住至启动后录音，松开发送；未启动语音、静音或免打扰时沿用现有门控。开机按住及消息抢占不复用旧手势确认新画面。
+主页短按 BOOT 查看消息，长按至少 800 ms 后松开进入菜单；菜单内短按选择下一项，长按进入分类或执行动作，BOOT 左方向键返回上级/关闭。语音菜单“按住说话”在持续按住至启动后录音，松开发送；未启动语音、静音或免打扰时沿用现有门控。开机按住及消息抢占不复用旧手势确认新画面。
+
+### 两级菜单（INT-01-S3，主机交付）
+
+菜单改为静态表驱动的两级结构（`ui_lvgl/src/menu_def.h/.c`）：ROOT 分类为互动、状态、环境、消息、AI 对话、设置、网络、系统，各分类下挂叶子动作，深度恒为 2，新增节点只改表不改状态机。可用性按动作门控：AI 项需语音、环境需温湿度、网络需网络模块、成长/成就/专注在 `voice_only` 下隐藏，分类内全部不可用时整类跳过。进入子页刷新 30 秒无操作计时，超时自动关闭菜单回主页（`pet_growth_input_menu_expired`）。设置分类提供音量/亮度/提示音 ±5、息屏时长循环（关闭→30→60→300→600 秒）与待机亮度调整，本地立即生效并异步保存；消息分类触发未读浏览，系统分类显示固件版本（`esp_app_get_description`）。选中即预览（冷却、任务、成就说明）沿用既有渲染，“成长成就”仍为仅预览不执行。所有叶子动作经统一 `handle_selection` 分发，BOOT 与三键路径共用。主机测试 `test_menu_def`（表结构与深度约束）与重写后的 `test_growth_input`（两级导航、PTT、超时、门控）覆盖。
 
 启用 `PET_SETUP_PORTAL_ENABLED` 后，菜单增加“网络设置”，执行后重启进入限时热点配网；设置页长按 BOOT 2 秒返回宠物。手机设置 Wi-Fi、小智官方绑定与可选 MQTT 的操作见 [28](28-device-web-setup.md)。正常语音/消息与热点设置使用独立启动模式，不同时拥有 Wi-Fi 和显示。
 
 ### 三物理按键层（INT-01-S2，主机交付，待接线）
 
-`board.json` `input.keys` 定义三键并经 `tools/board_codegen.py` 生成 `PET_BOARD_KEY_{CONFIRM,NEXT,VOICE}_GPIO`（13/14/41）；全部按键对地、内部上拉、active-low。`CONFIG_PET_INPUT_TRIPLE`（默认 y）启用后 `pet_button_input_t` 暴露 `keys_init`/`keys_read`，hal 层只做电平采集；消抖与分类由纯逻辑 `pet_key_tracker_update`（`pet/hal/keys.h`）完成：30 ms 消抖、短按 <800 ms、长按 ≥800 ms（每按一次只发一次）、组合=两键按下起点重叠窗口 ≤300 ms（仅定义 A+B 重启提示、B+C 息屏开关，其余键对不组合），组合期间抑制两键的单键事件，两键均稳定释放后发出组合事件。业务映射为表驱动 `pet_ui_key_action`（`ui_lvgl/src/key_actions.h`），按场景（主页/菜单/消息/AI 对话/TTS 播放/睡眠/息屏）翻译为 UI 动作，设计原则 A=确认/播放控制、B=导航/音量、C=语音/静音，KEY_C 长按恒为静音；完整矩阵见 [30 §3.3](30-interaction-feature-expansion-plan.md)。映射接入 ui_service 状态机与菜单重构（INT-01-S3）同步交付；主机测试覆盖 tracker 全部阈值/组合/抑制与映射矩阵（`test_key_input`）与 BSP 三键采集（`test_bsp_input`）。
+`board.json` `input.keys` 定义三键并经 `tools/board_codegen.py` 生成 `PET_BOARD_KEY_{CONFIRM,NEXT,VOICE}_GPIO`（13/14/41）；全部按键对地、内部上拉、active-low。`CONFIG_PET_INPUT_TRIPLE`（默认 y）启用后 `pet_button_input_t` 暴露 `keys_init`/`keys_read`，hal 层只做电平采集；消抖与分类由纯逻辑 `pet_key_tracker_update`（`pet/hal/keys.h`）完成：30 ms 消抖、短按 <800 ms、长按 ≥800 ms（每按一次只发一次）、组合=两键按下起点重叠窗口 ≤300 ms（仅定义 A+B 重启提示、B+C 息屏开关，其余键对不组合），组合期间抑制两键的单键事件，两键均稳定释放后发出组合事件。业务映射为表驱动 `pet_ui_key_action`（`ui_lvgl/src/key_actions.h`），按场景（主页/菜单/消息/AI 对话/TTS 播放/睡眠/息屏）翻译为 UI 动作，设计原则 A=确认/播放控制、B=导航/音量、C=语音/静音，KEY_C 长按恒为静音；完整矩阵见 [30 §3.3](30-interaction-feature-expansion-plan.md)。映射已于 INT-01-S3 接入 ui_service 状态机：`key_scene` 判定场景（息屏 > 消息 > AI 对话 > TTS 播放 > 菜单 > 主页），`key_dispatch` 翻译为统一动作（菜单开/确认/上下级、PTT 起止、静音、打断 TTS、音量、息屏/唤醒、重启提示、未读浏览、B 长按直达设置分类）。主机测试覆盖 tracker 全部阈值/组合/抑制与映射矩阵（`test_key_input`）与 BSP 三键采集（`test_bsp_input`）。边界：睡眠场景暂按主页场景处理（矩阵中睡眠专属动作与消息详情/清除、上一条、重播等低频动作未接线）；三键实体未接线，全部结论仅为主机测试。
 
 ## 验证边界
 

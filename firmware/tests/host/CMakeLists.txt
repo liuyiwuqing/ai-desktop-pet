@@ -9,6 +9,8 @@ set(CONFIG_LV_USE_THORVG_INTERNAL OFF CACHE BOOL "" FORCE)
 add_subdirectory("${PET_ROOT}/firmware/managed_components/lvgl__lvgl" lvgl)
 add_executable(test_message_view test_message_view.c
     "${PET_ROOT}/firmware/components/ui_lvgl/src/message_view.c"
+    "${PET_ROOT}/firmware/components/ui_lvgl/src/menu_def.c"
+    "${PET_ROOT}/firmware/components/ui_lvgl/src/growth_input.c"
     "${PET_ROOT}/firmware/components/ui_lvgl/src/growth_view.c"
     "${PET_ROOT}/firmware/components/ui_lvgl/src/ai_view.c"
     "${PET_ROOT}/firmware/components/ui_lvgl/src/climate_view.c"

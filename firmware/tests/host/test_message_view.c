@@ -163,6 +163,7 @@ int main(int argc, char **argv)
     stats.environment = PET_GROWTH_ENV_NONE;
     stats.state = PET_GROWTH_IDLE;
     input.menu = true;
+    input.page = PET_MENU_INTERACT; input.selection = 0; /* 喂食 */
     stats.feed_cooldown_s = 1800;
     pet_growth_view_ui_show(&growth, &stats, &input, 3, false, false, NULL);
     assert(!pet_growth_view_ui_tick(&growth, 2000, true));
@@ -176,7 +177,7 @@ int main(int argc, char **argv)
     lv_obj_update_layout(growth.root);
     assert(lv_obj_get_y(growth.footer) + lv_obj_get_height(growth.footer) <= 320);
     input.navigation_enabled = false;
-    input.selection = PET_GROWTH_CLAIM_PET;
+    input.page = PET_MENU_STATUS; input.selection = 1; /* 摸头任务 */
     stats.task_day = 20833;
     stats.task_progress[0] = 1; stats.task_progress[1] = 3; stats.task_claimed = 1;
     pet_growth_view_ui_show(&growth, &stats, &input, 3, false, false, NULL);
@@ -187,7 +188,7 @@ int main(int argc, char **argv)
     stats.task_claimed |= 2;
     pet_growth_view_ui_show(&growth, &stats, &input, 3, false, false, NULL);
     assert(strstr(lv_label_get_text(growth.action), "已领取"));
-    input.selection = PET_GROWTH_MENU_ACHIEVEMENTS;
+    input.selection = 3; /* 成长成就 */
     stats.intimacy = 19; stats.level = 4; stats.achievements = PET_GROWTH_ACHIEVEMENT_CARE;
     pet_growth_view_ui_show(&growth, &stats, &input, 3, false, false, NULL);
     assert(strstr(lv_label_get_text(growth.stats), "亲密 19/20"));
@@ -281,7 +282,7 @@ int main(int argc, char **argv)
     assert(strcmp(lv_label_get_text(ai.title), "等待唤醒") == 0);
     assert(strcmp(lv_label_get_text(ai.status), "请说“小爱同学”") == 0 && lv_bar_get_value(ai.level) == 0);
     screenshot(argv[2], "ai-wake-idle", display);
-    input.menu=true;input.selection=PET_GROWTH_MENU_AI_TALK;
+    input.menu=true;input.page=PET_MENU_AI;input.selection=0;
     pet_ai_view_ui_show(&ai,&model,&input,900);lv_refr_now(display);
     unsigned unchanged=flush_count;
     pet_ai_view_ui_show(&ai,&model,&input,900);lv_refr_now(display);
@@ -321,7 +322,7 @@ int main(int argc, char **argv)
     assert(lv_obj_get_y(ai.status) + lv_obj_get_height(ai.status) <= lv_obj_get_y(ai.avatar.object));
     screenshot(argv[2], "ai-error-listening", display);
     input.menu = true;
-    input.selection = PET_GROWTH_MENU_AI_TALK;
+    input.page = PET_MENU_AI; input.selection = 0;
     pet_ai_view_ui_show(&ai, &model, &input, 1700);
     assert(strcmp(lv_label_get_text(ai.status), "麦克风已开启") == 0);
     input.menu = false;
@@ -341,14 +342,14 @@ int main(int argc, char **argv)
     assert(!strstr(lv_label_get_text(ai.status), "已停止"));
     screenshot(argv[2], "ai-fault", display);
     input.menu = true;
-    input.selection = PET_GROWTH_MENU_AI_DND;
+    input.page = PET_MENU_AI; input.selection = 2; /* 免打扰 */
     model.faulted = false;
     model.dnd = true;
     pet_ai_view_ui_show(&ai, &model, &input, 2400);
     assert(strcmp(lv_label_get_text(ai.detail), "关闭免打扰") == 0);
     screenshot(argv[2], "ai-menu", display);
     input.navigation_enabled = true;
-    input.selection = PET_GROWTH_MENU_AI_TALK;
+    input.selection = 0; /* 按住说话 */
     pet_ai_view_ui_show(&ai, &model, &input, 2400);
     assert(strstr(lv_label_get_text(ai.footer), "中键说话"));
     screenshot(argv[2], "ai-joystick-menu", display);

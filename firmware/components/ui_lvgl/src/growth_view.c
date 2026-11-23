@@ -55,10 +55,13 @@ void pet_growth_view_ui_show(pet_growth_view_ui_t *v, const pet_growth_view_t *s
                             bool pending, const char *feedback)
 {
     static const char *states[] = {"自在发呆", "心情不错", "有新收获！", "有点低落", "有点困了", "肚子饿了", "需要照料", "正在睡觉"};
-    static const char *actions[] = {"喂食 · 5 金币", "摸头", "玩耍 · 10 精力", "睡觉", "唤醒", "喂食任务", "摸头任务", "玩耍任务", "成长成就", "温湿度", "开始 25 分钟专注", "暂停专注", "继续专注", "取消专注", "网络设置", "返回主页"};
     /* 菜单保留完整的操作空间；主页把数值排紧，为角色留出固定画布。 */
     const bool home = !input->menu;
-    const bool achievements = input->menu && input->selection == PET_GROWTH_MENU_ACHIEVEMENTS;
+    const pet_menu_page_t *menu_page = input->menu ? pet_menu_page(input->page) : NULL;
+    const uint8_t choice = pet_growth_input_selected_action(input);
+    const char *choice_label = menu_page && input->selection < menu_page->count ?
+        menu_page->items[input->selection].label : "";
+    const bool achievements = choice == PET_GROWTH_MENU_ACHIEVEMENTS;
     lv_obj_set_style_text_font(v->title, home ? v->small : v->large, 0);
     lv_obj_set_y(v->title, home ? 8 : 12);
     lv_obj_set_y(v->status, home ? 34 : 48);
@@ -72,7 +75,8 @@ void pet_growth_view_ui_show(pet_growth_view_ui_t *v, const pet_growth_view_t *s
     v->animate = home && s && s->storage_ready;
     if (!v->animate) pet_avatar_tick(&v->avatar, v->state, lv_tick_get(), false);
     pet_avatar_set_environment(&v->avatar, s ? (pet_growth_environment_t)s->environment : PET_GROWTH_ENV_NONE);
-    lv_label_set_text(v->title, "NEXUS PET");
+    lv_label_set_text(v->title, home ? "NEXUS PET" : achievements ? "成长成就" :
+                      menu_page ? menu_page->title : "主菜单");
     if (!s) {
         lv_label_set_text(v->status, "成长服务暂不可用");
         lv_label_set_text(v->stats, "");
@@ -94,13 +98,13 @@ void pet_growth_view_ui_show(pet_growth_view_ui_t *v, const pet_growth_view_t *s
     }
     if (pending) lv_label_set_text(v->action, "正在保存互动…");
     else if (input->menu) {
-        unsigned choice = input->selection < PET_GROWTH_MENU_COUNT ? input->selection : PET_GROWTH_MENU_RETURN;
-        unsigned cooldown = !s ? 0 : choice == 0 ? s->feed_cooldown_s : choice == 1 ? s->pet_cooldown_s : choice == 2 ? s->play_cooldown_s : 0;
-        if (s && choice == PET_GROWTH_MENU_ACHIEVEMENTS) {
+        unsigned cooldown = !s ? 0 : choice == PET_GROWTH_FEED ? s->feed_cooldown_s :
+            choice == PET_GROWTH_PET ? s->pet_cooldown_s :
+            choice == PET_GROWTH_PLAY ? s->play_cooldown_s : 0;
+        if (s && achievements) {
             char friendship[32], level[32];
             lv_snprintf(friendship, sizeof(friendship), "亲密 %u/%u", s->intimacy, PET_GROWTH_FRIEND_TARGET);
             lv_snprintf(level, sizeof(level), "等级 %u/%u", s->level, PET_GROWTH_LEVEL_TARGET);
-            lv_label_set_text(v->title, "成长成就");
             if (s->time_ready && s->storage_ready && !s->save_recovered)
                 lv_label_set_text_fmt(v->status, "%u/3 项已达成",
                     !!(s->achievements & PET_GROWTH_ACHIEVEMENT_CARE) +
@@ -120,17 +124,16 @@ void pet_growth_view_ui_show(pet_growth_view_ui_t *v, const pet_growth_view_t *s
                 s->task_progress[0], s->task_claimed & 1 ? "已领" : "",
                 s->task_progress[1], s->task_claimed & 2 ? "已领" : "",
                 s->task_progress[2], s->task_claimed & 4 ? "已领" : "");
-            lv_label_set_text_fmt(v->action, "%s · %s", actions[choice],
+            lv_label_set_text_fmt(v->action, "%s · %s", choice_label,
                 !s->task_day ? "等待对时" : claimed ? "已领取" :
                 s->task_progress[task] >= (task == 1 ? 3 : 1) ? "可领取" : "未完成");
-        } else if (cooldown) lv_label_set_text_fmt(v->action, "%s\n冷却 %u 秒", actions[choice], cooldown);
-        else lv_label_set_text(v->action, actions[choice]);
+        } else if (cooldown) lv_label_set_text_fmt(v->action, "%s\n冷却 %u 秒", choice_label, cooldown);
+        else lv_label_set_text(v->action, choice_label);
     } else if (feedback && *feedback) lv_label_set_text(v->action, feedback);
     else lv_label_set_text_fmt(v->action, "%u 条未读%s", unread, dnd ? " · 免打扰" : "");
     lv_label_set_text(v->footer, input->navigation_enabled ?
                       (input->menu ? "上下选择 · 右确认 · 左返回" : "短按消息 · 右推菜单") :
-                      input->menu && input->selection == PET_GROWTH_MENU_ACHIEVEMENTS ?
-                      "短按切换 · 长按返回" : input->menu ? "短按切换 · 长按执行" :
+                      input->menu ? (achievements ? "短按切换 · 长按返回" : "短按切换 · 长按执行") :
                       input->voice_enabled ? "短按消息 · 长按菜单" : "短按消息 · 长按互动");
 }
 

@@ -407,10 +407,18 @@ build_and_run "test_bsp_input_${variant}" \
     "${repo_root}/firmware/tests/host/test_bsp_input.c"
 done
 
+build_and_run test_menu_def \
+    -I "${hal_inc}" \
+    -I "${contracts_inc}" \
+    -I "${repo_root}/firmware/components/ui_lvgl/src" \
+    "${repo_root}/firmware/components/ui_lvgl/src/menu_def.c" \
+    "${repo_root}/firmware/tests/host/test_menu_def.c"
+
 build_and_run test_growth_input \
     -I "${hal_inc}" \
     -I "${contracts_inc}" \
     -I "${repo_root}/firmware/components/ui_lvgl/src" \
+    "${repo_root}/firmware/components/ui_lvgl/src/menu_def.c" \
     "${repo_root}/firmware/components/ui_lvgl/src/growth_input.c" \
     "${repo_root}/firmware/tests/host/test_growth_input.c"
 
