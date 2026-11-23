@@ -1683,3 +1683,13 @@ ACC-01 一直停在“用户已提供 Debian/1Panel 与域名、尚未连接目�
 边界：本项是计划，不是部署完成；ACC-01 仍需真实服务器、生产库迁移、备份恢复演练、HTTPS/MQTT 与 24 小时观测才能关闭，ACC-02 不受影响。`acc95fb` 与新发布物不能混用代码与镜像。
 
 推送与 CI（2026-11-20）：04 `ba8618e` 已推送并核对远端（`git ls-remote` 指向 `ba8618e95a10451936b5d5691da0909250e3a4a6`）。本次只改 `docs/`，`Software checks` 的 push 路径不含 `docs/**`，未触发运行（`gh run list --commit ba8618e…` 为空），不计作远程 CI 通过。
+
+## ACC-01-G0-01 · 发布 ACC-01 部署镜像（2026-11-23，CORE `d2711f7` / 04 `cdfb555`）
+
+按 [29 计划](29-acc01-production-deployment-plan.md) 执行 G0。CORE `d2711f7`（含 V27/V28）此前 Docker deployment [44709282509](https://github.com/liuyiwuqing/nexus-core/actions/runs/44709282509) 为 success；本次 `workflow_dispatch` 发布运行 [45103288550](https://github.com/liuyiwuqing/nexus-core/actions/runs/45103288550) success，产物 `published-image-verification` 给出 CORE `sha256:bcf7f6191d61e2f1cd93592ff4e4f9c44eaa42e07688d7cb243254800049a037`、init `sha256:70d178fb6236b68939438a5f22b151deb374bc72968c78efa2793216237c8055`。冒烟 7 项通过（隔离初始化/重复拒绝/1Panel 编排/CORE 非根只读就绪/静态资源与鉴权/MQTT TLS/重建持久性），报告 `passed=true`，边界为隔离镜像容器。
+
+本地补充核对（macOS arm64）：`docker buildx imagetools inspect` 显示 index digest 与上述 CORE digest 一致，含 `linux/amd64`、`linux/arm64`；拉取 arm64 镜像后从 `/app/core.jar` 检出 `db/migration` V1–V28，V27/V28 的 SHA-256 与源码一致。文档同步：29 增加 3.4 执行记录，27 首次安装示例改用新 digest，1Panel 本地镜像说明标注历史基线与替换要求。
+
+验证：04 `cdfb555` 的 Software checks [45103986101](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/45103986101) 8 个 job 全部 success。触发细节：当前 `GH_TOKEN` 缺少 `actions:write`，首次 dispatch 返回 403；改用 `env -u GH_TOKEN` 走 keyring OAuth（含 `workflow` scope）后成功，后续同类操作按此处理。
+
+边界：G0 只发布并核对镜像，仍未连接目标机，未建生产库、未迁移、未配置 HTTPS/DNS、未接真实供应商或设备、未发送消息。产物下载在本机 `/tmp/nexus-publish-45103288550`，未入库；部署者应归档至 `/secure-release/45103288550`。ACC-01 从 G1 继续，完成判定不变；`acc95fb` 仅作功能冻结回退。
