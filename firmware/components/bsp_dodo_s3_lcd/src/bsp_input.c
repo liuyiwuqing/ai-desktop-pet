@@ -41,6 +41,26 @@ static esp_err_t navigation_init(void)
 }
 #endif
 
+#if CONFIG_PET_INPUT_TRIPLE
+static esp_err_t keys_init(void)
+{
+    const gpio_config_t config = {
+        .pin_bit_mask = (1ULL << PET_BOARD_KEY_CONFIRM_GPIO) | (1ULL << PET_BOARD_KEY_NEXT_GPIO) |
+            (1ULL << PET_BOARD_KEY_VOICE_GPIO),
+        .mode = GPIO_MODE_INPUT, .pull_up_en = GPIO_PULLUP_ENABLE,
+    };
+    return gpio_config(&config);
+}
+
+static void keys_read(bool pressed[PET_KEY_COUNT])
+{
+    if (!pressed) return;
+    pressed[PET_KEY_CONFIRM] = gpio_get_level(PET_BOARD_KEY_CONFIRM_GPIO) == 0;
+    pressed[PET_KEY_NEXT] = gpio_get_level(PET_BOARD_KEY_NEXT_GPIO) == 0;
+    pressed[PET_KEY_VOICE] = gpio_get_level(PET_BOARD_KEY_VOICE_GPIO) == 0;
+}
+#endif
+
 static esp_err_t init(void)
 {
     const gpio_config_t config = {
@@ -58,6 +78,9 @@ const pet_button_input_t *pet_bsp_confirm_button(void)
     static const pet_button_input_t input = {.init = init, .pressed = pressed,
 #if CONFIG_PET_EXT_JOYSTICK
         .navigation_init = navigation_init, .navigation_read = navigation_read,
+#endif
+#if CONFIG_PET_INPUT_TRIPLE
+        .keys_init = keys_init, .keys_read = keys_read,
 #endif
     };
     return &input;

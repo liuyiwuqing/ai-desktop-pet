@@ -4,6 +4,7 @@
 #include "sdkconfig.h"
 #include "pet/hal/input.h"
 #include "pet/hal/display.h"
+#include "board_generated.h"
 #include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
 
@@ -12,7 +13,10 @@ static int levels[49], raw_x = 2048, raw_y = 2048, raw_light = 1200, units;
 esp_err_t gpio_config(const gpio_config_t *config)
 {
     assert(config->mode == GPIO_MODE_INPUT && config->pull_up_en == GPIO_PULLUP_ENABLE);
-    assert(config->pin_bit_mask == 1ULL || config->pin_bit_mask == (1ULL << 6));
+    const uint64_t keys_mask = (1ULL << PET_BOARD_KEY_CONFIRM_GPIO) | (1ULL << PET_BOARD_KEY_NEXT_GPIO) |
+        (1ULL << PET_BOARD_KEY_VOICE_GPIO);
+    assert(config->pin_bit_mask == 1ULL || config->pin_bit_mask == (1ULL << 6) ||
+        config->pin_bit_mask == keys_mask);
     return ESP_OK;
 }
 int gpio_get_level(int pin) { return levels[pin]; }
@@ -43,6 +47,7 @@ esp_err_t adc_oneshot_read(adc_oneshot_unit_handle_t unit, adc_channel_t channel
 int main(void)
 {
     levels[0] = levels[6] = 1;
+    levels[13] = levels[14] = levels[41] = 1;
     const pet_button_input_t *input = pet_bsp_confirm_button();
     assert(input->init() == ESP_OK && !input->pressed() && units == 0);
 #if CONFIG_PET_EXT_JOYSTICK
@@ -96,6 +101,19 @@ int main(void)
     fail_read = false; raw_light = 5000;
     assert(pet_bsp_ambient_read(&light) == ESP_ERR_INVALID_ARG);
     assert(pet_bsp_ambient_read(NULL) == ESP_ERR_INVALID_ARG);
+#endif
+#if CONFIG_PET_INPUT_TRIPLE
+    assert(input->keys_init && input->keys_read);
+    assert(input->keys_init() == ESP_OK);
+    bool keys[PET_KEY_COUNT];
+    input->keys_read(keys);
+    assert(!keys[PET_KEY_CONFIRM] && !keys[PET_KEY_NEXT] && !keys[PET_KEY_VOICE]); /* 高电平=释放 */
+    levels[41] = 0;
+    input->keys_read(keys);
+    assert(!keys[PET_KEY_CONFIRM] && !keys[PET_KEY_NEXT] && keys[PET_KEY_VOICE]); /* active-low: 0=按下 */
+    input->keys_read(NULL); /* 空指针安全。 */
+#else
+    assert(!input->keys_init && !input->keys_read);
 #endif
 #if !CONFIG_PET_EXT_JOYSTICK && !CONFIG_PET_EXT_LIGHT_SENSOR
     assert(units == 0);

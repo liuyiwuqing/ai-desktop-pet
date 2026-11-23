@@ -376,6 +376,13 @@ build_and_run test_navigation \
     "${repo_root}/firmware/components/pet_hal/src/navigation.c" \
     "${repo_root}/firmware/tests/host/test_navigation.c"
 
+build_and_run test_key_input \
+    -I "${hal_inc}" \
+    -I "${repo_root}/firmware/components/ui_lvgl/src" \
+    "${repo_root}/firmware/components/pet_hal/src/keys.c" \
+    "${repo_root}/firmware/components/ui_lvgl/src/key_actions.c" \
+    "${repo_root}/firmware/tests/host/test_key_input.c"
+
 build_and_run test_ambient_light \
     -I "${hal_inc}" \
     "${repo_root}/firmware/components/pet_hal/src/ambient_light.c" \

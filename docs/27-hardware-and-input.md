@@ -25,6 +25,9 @@
 | MAX98357A | SD_MODE / GAIN | 标准模块可将 SD_MODE 接 3V3；GAIN 悬空，核对模块电路 |
 | 喇叭 | 两根线 | 仅接功放 SPK+ / SPK−，不接 GND |
 | BOOT | 板载按键 | GPIO0，无需额外接线 |
+| KEY_A 确认键 | 一端接 GND | GPIO13（内部上拉，active-low；未接线时关闭 `PET_INPUT_TRIPLE`） |
+| KEY_B 方向键 | 一端接 GND | GPIO14（同上） |
+| KEY_C 语音键 | 一端接 GND | GPIO41（同上） |
 
 功放 LRC 由旧 GPIO38 改为 GPIO40，避开 DevKitC-1 v1.1 的 RGB 灯；初版的 GPIO48 也保留。**旧接线必须同步更改，旧固件不能直接使用新线序。** 依据：[乐鑫板卡说明](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide_v1.1.html)。GPIO19/20 留给原生 USB，GPIO43/44 留给 UART，Flash/PSRAM 与其他启动绑带脚不分配扩展。
 
@@ -62,6 +65,7 @@ BOOT 始终保留。消息已读、外部控制确认和恢复重启继续要求
 | --- | --- | --- |
 | `PET_MODULE_CLIMATE_ENABLED` | n | GPIO15 的 DHT11 采集、菜单与环境联动 |
 | `PET_EXT_JOYSTICK` | n | GPIO4/5/6 的二维摇杆菜单输入 |
+| `PET_INPUT_TRIPLE` | y | GPIO13/14/41 三物理按键输入层（未接线设备应关闭，降级为 BOOT 单键） |
 | `PET_EXT_LIGHT_SENSOR` | n | GPIO7 的光敏采样与背光调节 |
 | `PET_EXT_SERVO` | n | 编译舵机；另需 GPIO、限位与 arm |
 
@@ -83,6 +87,10 @@ idf.py -C firmware -B "$PWD/firmware/build-hardware" \
 主页短按 BOOT 查看消息，长按至少 800 ms 后松开进入菜单；菜单短按选择下一项，长按执行，选择“返回主页”退出。语音菜单“按住说话”在持续按住至启动后录音，松开发送；未启动语音、静音或免打扰时沿用现有门控。开机按住及消息抢占不复用旧手势确认新画面。
 
 启用 `PET_SETUP_PORTAL_ENABLED` 后，菜单增加“网络设置”，执行后重启进入限时热点配网；设置页长按 BOOT 2 秒返回宠物。手机设置 Wi-Fi、小智官方绑定与可选 MQTT 的操作见 [28](28-device-web-setup.md)。正常语音/消息与热点设置使用独立启动模式，不同时拥有 Wi-Fi 和显示。
+
+### 三物理按键层（INT-01-S2，主机交付，待接线）
+
+`board.json` `input.keys` 定义三键并经 `tools/board_codegen.py` 生成 `PET_BOARD_KEY_{CONFIRM,NEXT,VOICE}_GPIO`（13/14/41）；全部按键对地、内部上拉、active-low。`CONFIG_PET_INPUT_TRIPLE`（默认 y）启用后 `pet_button_input_t` 暴露 `keys_init`/`keys_read`，hal 层只做电平采集；消抖与分类由纯逻辑 `pet_key_tracker_update`（`pet/hal/keys.h`）完成：30 ms 消抖、短按 <800 ms、长按 ≥800 ms（每按一次只发一次）、组合=两键按下起点重叠窗口 ≤300 ms（仅定义 A+B 重启提示、B+C 息屏开关，其余键对不组合），组合期间抑制两键的单键事件，两键均稳定释放后发出组合事件。业务映射为表驱动 `pet_ui_key_action`（`ui_lvgl/src/key_actions.h`），按场景（主页/菜单/消息/AI 对话/TTS 播放/睡眠/息屏）翻译为 UI 动作，设计原则 A=确认/播放控制、B=导航/音量、C=语音/静音，KEY_C 长按恒为静音；完整矩阵见 [30 §3.3](30-interaction-feature-expansion-plan.md)。映射接入 ui_service 状态机与菜单重构（INT-01-S3）同步交付；主机测试覆盖 tracker 全部阈值/组合/抑制与映射矩阵（`test_key_input`）与 BSP 三键采集（`test_bsp_input`）。
 
 ## 验证边界
 

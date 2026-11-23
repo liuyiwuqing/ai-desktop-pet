@@ -352,6 +352,18 @@ config PET_EXT_JOYSTICK
       available and is still required for message/control/recovery confirmation.
       This is explicit configuration, not automatic hot-plug detection.
 
+config PET_INPUT_TRIPLE
+    bool "Enable triple physical keys (confirm/next/voice)"
+    depends on PET_MODULE_UI_ENABLED
+    default y
+    help
+      KEY_A GPIO13 confirm, KEY_B GPIO14 next/back, KEY_C GPIO41 voice/mute;
+      all active-low with internal pull-ups. Hal layer only debounces (30 ms)
+      and classifies short (<800 ms), long (>=800 ms) and two-key combos
+      (overlap window 300 ms); business mapping lives in the UI layer per
+      docs/27. Requires the keys to be wired; boards without wiring must
+      disable this to keep BOOT-only semantics.
+
 config PET_EXT_LIGHT_SENSOR
     bool "Enable optional ambient-light backlight control"
     depends on PET_MODULE_UI_ENABLED

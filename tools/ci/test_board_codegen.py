@@ -44,6 +44,26 @@ header = generate(board)
 assert "#define PET_BOARD_MIC_DIN 18\n" in header
 assert "#define PET_BOARD_SPEAKER_BCLK 21\n" in header
 assert "#define PET_BOARD_SPEAKER_WS 40\n" in header
+assert "#define PET_BOARD_KEY_CONFIRM_GPIO 13\n" in header
+assert "#define PET_BOARD_KEY_NEXT_GPIO 14\n" in header
+assert "#define PET_BOARD_KEY_VOICE_GPIO 41\n" in header
+for field, pin in (("confirm", 0), ("confirm", True), ("confirm", 14), ("next", 15), ("voice", 4)):
+    invalid = copy.deepcopy(board)
+    invalid["input"]["keys"][field] = pin
+    try:
+        generate(invalid)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"accepted invalid keys.{field}={pin}")
+invalid = copy.deepcopy(board)
+invalid["input"]["keys"] = {"confirm": 13, "next": 14}
+try:
+    generate(invalid)
+except ValueError:
+    pass
+else:
+    raise AssertionError("accepted incomplete keys")
 for field, value in [("i2s", 0), ("dout", 49), ("dout", True),
                      *[("ws", pin) for pin in (3, 19, 20, 22, 26, 35, 36, 37, 38, 43, 44, 45, 46, 48)]]:
     invalid = copy.deepcopy(board)

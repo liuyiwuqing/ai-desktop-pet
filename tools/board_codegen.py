@@ -19,6 +19,10 @@ def generate(check=False):
         raise ValueError("DODO display must be 240x320")
     pins = [lcd[k] for k in ("mosi", "sclk", "cs", "dc", "reset", "backlight")]
     pins += [board["input"]["boot"], board["climate"]["dht11"]]
+    keys = board["input"]["keys"]
+    if set(keys) != {"confirm", "next", "voice"} or any(type(v) is not int for v in keys.values()):
+        raise ValueError("keys require confirm/next/voice GPIO ints")
+    pins += [keys[k] for k in ("confirm", "next", "voice")]
     joystick = board["input"]["joystick"]
     pins += [joystick[key] for key in ("x", "y", "select")]
     if any(type(joystick[key]) is not int or not 1 <= joystick[key] <= 10 for key in ("x", "y")):
@@ -42,6 +46,7 @@ def generate(check=False):
     values = {"LCD_" + k.upper(): v for k, v in lcd.items() if k != "invertColor"}
     values["LCD_INVERT_COLOR"] = int(lcd["invertColor"])
     values["BOOT_GPIO"] = board["input"]["boot"]
+    values.update({"KEY_" + key.upper() + "_GPIO": value for key, value in keys.items()})
     values["DHT11_GPIO"] = board["climate"]["dht11"]
     values.update({"JOYSTICK_" + key.upper(): value for key, value in joystick.items()})
     values["LIGHT_GPIO"] = light

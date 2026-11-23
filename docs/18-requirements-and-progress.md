@@ -1749,3 +1749,15 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 - 管线同步：`device-config.schema.json` 增 `screen`/`sfxVolume`（非 required）→ `tools/schema_codegen.py` 再生成 `config_generated.h` 与 `pet-contracts.ts`；`config_codec.c` 解析（top 键集 10、screen 子键集、范围校验）与格式化输出新字段；`device-config.example.json` 更新。诊断 JSON 的 config 块原样内嵌新字段，服务端契约无顶层变更。
 
 验证（2026-11-23，本机 macOS）：`bash tools/ci/test_config_host.sh` 通过；`bash tools/ci/test_host.sh` 全部通过（新增 codec 往返/旧档兼容/越界拒绝/生成宏断言与 `pet_ai_agent_set_sfx_volume` 断言；唯一失败项 `test_build_matrix.py` 因本机 git 输出为中文、断言英文 'dubious ownership'，属环境既有 locale 问题，`LC_ALL=C` 下通过，与本切片无关，主分支同样存在）；`bash tools/ci/test_ui_host.sh` 10/10 通过。`ui_service.c`/`ai_startup.c`/`app.c` 未被主机测试编译，已用本地 stub 头 `-fsyntax-only -Wall -Wextra -Werror` 逐文件核查通过。未执行 ESP-IDF 目标编译与实机验证（本机无 idf 环境，待 CI/实机切片），息屏与提示音行为未在真机确认。
+
+## INT-01-S2 · 三物理按键输入层（2026-11-23，仅主机测试，未接线）
+
+落地 [30 §3.2/§3.3](30-interaction-feature-expansion-plan.md) 硬件输入层与映射表，映射接入 ui_service 状态机推迟到菜单重构切片（INT-01-S3）一并回归：
+
+- 板级：`board.json` `input.keys`（A=13/B=14/C=41）→ `tools/board_codegen.py` 校验（键集完整性、GPIO 合法、跨外设冲突）并生成 `PET_BOARD_KEY_{CONFIRM,NEXT,VOICE}_GPIO`；`tools/ci/test_board_codegen.py` 增补按键用例。
+- hal：`pet/hal/keys.h` + `pet_hal/src/keys.c` 纯逻辑 tracker（30ms 消抖、短按 <800ms、长按 ≥800ms 单发、组合=两键按下重叠 ≤300ms 且仅 A+B/B+C 两处，组合抑制单键事件）；`pet_button_input_t` 增可选 `keys_init`/`keys_read`；新 Kconfig `PET_INPUT_TRIPLE`（默认 y，依赖 UI 模块；未接线设备关闭后回到 BOOT 单键语义，`keys_*` 为 NULL）。
+- bsp：`bsp_input.c` 三键 GPIO 配置与 active-low 采集，受 `CONFIG_PET_INPUT_TRIPLE` 门控。
+- presentation：`ui_lvgl/src/key_actions.h/.c` 场景×按键映射表（7 场景、6 类事件，`pet_ui_key_action`），A=确认/播放控制、B=导航/音量、C=语音/静音；`ui_lvgl` CMake 按 `PET_INPUT_TRIPLE` 收编源文件。
+- 设计偏差记录：按键事件暂走 ui 轮询（与 BOOT/摇杆一致），不改事件总线契约（EVT_KEY_EVENT 未加）；若后续多订阅者需要再迁移。
+
+验证（2026-11-23，本机 macOS）：`bash tools/ci/test_host.sh` 全部 C 测试通过，含新增 `test_key_input`（tracker 阈值/组合/抑制/空指针/容量溢出 + 映射矩阵）与 5 变体 `test_bsp_input`（三键配置/采集/空指针安全）；`tools/ci/test_board_codegen.py` 通过；`bash tools/ci/test_ui_host.sh` 10/10 通过。`test_build_matrix.py` 仍因本机中文 git 输出断言失败（既有 locale 问题，与本切片无关）。未执行 ESP-IDF 目标编译；未接线，三键实物按压、消抖与组合手感未验收，接线测试须按 [27](27-hardware-and-input.md) 基础接线表与 [30 §3.3](30-interaction-feature-expansion-plan.md) 矩阵逐场景人工执行。

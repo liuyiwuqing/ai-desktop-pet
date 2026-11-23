@@ -6,7 +6,7 @@
     "mosi": 11, "sclk": 12, "cs": 10, "dc": 8, "reset": 9,
     "backlight": 42, "invertColor": true
   },
-  "input": {"boot": 0, "joystick": {"x": 4, "y": 5, "select": 6}},
+  "input": {"boot": 0, "keys": {"confirm": 13, "next": 14, "voice": 41}, "joystick": {"x": 4, "y": 5, "select": 6}},
   "climate": {"dht11": 15},
   "light": {"gpio": 7},
   "audio": {
