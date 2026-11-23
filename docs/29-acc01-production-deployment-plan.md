@@ -634,6 +634,13 @@ SSE 的 `X-Accel-Buffering: no` 由 CORE `ConsoleSetupController` 设置，OpenR
 - 07:46:12Z 为验证会话持久性主动重启 CORE 一次，14 s 恢复，MQTT 07:46:20Z 重连，status 双 ready；该时刻是计划内中断，后续样本使用新的容器启动时间。
 - 状态：观测进行中，24 小时未满，不记为通过；设备 `dodo-1` 仍离线，实机 MQTT/遥测不由本观测替代。
 
+### 10.3.2 设备回归与 dodo-1 在线监控（2026-11-23）
+
+- `dodo-1` 自 2026-11-18 16:43Z 离线后，于 2026-11-23 12:56:47Z 重新上报遥测（RSSI -41/-43），`devices.last_seen` 此后持续刷新；说明设备已按 G1 决定改用 `pet.muyin.site:8883` 成功接入生产 MQTT/TLS，设备 TLS 路线由真实设备验证。
+- 新增服务器侧设备在线监控：`~/nexus-device-observe.sh`（`nexus-deploy`，`nohup setsid` 后台），每 300 s 只读查询 `devices`/`device_telemetry_samples`，记录 `fresh_online`（`online` 且 90 秒内有活动）、`last_seen`、最近 RSSI、16 分钟内断开事件；在线/离线翻转时附加 `event` 标记。日志 `~/nexus-observe/device-dodo-1.ndjson`；不写库、不重启服务、不输出凭据。
+- 执行工作站另建每 30 分钟定时巡检（Schedule 任务 `c5a90b00`）：SSH 只读核对在线状态与观测脚本存活，正常时简报，离线/查询失败/断开事件激增时报告证据与排查方向，不自行重启容器或改配置。
+- 边界：设备监控只记录连接状态与遥测，不发送测试消息；断开原因码分析、长稳与声学仍属 ACC-02。
+
 ## 11. 回滚
 
 ### 11.1 决策树
