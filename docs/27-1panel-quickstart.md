@@ -1,6 +1,6 @@
 # 1Panel：直接拉取镜像部署管理台
 
-2026-11-15 已验证版本：CORE `230c809`，支持 `linux/amd64`、`linux/arm64`。发布与按 digest 回拉的 [运行 43620052738](https://github.com/liuyiwuqing/nexus-core/actions/runs/43620052738) 全部成功，7 项无源码初始化/编排/鉴权/静态资源/TLS/重建持久性检查通过。以下供部署者在自己的 Debian/1Panel 执行；本项目未连接或部署该服务器。
+2026-11-15 已验证版本：CORE `230c809`，支持 `linux/amd64`、`linux/arm64`。发布与按 digest 回拉的 [运行 43620052738](https://github.com/liuyiwuqing/nexus-core/actions/runs/43620052738) 全部成功，7 项无源码初始化/编排/鉴权/静态资源/TLS/重建持久性检查通过。当前发布物为 CORE `d2711f7`（含 V27/V28），发布运行 [45103288550](https://github.com/liuyiwuqing/nexus-core/actions/runs/45103288550)，digest 见下方命令；完整门禁与迁移步骤见 [ACC-01 执行计划](29-acc01-production-deployment-plan.md)。以下供部署者在自己的 Debian/1Panel 执行；本项目未连接或部署该服务器。
 
 ## 首次安装
 
@@ -17,8 +17,8 @@ docker login ghcr.io -u liuyiwuqing
 ```sh
 (
 set -e
-NEXUS_CORE_IMAGE='ghcr.io/liuyiwuqing/nexus-core@sha256:bc7e95294d3df8f6f415381240439e828959b93e6c94e43109ca12c79f6cc2d1'
-NEXUS_INIT_IMAGE='ghcr.io/liuyiwuqing/nexus-core-init@sha256:f912df8e436084e46793c4f6c23ebd044edadb2279a3df9c6bc0c721021e3ec9'
+NEXUS_CORE_IMAGE='ghcr.io/liuyiwuqing/nexus-core@sha256:bcf7f6191d61e2f1cd93592ff4e4f9c44eaa42e07688d7cb243254800049a037'
+NEXUS_INIT_IMAGE='ghcr.io/liuyiwuqing/nexus-core-init@sha256:70d178fb6236b68939438a5f22b151deb374bc72968c78efa2793216237c8055'
 install -d -m 700 /etc/nexus
 docker pull "$NEXUS_CORE_IMAGE"
 docker pull "$NEXUS_INIT_IMAGE"

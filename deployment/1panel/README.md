@@ -1,5 +1,7 @@
 # 1Panel：本地镜像部署
 
+当前发布物为 CORE `d2711f7`（含 V27/V28），运行 [45103288550](https://github.com/liuyiwuqing/nexus-core/actions/runs/45103288550) 已发布并核验，CORE digest `sha256:bcf7f6191d61e2f1cd93592ff4e4f9c44eaa42e07688d7cb243254800049a037`、init digest `sha256:70d178fb6236b68939438a5f22b151deb374bc72968c78efa2793216237c8055`。本文件与编排仍以 `e76732b` 本地路线为已验证基线；采用时应按 [ACC-01 执行计划](../../docs/29-acc01-production-deployment-plan.md) G0 产物替换镜像标签/digest，并在本机重新核对架构与启动。
+
 [docker-compose.yml](docker-compose.yml) 适用于当前 Debian x86_64 服务器，CORE 固定使用 `e76732b3792313ea5f3744b09970a7972fc89a36` 发布的多架构 digest `sha256:0310e7335b24bae830108f47001b18fdc195a47f8456ad47f977d0b96453ddba`，要求本机已有 `linux/amd64` 镜像；`NEXUS_AUTH_SESSION_DIRECTORY` 把登录会话写入 `console-sessions` 卷。CORE 的 `pull_policy: never` 禁止自动访问 GHCR，镜像缺失会直接报错；PostgreSQL 17 和 Mosquitto 2.0.22 沿用已有编排的 digest，仅在本机缺失时拉取。这是 CORE 本地镜像方案，首次部署仍可能下载两个基础服务镜像。
 
 配置复用 `/etc/nexus/docker`，管理台仅绑定 `127.0.0.1:18088`，MQTT/TLS 发布 TCP 8883；数据库使用内部网络和持久卷。HTTPS 由已有 1Panel/OpenResty 提供，不占用额外的 80/443。文件不包含密码，不需要源码、构建步骤或另行填写面板环境变量。
