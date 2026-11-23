@@ -222,11 +222,43 @@ docker image inspect "$NEXUS_CORE_IMAGE" \
 
 只导入 CORE 和 init 不够；启动时仍会尝试拉取 PostgreSQL/Mosquitto，离线环境会失败。
 
+### 5.3 G1 只读盘点（2026-11-23）
+
+通过 `nexus-deploy`（docker 组、无免密 sudo）登录，只执行查询，未停止或修改服务。现有安装判定为**升级**，不得执行第 7 节首次初始化。
+
+| 项 | 实际值 |
+| --- | --- |
+| 主机 | Debian 12 / x86_64；Docker 27.3.1 |
+| Compose 项目 | `nexus-production`，服务 `core`、`postgres`、`mqtt` |
+| 活动编排 | `/data/1panel/docker/compose/nexus-production/docker-compose.yml`（1Panel 管理，root-only，`nexus-deploy` 不可读） |
+| 私有配置 | `/etc/nexus/docker`（root-only）；MQTT 证书/配置只读挂载；CORE 挂载 `ca.crt` |
+| CORE | `ghcr.io/liuyiwuqing/nexus-core:sha-230c809…`，healthy；`65534:65534`、只读根、1 GiB、`cap_drop: ALL`、`no-new-privileges` |
+| PostgreSQL | `postgres:17-alpine@sha256:18cfe3ef…`，healthy，卷 `nexus-production_postgres-data`，库大小约 9.4 MB |
+| MQTT | `eclipse-mosquitto:2.0.22@sha256:81a6193a…`，`0.0.0.0:8883`；数据/日志为匿名卷 |
+| 迁移 | `flyway_schema_history` 最新 V23，全部 success；待执行 V24–V28 |
+| 数据量 | `deliveries` 6 行、`device_telemetry_samples` 146 行 |
+| 端口 | 80/443 OpenResty；`127.0.0.1:18088`；`0.0.0.0:8883` |
+| HTTPS | `pet.muyin.site` 返回 CORE `401`；Let's Encrypt 有效至 2027-02-13 |
+| DNS | `pet.muyin.site → 106.54.109.58`；`mqtt.muyin.site` 无 A 记录 |
+| MQTT 证书 | CN `pet.muyin.site`，SAN 含 `pet.muyin.site`、`mqtt.muyin.site`、`mqtt`、`localhost`、`127.0.0.1` |
+| 会话卷 | 不存在；旧镜像无 `NEXUS_AUTH_SESSION_DIRECTORY`，默认目录在只读根上，`remember` 会话不可用 |
+
+G1 结论与待办：
+
+- 走第 8 节升级路径；保留项目名、卷、CA、设备配置与现有 env（Halo/成长同步/OTA 已开启，AI/记忆/清理/桥接关闭）。
+- 活动编排不是 `/etc/nexus/docker/compose.1panel.yml`；修改必须在 1Panel 编排编辑器或用 root 对该实际文件操作，不能另建第二份编排。
+- 升级时补 `console-sessions` 卷；新镜像已内置 `NEXUS_AUTH_SESSION_DIRECTORY=/var/lib/nexus/sessions`，空卷会继承镜像目录属主。
+- `mqtt.muyin.site` 缺 A 记录；证书 SAN 已覆盖，需决定新增 A 记录或把设备 Broker 改为 `pet.muyin.site:8883`。
+- 迁移量很小（V24 涉及 146 行，V27/V28 各 6 行），但仍按第 6 节备份并在维护窗口停 CORE 写入。
+- 目标机可用内存约 860 MB，重启 CORE 前需释放内存或扩容，避免 1 GiB 限额与同机服务争抢。
+
 ## 6. G2 既有安装备份与恢复演练
 
 仅当 G1 发现已有安装时执行；首次部署跳到第 7 节。
 
 先记录现状，再停写备份。以下命令以项目名 `nexus-production` 为例；实际值以 `docker compose ls` 和 1Panel 编排为准，不能另建项目名。
+
+权限边界：`nexus-deploy` 无免密 sudo。`pg_dump` 与临时恢复容器可经 docker 组执行；读取活动编排、`/etc/nexus/docker` 以及写入 `/var/backups` 需要 root 或 1Panel 终端。没有 root 时把 dump 放到 `~/nexus-backups`（700），私有目录包由 root 补做，不能跳过异机副本。
 
 ```sh
 PROJECT=nexus-production
@@ -398,14 +430,15 @@ docker stop "$CORE_ID"
 
 ### 8.3 更新镜像并启动
 
-先备份编排，修改前后只允许镜像行变化：
+先备份编排，修改前后只允许镜像行变化。实际路径以 Compose 标签为准（本机为 `/data/1panel/docker/compose/nexus-production/docker-compose.yml`）；该文件与 `/etc/nexus/docker` 均为 root-only，`nexus-deploy` 不可读。修改统一在 1Panel 编排编辑器完成，不要另建第二份编排。需要命令行核对时由 root 执行：
 
 ```sh
-cp -a /etc/nexus/docker/compose.1panel.yml \
-  "/etc/nexus/docker/compose.1panel.yml.bak-$(date -u +%Y%m%dT%H%M%SZ)"
+COMPOSE=$(docker inspect "$CORE_ID" \
+  --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}')
+sudo cp -a "$COMPOSE" "$COMPOSE.bak-$(date -u +%Y%m%dT%H%M%SZ)"
 ```
 
-在 1Panel 编排编辑器中把 CORE 的 `image` 替换为 G0 冻结的 digest；同时更新 `/etc/nexus/docker/compose.1panel.yml` 副本，保持审计一致。若旧编排没有登录会话卷，按 [CORE 1Panel 部署说明](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/1panel-deployment.md) 补齐：
+在 1Panel 编排编辑器中把 CORE 的 `image` 替换为 G0 冻结的 digest；活动编排就是唯一副本，不再维护 `/etc/nexus/docker/compose.1panel.yml` 第二份。若旧编排没有登录会话卷，按 [CORE 1Panel 部署说明](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/1panel-deployment.md) 补齐：
 
 - `core.environment` 增加 `NEXUS_AUTH_SESSION_DIRECTORY: /var/lib/nexus/sessions`
 - `core.volumes` 增加 `console-sessions:/var/lib/nexus/sessions`
@@ -414,11 +447,8 @@ cp -a /etc/nexus/docker/compose.1panel.yml \
 保存前核对：
 
 ```sh
-grep -n 'image: ghcr.io/liuyiwuqing/nexus-core@sha256:' \
-  /etc/nexus/docker/compose.1panel.yml
-diff -u \
-  "$(ls -1t /etc/nexus/docker/compose.1panel.yml.bak-* | head -1)" \
-  /etc/nexus/docker/compose.1panel.yml
+grep -n 'image: ghcr.io/liuyiwuqing/nexus-core@sha256:' "$COMPOSE"
+diff -u "$(ls -1t "$COMPOSE".bak-* | head -1)" "$COMPOSE"
 ```
 
 预期 diff 只有 `image` 行（以及首次补会话卷时的三处）。确认新镜像已存在：
@@ -431,8 +461,8 @@ docker image inspect "$NEXUS_CORE_IMAGE" \
 在 1Panel 重新部署该编排；若 1Panel 不支持就地更新，用同一项目名执行：
 
 ```sh
-docker compose -p nexus-production \
-  -f /etc/nexus/docker/compose.1panel.yml \
+sudo docker compose -p nexus-production \
+  -f "$COMPOSE" \
   up -d --wait --wait-timeout 180 core
 ```
 
