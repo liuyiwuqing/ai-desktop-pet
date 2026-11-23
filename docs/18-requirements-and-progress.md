@@ -1730,6 +1730,6 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 
 ## ACC-01-G6-02 · 管理员令牌受保护文件模式（2026-11-23）
 
-生产 CORE 从 `NEXUS_ADMIN_TOKEN` env 模式切换为 `NEXUS_AUTH_TOKEN_FILE` 受保护文件模式，保留当前令牌与审计归属（revision=1、actor `cf739d…`）。宿主 `/etc/nexus/docker/core-auth`（0700，65534:65534）挂到容器 `/etc/nexus/core-auth`，`tokens.json` 与 `tokens.json.lock` 均 0600；编排新增 `NEXUS_AUTH_TOKEN_FILE=/etc/nexus/core-auth/tokens.json`。旧编排备份 `docker-compose.yml.bak-auth-20261123`（SHA-256 `b7760ab…`），新编排 `ad3d737…`；CORE 07:52:41Z healthy，`GET /api/v1/access/admin-token` 返回 `mode=file`、`editable=true`、`revision=1`，管理员登录 200，日志无鉴权错误。`core.env` 的旧令牌不再校验，仅保留用于回滚。
+生产 CORE 从 `NEXUS_ADMIN_TOKEN` env 模式切换为 `NEXUS_AUTH_TOKEN_FILE` 受保护文件模式，保留当前令牌与审计归属（revision=1、actor `cf739d…`）。宿主 `/etc/nexus/docker/core-auth`（0700，65534:65534）挂到容器 `/etc/nexus/core-auth`，`tokens.json` 与 `tokens.json.lock` 均 0600；编排新增 `NEXUS_AUTH_TOKEN_FILE=/etc/nexus/core-auth/tokens.json`。旧编排备份 `docker-compose.yml.bak-auth-20261123`（SHA-256 `b7760ab…`），新编排 `ad3d737…`；CORE 07:52:41Z healthy，`GET /api/v1/access/admin-token` 返回 `mode=file`、`editable=true`、`revision=1`，管理员登录 200，日志无鉴权错误；切换重建窗口对应 07:52:42/45 两条 502，无其他 5xx。`core.env` 的旧令牌不再校验，仅保留用于回滚。
 
 管理台“权限 → 修改管理员令牌”现已可用：输入当前令牌与新令牌（32–256 个可见 ASCII 字符），保存后旧令牌立即失效、无需重启。观测脚本同日改为优先从 `tokens.json` 读取管理员令牌，以同一日志续跑至 11-24 07:42Z。

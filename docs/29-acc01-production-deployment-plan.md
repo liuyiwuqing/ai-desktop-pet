@@ -626,7 +626,8 @@ SSE 的 `X-Accel-Buffering: no` 由 CORE `ConsoleSetupController` 设置，OpenR
 ### 10.3.1 观测执行状态（2026-11-23）
 
 - 观测脚本 `~/nexus-observe/observe.sh`（`nexus-deploy`，`nohup setsid` 后台，PID 946298），日志 `~/nexus-observe/observe-20261123T074228Z.ndjson`，07:42:28Z 启动，每 900 s 一条，计划到 2026-11-24 07:42Z。
-- 07:52:03Z 更新脚本后以同一日志续跑：令牌优先从容器内 `/etc/nexus/core-auth/tokens.json` 读取，缺失时回退 `NEXUS_ADMIN_TOKEN`；重启后首条样本三服务正常、status 双 ready，`http5xx_last200=2` 来自 07:46Z 计划内重启窗口的 502/503，不是新增故障。
+- 07:52:03Z 更新脚本后以同一日志续跑：令牌优先从容器内 `/etc/nexus/core-auth/tokens.json` 读取，缺失时回退 `NEXUS_ADMIN_TOKEN`；重启后首条样本三服务正常、status 双 ready。
+- 截至 07:56Z，access.log 最近 200 行共 4 条 502：07:46:14/17 与 07:52:42/45，分别对应会话持久性和令牌文件模式两次计划内重建；无其他 5xx。
 - 每条记录：CORE/PostgreSQL/Mosquitto 状态与重启计数、`/api/v1/status`、根分区可用量与使用率、PostgreSQL 连接数、CORE 内存、16 分钟内 MQTT 重连数、access.log 最近 200 行 5xx 数、HTTPS/MQTT 证书到期时间。
 - 首条样本：三服务正常（CORE/PostgreSQL healthy、MQTT running，重启 0），status `database=ready`、`mqtt=ready`，根分区可用 16,356,420 kB（已用 81%），PostgreSQL 连接 12，CORE 223.7 MiB/1 GiB，MQTT 重连 0，5xx 0，HTTPS 证书至 2027-02-13，MQTT 证书至 2029-02-17。
 - 异机备份：服务器 `~/nexus-backups/acc01-observe-20261123T074441Z.dump`，107,230 B，SHA-256 `258df4d00bc085f442d030389afc33f7c92875f050723b7931a89936e1f05998`，`pg_restore --list` 含 42 个 TABLE DATA 段；已复制到观测工作站 `~/.nexus-evidence/acc01/`，本地哈希一致。
