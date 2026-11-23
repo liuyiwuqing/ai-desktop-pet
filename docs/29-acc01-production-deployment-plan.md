@@ -1,6 +1,6 @@
 # ACC-01 生产部署与数据库迁移执行计划
 
-2026-11-20 制定，2026-11-23 执行 G0。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，不是部署记录**：G0 已发布并核对镜像（见 3.4）；仍未连接目标服务器，没有生产库、真实凭据或设备，也没有执行任何部署、迁移、消息发送或烧录。计划中的命令由部署者在目标机执行，结果回填到第 13 节。
+2026-11-20 制定，2026-11-23 执行 G0–G4。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，执行结果回填在各节末尾**：G0 发布物（3.4）、G1 只读盘点（5.3）、G2 备份与隔离恢复（6.2）、G4 离线导入与升级（8.5）。生产仍未接真实设备消息，HTTPS/SSE 完整验收与 24 小时观测未完成；第 13 节保留空白模板供后续变更使用。
 
 ## 1. 目标、范围与完成判定
 
@@ -220,7 +220,7 @@ docker image inspect "$NEXUS_CORE_IMAGE" \
   --format '{{.Os}}/{{.Architecture}} {{index .RepoDigests 0}}'
 ```
 
-只导入 CORE 和 init 不够；启动时仍会尝试拉取 PostgreSQL/Mosquitto，离线环境会失败。
+只导入 CORE 和 init 不够；首次部署时启动仍会尝试拉取 PostgreSQL/Mosquitto，离线环境会失败。既有安装升级时后两者已在本地，只需导入 CORE（本次 G4 即如此）。
 
 ### 5.3 G1 只读盘点（2026-11-23）
 
@@ -445,7 +445,7 @@ COMPOSE=$(docker inspect "$CORE_ID" \
 sudo cp -a "$COMPOSE" "$COMPOSE.bak-$(date -u +%Y%m%dT%H%M%SZ)"
 ```
 
-在 1Panel 编排编辑器中把 CORE 的 `image` 替换为 G0 冻结的 digest；活动编排就是唯一副本，不再维护 `/etc/nexus/docker/compose.1panel.yml` 第二份。若旧编排没有登录会话卷，按 [CORE 1Panel 部署说明](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/1panel-deployment.md) 补齐：
+在 1Panel 编排编辑器中把 CORE 的 `image` 替换为 G0 冻结的 digest；活动编排就是唯一副本，不再维护 `/etc/nexus/docker/compose.1panel.yml` 第二份。若走 5.2 离线导入，`docker load` 不保留 digest 引用，`image` 必须改用本地 tag（本次为 `:acc01-d2711f7`）并加 `pull_policy: never`，否则 Compose 无法按 digest 找到本地镜像。若旧编排没有登录会话卷，按 [CORE 1Panel 部署说明](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/1panel-deployment.md) 补齐：
 
 - `core.environment` 增加 `NEXUS_AUTH_SESSION_DIRECTORY: /var/lib/nexus/sessions`
 - `core.volumes` 增加 `console-sessions:/var/lib/nexus/sessions`
@@ -489,6 +489,34 @@ docker logs -f --tail 200 "$(docker ps -q \
 - 无 `Migration ... failed`、`SQL State`、连接超时或反复重启。
 - 健康检查在 10 分钟内通过；MQTT 恢复 `ready`。
 - 迁移期间不要重复 `docker restart` 或并发启动第二个 CORE。
+
+### 8.5 G4 执行记录（2026-11-23，离线导入）
+
+镜像准备，全程跳过 GHCR 拉取：
+
+| 项 | 值 |
+| --- | --- |
+| 本地归档 | `/tmp/nexus-core-acc01-amd64.tar`，319,047,168 B，SHA-256 `7bc6bc5909e7897d6614be70fc01da9f989985741939a10a053779a9c5528deb` |
+| 服务器归档 | `/home/nexus-deploy/images/nexus-core-acc01-amd64.tar`，尺寸与 SHA-256 一致 |
+| `docker load` | 成功；镜像 ID `sha256:a8f98e163337def81f4136d862851edaa60452124fd153543114927a4fe00700`，`linux/amd64`，`revision=d2711f7` |
+| 分层 | 8 层 diffID 与本地逐层一致；`RepoDigests=[]` |
+| 本地 tag | `ghcr.io/liuyiwuqing/nexus-core:acc01-d2711f7` |
+
+编排只改 CORE 四处：`image` 改为上述本地 tag、加 `pull_policy: never`、加 `NEXUS_AUTH_SESSION_DIRECTORY: /var/lib/nexus/sessions`、挂载 `console-sessions:/var/lib/nexus/sessions` 并声明顶层卷；PostgreSQL、Mosquitto、网络与安全配置未动。新编排 SHA-256 `b7760ab206d4610461dff13fa8dd19feaa0720c64542f817e5d101f908b6c6ab`，旧编排备份 `/home/nexus-deploy/backups/nexus-production.docker-compose.yml.20261123`，SHA-256 `c0149c62db20c06d209f2749bd62dc6de1216cb7106c78558889d72668730fc3`。
+
+执行方式：`nexus-deploy` 无免密 sudo，但属于 docker 组。使用本地 CORE 镜像作为一次性 root 客户端，挂载宿主 `docker.sock`、`/usr/bin/docker`、compose 插件、活动编排目录与 `/etc/nexus/docker`，以宿主真实路径执行 `docker compose -f /data/1panel/docker/compose/nexus-production/docker-compose.yml -p nexus-production up -d --no-deps --force-recreate core`。只读检查 `agent.db` 确认 `composes` 表只保存 `path`、不保存 YAML，1Panel 编排是文件驱动，因此直接改文件不会产生第二份内容。
+
+结果：
+
+- 首次重建 07:32:22Z 启动，12 s 进入 healthy；Flyway 从 V23 顺序执行 V24–V28，07:32:27Z 完成，5 个迁移全部成功。因首次 compose 客户端路径为容器内 `/w/...`，07:34 用宿主真实路径强制重建一次修正 `com.docker.compose.project.config_files` 标签；第二次启动显示 “No migration necessary”。
+- `flyway_schema_history` 最高 `installed_rank=28`，`bool_and(success)=t`；`deliveries` 6 行，`device_telemetry_samples` 147 行（升级窗口内设备新增 1 行，非迁移造成）。
+- 运行镜像 ID `sha256:a8f98e…`，`65534:65534`、只读根、1 GiB、`cap_drop: ALL`、重启计数 0。
+- 会话卷 `nexus-production_console-sessions` 已创建；容器内 `/var/lib/nexus/sessions` 为 `nobody:nogroup 700`，写入探测成功。
+- `https://pet.muyin.site/` 返回 200（管理台登录页），`/api/console/session` 与 `/api/v1/deliveries` 返回 401。
+- Mosquitto 日志显示 CORE 以 `nexus-core` 重新连接（172.20.0.2:49224），旧连接已断开。
+- 资源：宿主 available 约 1.0 GiB，根分区剩余约 14 GB。
+
+边界：本次是既有安装升级，不导入 init 镜像、不执行首次初始化；未重建 PostgreSQL/Mosquitto；未发送真实消息；未做 24 小时观测；设备 MQTT 改指 `pet.muyin.site:8883`、HTTPS/SSE 完整验收与实机联调仍待执行。回滚若跨越 V28，必须同时恢复 G2 备份，不能只换回旧镜像。
 
 ## 9. G5 数据库迁移验证
 
