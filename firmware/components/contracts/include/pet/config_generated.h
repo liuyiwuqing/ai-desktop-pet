@@ -25,6 +25,15 @@
 #define PET_CFG_DND_END_MINUTE_MAX 1439
 #define PET_CFG_DND_DEFAULT_END_MINUTE 420
 #define PET_CFG_DND_DEFAULT_ALLOW_CRITICAL true
+#define PET_CFG_SCREEN_TIMEOUT_S_MIN 0
+#define PET_CFG_SCREEN_TIMEOUT_S_MAX 3600
+#define PET_CFG_SCREEN_DEFAULT_TIMEOUT_S 60
+#define PET_CFG_SCREEN_IDLE_BRIGHTNESS_MIN 0
+#define PET_CFG_SCREEN_IDLE_BRIGHTNESS_MAX 100
+#define PET_CFG_SCREEN_DEFAULT_IDLE_BRIGHTNESS 40
+#define PET_CFG_SFX_VOLUME_MIN 0
+#define PET_CFG_SFX_VOLUME_MAX 100
+#define PET_CFG_DEFAULT_SFX_VOLUME 25
 #define PET_CFG_MESSAGE_QUEUE_DEPTH_MIN 1
 #define PET_CFG_MESSAGE_QUEUE_DEPTH_MAX 8
 #define PET_CFG_MESSAGE_DEFAULT_QUEUE_DEPTH 8
@@ -46,6 +55,11 @@ typedef struct {
 } pet_config_dnd_t;
 
 typedef struct {
+    uint16_t timeout_s;
+    uint8_t idle_brightness;
+} pet_config_screen_t;
+
+typedef struct {
     uint8_t queue_depth;
     uint16_t duration_ms;
 } pet_config_message_t;
@@ -58,5 +72,7 @@ typedef struct {
     uint8_t brightness;
     bool muted;
     pet_config_dnd_t dnd;
+    pet_config_screen_t screen;
+    uint8_t sfx_volume;
     pet_config_message_t message;
 } pet_config_t;

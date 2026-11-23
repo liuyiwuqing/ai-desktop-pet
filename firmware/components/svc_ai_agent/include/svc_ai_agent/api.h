@@ -25,6 +25,7 @@ typedef struct {
     pet_ai_transport_t transport;
     pet_ai_runtime_frontend_t frontend;
     uint8_t volume_pct;
+    uint8_t sfx_volume_pct; /* 消息提示音音量，与 TTS 人声分离。 */
     pet_ai_policy_t initial_policy;
     bool notifications_only; /* 无传输、无前端、不开麦；只拥有提示音输出。 */
     void (*on_completed)(uint32_t turn_id); /* 音频拥有者仅发送有界完成通知，不得阻塞。 */
@@ -42,6 +43,7 @@ typedef struct {
     uint32_t captured_frames;
     uint64_t submitted_samples;
     uint8_t volume_pct;
+    uint8_t sfx_volume_pct;
     uint8_t playback_level_pct;
     uint32_t playback_underruns;
     uint16_t buffered_samples;
@@ -89,6 +91,7 @@ esp_err_t pet_ai_agent_set_policy(const pet_ai_policy_t *policy);
 esp_err_t pet_ai_agent_set_dnd(bool enabled);
 esp_err_t pet_ai_agent_set_interrupted(bool enabled);
 esp_err_t pet_ai_agent_set_volume(uint8_t volume_pct); /* 新的 PCM 块生效，非阻塞。 */
+esp_err_t pet_ai_agent_set_sfx_volume(uint8_t volume_pct); /* 仅提示音；下一个提示音块生效，非阻塞。 */
 
 /* 24 kHz mono s16，1..480 样本，返回前复制；finish=true 仅允许 samples=0。
  * 单一传输生产者按原顺序提交数据和结束标记；ESP_OK 不代表 DMA 已播放。

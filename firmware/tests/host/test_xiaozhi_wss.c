@@ -531,12 +531,12 @@ int main(int argc, char **argv)
         if (!is_case("boot-start")) {
             const esp_err_t expected = is_case("boot-missing") ? ESP_ERR_NVS_NOT_FOUND :
                 is_case("boot-empty-ca") ? ESP_ERR_INVALID_ARG : ESP_ERR_INVALID_SIZE;
-            assert(app_ai_start(25, false, false, pet_storage_load_str,NULL) == expected);
+            assert(app_ai_start(25, 25, false, false, pet_storage_load_str,NULL) == expected);
             assert(task_count == 0 && socket_inits == 0);
             assert(pet_xz_wss_snapshot(&snapshot) == ESP_ERR_INVALID_STATE);
             failure_armed = false;
         }
-        assert(app_ai_start(25, false, false, pet_storage_load_str,NULL) == ESP_OK);
+        assert(app_ai_start(25, 25, false, false, pet_storage_load_str,NULL) == ESP_OK);
         step("pet_xz_wss");
         step("pet_ai_agent");
         assert(pet_xz_wss_snapshot(&snapshot) == ESP_OK && snapshot.ready);

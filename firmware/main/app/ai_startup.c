@@ -31,11 +31,11 @@ static void clear_credentials(void)
     for (size_t i = 0; i < sizeof(credentials); ++i) bytes[i] = 0;
 }
 
-esp_err_t app_ai_start(uint8_t volume, bool muted, bool dnd,
+esp_err_t app_ai_start(uint8_t volume, uint8_t sfx_volume, bool muted, bool dnd,
     esp_err_t (*load_str)(const char *, const char *, char *, size_t),
     void (*completed)(uint32_t))
 {
-    if (volume > 100 || !load_str) return ESP_ERR_INVALID_ARG;
+    if (volume > 100 || sfx_volume > 100 || !load_str) return ESP_ERR_INVALID_ARG;
     const struct {
         const char *key;
         char *out;
@@ -65,6 +65,7 @@ esp_err_t app_ai_start(uint8_t volume, bool muted, bool dnd,
             .ca_cert_pem = ca,
         };
         pet_ai_agent_config_t ai = {.audio = pet_bsp_audio(), .volume_pct = volume,
+            .sfx_volume_pct = sfx_volume,
             .initial_policy = {.muted = muted, .dnd = dnd},.on_completed=completed};
 #if CONFIG_PET_AI_ESP_SR_ENABLED
         ai.frontend = pet_ai_sr_frontend(&speech_frontend);

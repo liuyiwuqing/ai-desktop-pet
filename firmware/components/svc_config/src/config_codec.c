@@ -14,6 +14,8 @@ void pet_config_defaults(pet_config_t *out)
         .brightness = PET_CFG_DEFAULT_BRIGHTNESS, .muted = PET_CFG_DEFAULT_MUTED,
         .dnd = {.enabled = PET_CFG_DND_DEFAULT_ENABLED, .start_minute = PET_CFG_DND_DEFAULT_START_MINUTE,
                 .end_minute = PET_CFG_DND_DEFAULT_END_MINUTE, .allow_critical = PET_CFG_DND_DEFAULT_ALLOW_CRITICAL},
+        .screen = {.timeout_s = PET_CFG_SCREEN_DEFAULT_TIMEOUT_S, .idle_brightness = PET_CFG_SCREEN_DEFAULT_IDLE_BRIGHTNESS},
+        .sfx_volume = PET_CFG_DEFAULT_SFX_VOLUME,
         .message = {PET_CFG_MESSAGE_DEFAULT_QUEUE_DEPTH, PET_CFG_MESSAGE_DEFAULT_DURATION_MS}};
     strcpy(out->timezone, PET_CFG_DEFAULT_TIMEZONE);
 }
@@ -41,6 +43,8 @@ esp_err_t pet_config_validate(const pet_config_t *c)
     bool invalid=!c || c->schema_version != PET_CFG_SCHEMA_VERSION ||
         pet_config_utc_offset(c, &offset) != ESP_OK || (unsigned)c->language > PET_CFG_LANGUAGE_EN_US ||
         c->volume > PET_CFG_VOLUME_MAX || c->brightness > PET_CFG_BRIGHTNESS_MAX ||
+        c->screen.timeout_s > PET_CFG_SCREEN_TIMEOUT_S_MAX || c->screen.idle_brightness > PET_CFG_SCREEN_IDLE_BRIGHTNESS_MAX ||
+        c->sfx_volume > PET_CFG_SFX_VOLUME_MAX ||
         c->dnd.start_minute > 1439 || c->dnd.end_minute > 1439 ||
         c->message.queue_depth < 1 || c->message.queue_depth > 8 ||
         c->message.duration_ms < 5000 || c->message.duration_ms > 30000;
@@ -76,17 +80,22 @@ esp_err_t pet_config_parse_json(const char *json, size_t bytes, pet_config_t *ou
     const char *end;
     cJSON *root = cJSON_ParseWithLengthOpts(input, bytes, &end, false);
     while (root && end < input + bytes && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')) ++end;
-    static const char *const top[] = {"schemaVersion", "timezone", "language", "volume", "brightness", "dnd", "message", "muted"};
+    static const char *const top[] = {"schemaVersion", "timezone", "language", "volume", "brightness", "dnd", "message", "muted", "screen", "sfxVolume"};
     static const char *const dk[] = {"enabled", "startMinute", "endMinute", "allowCritical", "manual"};
+    static const char *const sk[] = {"timeoutS", "idleBrightness"};
     static const char *const mk[] = {"queueDepth", "durationMs"};
     const cJSON *d = field(root, "dnd"), *m = field(root, "message"), *z = field(root, "timezone");
+    const cJSON *sc = field(root, "screen"), *sv = field(root, "sfxVolume");
     const cJSON *language = field(root, "language"), *muted = field(root, "muted");
-    bool valid = root && end == input + bytes && keys(root, top, 8, 127) &&
+    bool valid = root && end == input + bytes && keys(root, top, 10, 127) &&
         keys(d, dk, 5, 15) && keys(m, mk, 2, 3) && integer(field(root, "schemaVersion"), 1, 1) &&
         cJSON_IsString(z) && strlen(z->valuestring) < sizeof(out->timezone) && cJSON_IsString(language) &&
         (!strcmp(language->valuestring, "zh-CN") || !strcmp(language->valuestring, "en-US")) &&
         integer(field(root, "volume"), 0, 100) && integer(field(root, "brightness"), 0, 100) &&
-        (!muted || cJSON_IsBool(muted)) && cJSON_IsBool(field(d, "enabled")) &&
+        (!muted || cJSON_IsBool(muted)) && (!sv || integer(sv, 0, 100)) &&
+        (!sc || (keys(sc, sk, 2, 3) && integer(field(sc, "timeoutS"), 0, PET_CFG_SCREEN_TIMEOUT_S_MAX) &&
+            integer(field(sc, "idleBrightness"), 0, PET_CFG_SCREEN_IDLE_BRIGHTNESS_MAX))) &&
+        cJSON_IsBool(field(d, "enabled")) &&
         cJSON_IsBool(field(d, "allowCritical")) && (!field(d, "manual") || cJSON_IsBool(field(d, "manual"))) &&
         integer(field(d, "startMinute"), 0, 1439) &&
         integer(field(d, "endMinute"), 0, 1439) && integer(field(m, "queueDepth"), 1, 8) &&
@@ -105,6 +114,12 @@ esp_err_t pet_config_parse_json(const char *json, size_t bytes, pet_config_t *ou
         candidate.dnd.allow_critical = cJSON_IsTrue(field(d, "allowCritical"));
         candidate.dnd.start_minute = (uint16_t)field(d, "startMinute")->valueint;
         candidate.dnd.end_minute = (uint16_t)field(d, "endMinute")->valueint;
+        if (sc) {
+            candidate.screen.timeout_s = (uint16_t)field(sc, "timeoutS")->valueint;
+            candidate.screen.idle_brightness = (uint8_t)field(sc, "idleBrightness")->valueint;
+        }
+        /* 旧存档没有 sfxVolume：提示音沿用原 volume，行为不变。 */
+        candidate.sfx_volume = sv ? (uint8_t)sv->valueint : candidate.volume;
         candidate.message.queue_depth = (uint8_t)field(m, "queueDepth")->valueint;
         candidate.message.duration_ms = (uint16_t)field(m, "durationMs")->valueint;
         validation=pet_config_validate(&candidate);
@@ -120,10 +135,13 @@ esp_err_t pet_config_format_json(const pet_config_t *c, char *out, size_t capaci
 {
     if (!out || !bytes || !capacity || pet_config_validate(c) != ESP_OK) return ESP_ERR_INVALID_ARG;
     int n = snprintf(out, capacity, "{\"schemaVersion\":1,\"timezone\":\"%s\",\"language\":\"%s\","
-        "\"volume\":%u,\"brightness\":%u,\"muted\":%s,\"dnd\":{\"enabled\":%s,\"manual\":%s,\"startMinute\":%u,\"endMinute\":%u,"
+        "\"volume\":%u,\"brightness\":%u,\"muted\":%s,\"sfxVolume\":%u,"
+        "\"screen\":{\"timeoutS\":%u,\"idleBrightness\":%u},"
+        "\"dnd\":{\"enabled\":%s,\"manual\":%s,\"startMinute\":%u,\"endMinute\":%u,"
         "\"allowCritical\":%s},\"message\":{\"queueDepth\":%u,\"durationMs\":%u}}", c->timezone,
         c->language == PET_CFG_LANGUAGE_EN_US ? "en-US" : "zh-CN", c->volume, c->brightness,
-        c->muted ? "true" : "false", c->dnd.enabled ? "true" : "false", c->dnd.manual ? "true" : "false", c->dnd.start_minute,
+        c->muted ? "true" : "false", c->sfx_volume, c->screen.timeout_s, c->screen.idle_brightness,
+        c->dnd.enabled ? "true" : "false", c->dnd.manual ? "true" : "false", c->dnd.start_minute,
         c->dnd.end_minute, c->dnd.allow_critical ? "true" : "false", c->message.queue_depth, c->message.duration_ms);
     if (n < 0 || (size_t)n >= capacity) return ESP_ERR_INVALID_SIZE;
     *bytes = (size_t)n;

@@ -61,6 +61,13 @@ export interface DeviceConfigDnd {
   allowCritical: boolean;
 }
 
+export interface DeviceConfigScreen {
+  /** 无输入/语音/消息事件达到该秒数后关背光；0=永不息屏。 */
+  timeoutS: number;
+  /** 静置 30 秒后降至的待机亮度（不高于交互亮度时生效）。 */
+  idleBrightness: number;
+}
+
 export interface DeviceConfigMessage {
   queueDepth: number;
   durationMs: number;
@@ -77,6 +84,10 @@ export interface DeviceConfig {
   /** 独立语音静音，重启后保留；不受定时免打扰结束影响。 */
   muted?: boolean;
   dnd: DeviceConfigDnd;
+  /** 屏幕节能：两段亮度（交互亮度 brightness / 待机亮度 idleBrightness）+ 息屏超时。 */
+  screen?: DeviceConfigScreen;
+  /** 消息提示音音量，与 TTS 人声 volume 分离；旧存档缺失时沿用 volume。 */
+  sfxVolume?: number;
   message: DeviceConfigMessage;
 }
 

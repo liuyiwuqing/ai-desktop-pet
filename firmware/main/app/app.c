@@ -571,7 +571,8 @@ esp_err_t app_start(void)
     pet_config_snapshot_t settings;
     esp_err_t ai_err = pet_config_snapshot(&settings);
     if (ai_err == ESP_OK && !settings.writable) ai_err = ESP_ERR_INVALID_STATE;
-    if (ai_err == ESP_OK) ai_err = app_ai_start(settings.config.volume, settings.config.muted,
+    if (ai_err == ESP_OK) ai_err = app_ai_start(settings.config.volume, settings.config.sfx_volume,
+        settings.config.muted,
         pet_config_dnd_active(&settings.config, app_epoch_now(), app_epoch_now() != 0), pet_provision_load_str,app_behavior_dialogue);
     if (ai_err != ESP_OK)
         ESP_LOGW(TAG, "AI services unavailable: %s", esp_err_to_name(ai_err));
@@ -581,7 +582,8 @@ esp_err_t app_start(void)
     pet_config_snapshot_t tone_settings;
     if(pet_config_snapshot(&tone_settings)==ESP_OK&&tone_settings.writable) {
         const pet_ai_agent_config_t tones={.audio=pet_bsp_audio(),.notifications_only=true,
-            .volume_pct=tone_settings.config.volume,.initial_policy={.muted=tone_settings.config.muted,
+            .volume_pct=tone_settings.config.volume,.sfx_volume_pct=tone_settings.config.sfx_volume,
+            .initial_policy={.muted=tone_settings.config.muted,
             .dnd=pet_config_dnd_active(&tone_settings.config,app_epoch_now(),app_epoch_now()!=0)}};
         esp_err_t tone_error=pet_ai_agent_start(&tones);
         if(tone_error!=ESP_OK)ESP_LOGW(TAG,"notification audio unavailable: %s",esp_err_to_name(tone_error));

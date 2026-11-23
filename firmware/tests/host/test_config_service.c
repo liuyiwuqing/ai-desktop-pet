@@ -104,7 +104,8 @@ int xTaskCreate(TaskFunction_t fn,const char *name,uint32_t stack,void *context,
 static void *run_settings(void *unused) {(void)unused;settings_task(settings_context);return NULL;}
 
 static const char json[] = "{\"schemaVersion\":1,\"timezone\":\"Asia/Shanghai\",\"language\":\"zh-CN\","
-    "\"volume\":30,\"brightness\":70,\"dnd\":{\"enabled\":true,\"startMinute\":1320,\"endMinute\":420,"
+    "\"volume\":30,\"brightness\":70,\"sfxVolume\":35,\"screen\":{\"timeoutS\":120,\"idleBrightness\":50},"
+    "\"dnd\":{\"enabled\":true,\"startMinute\":1320,\"endMinute\":420,"
     "\"allowCritical\":true},\"message\":{\"queueDepth\":8,\"durationMs\":8000}}";
 int main(void)
 {
@@ -177,6 +178,7 @@ int main(void)
     assert(s.config.volume == 25);
     assert(pet_config_apply_json(json, strlen(json), 0) == ESP_OK);
     assert(pet_config_snapshot(&s) == ESP_OK && s.revision == 1 && s.config.brightness == 70);
+    assert(s.config.sfx_volume == 35 && s.config.screen.timeout_s == 120 && s.config.screen.idle_brightness == 50);
     unsigned previous_writes = writes;
     pet_config_t unsupported=s.config;unsupported.language=PET_CFG_LANGUAGE_EN_US;
     assert(pet_config_apply(&unsupported,1)==ESP_ERR_NOT_SUPPORTED&&writes==previous_writes);
@@ -214,7 +216,8 @@ int main(void)
     assert(pet_config_snapshot(&s) == ESP_OK && s.revision == 1 && s.config.volume == 30);
     char exported[768]; size_t size;
     assert(pet_config_export_json(exported, sizeof(exported), &size) == ESP_OK);
-    assert(strstr(exported, "\"volume\":30") && !strstr(exported, "token"));
+    assert(strstr(exported, "\"volume\":30") && strstr(exported, "\"sfxVolume\":35") &&
+        strstr(exported, "\"screen\":{\"timeoutS\":120,\"idleBrightness\":50}") && !strstr(exported, "token"));
     pet_config_t changed = s.config; changed.volume = 15;
     fail_write = true;
     assert(pet_config_apply(&changed, 1) != ESP_OK);
@@ -253,6 +256,21 @@ int main(void)
     assert(pet_config_apply(&s.config,4)==ESP_OK); /* An enqueue failure must release its reservation. */
     pthread_mutex_lock(&settings_queue->lock);settings_queue->stop=true;pthread_cond_signal(&settings_queue->ready);pthread_mutex_unlock(&settings_queue->lock);
     assert(!pthread_join(thread,NULL));vQueueDelete(settings_queue);
+    /* 旧存档兼容：缺 screen/sfxVolume 取默认值，提示音沿用原 volume；越界与缺键拒绝。 */
+    assert(pet_config_snapshot(&s) == ESP_OK);
+    const char legacy[] = "{\"schemaVersion\":1,\"timezone\":\"Asia/Shanghai\",\"language\":\"zh-CN\","
+        "\"volume\":30,\"brightness\":70,\"dnd\":{\"enabled\":true,\"startMinute\":1320,\"endMinute\":420,"
+        "\"allowCritical\":true},\"message\":{\"queueDepth\":8,\"durationMs\":8000}}";
+    char bad[768];
+    snprintf(bad, sizeof(bad), "%.*s,\"sfxVolume\":101}", (int)strlen(legacy)-1, legacy);
+    assert(pet_config_apply_json(bad, strlen(bad), s.revision) == ESP_ERR_INVALID_ARG);
+    snprintf(bad, sizeof(bad), "%.*s,\"screen\":{\"timeoutS\":3601,\"idleBrightness\":40}}", (int)strlen(legacy)-1, legacy);
+    assert(pet_config_apply_json(bad, strlen(bad), s.revision) == ESP_ERR_INVALID_ARG);
+    snprintf(bad, sizeof(bad), "%.*s,\"screen\":{\"timeoutS\":60}}", (int)strlen(legacy)-1, legacy);
+    assert(pet_config_apply_json(bad, strlen(bad), s.revision) == ESP_ERR_INVALID_ARG);
+    assert(pet_config_apply_json(legacy, strlen(legacy), s.revision) == ESP_OK);
+    assert(pet_config_snapshot(&s) == ESP_OK && s.config.volume == 30 && s.config.brightness == 70 &&
+        s.config.screen.timeout_s == 60 && s.config.screen.idle_brightness == 40 && s.config.sfx_volume == 30);
     pet_config_close(); saved[0] ^= 1;
     assert(pet_config_init() != ESP_OK);
     assert(pet_config_snapshot(&s) == ESP_OK && !s.writable);

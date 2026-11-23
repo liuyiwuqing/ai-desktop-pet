@@ -512,6 +512,8 @@ int main(int argc, char **argv)
         }
         bool critical=failing("notification-critical");
         if(critical){assert(pet_ai_agent_set_interrupted(true)==ESP_OK);run_task();}
+        assert(pet_ai_agent_set_sfx_volume(101)==ESP_ERR_INVALID_ARG);
+        assert(pet_ai_agent_set_sfx_volume(40)==ESP_OK&&status().sfx_volume_pct==40);
         assert(pet_ai_agent_notify(PET_MESSAGE_SOUND_CHIME,critical)==ESP_OK);
         run_task();assert(playing && playback_starts==1 && starts==0);
         if(critical){run_task();assert(playing&&playback_starts==1);}

@@ -4,6 +4,11 @@
   "language": "zh-CN",
   "volume": 25,
   "brightness": 80,
+  "sfxVolume": 25,
+  "screen": {
+    "timeoutS": 60,
+    "idleBrightness": 40
+  },
   "dnd": {
     "enabled": false,
     "startMinute": 1320,

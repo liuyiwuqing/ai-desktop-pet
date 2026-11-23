@@ -1739,3 +1739,13 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 基于真实源码摸底（`svc_config` 设置项、`ui_lvgl/growth_input.h` 菜单动作、`svc_intent` 工具注册表、`contracts/pet/growth.h` 玩法数值、`boards/dodo-s3-lcd/board.json` 引脚占用）制定六个方向的设计方案，见 [30](30-interaction-feature-expansion-plan.md)：设备设置项拓展 10 项（settings_v1→v2 增量字段，P0 为息屏/待机亮度/免打扰时段/提示音量）、语音玩法拓展（场景化/多步联动/情感反馈三层）、三物理按键交互方案（KEY_A=确认 GPIO13、KEY_B=方向 GPIO14、KEY_C=语音 GPIO41，含场景×按键映射矩阵与组合键，BOOT 运行期语义保留、启动维护门控不变）、菜单体系（8 个一级分类、深度≤2、表驱动）、语音连续对话分阶段（M1 会话保持免唤醒多轮→M2 按键+语音打断→M3 上下文增强）与创新功能 10 项（P0 专注陪伴番茄钟），并给出 P0/P1/P2 汇总路线图。
 
 验证（2026-11-23，本机 macOS）：仅文档新增与索引登记；核对方案引用的现状（设置项清单、BOOT 按键语义、成长动作枚举、空闲引脚 13/14/41/47）与当前源码一致，docs/README 链接目标存在。未改任何代码与 schema，方案中标注的引脚、字段、状态机均属设计建议，实现切片落地时再行评审并在本台账逐项记账。本文不构成实现完成或实机验收证据。
+
+## INT-01-S1 · 设置切片一：息屏超时/待机亮度/提示音量（2026-11-23，仅主机测试）
+
+落地 [30 §1.1](30-interaction-feature-expansion-plan.md) P0 设置项 #1/#2/#4。配置契约以可选+默认值方式叠加（NVS 键保持 `pet_cfg/settings_v1`、`schemaVersion` 保持 1，避免旧档迁移孤档；[30 §1.2](30-interaction-feature-expansion-plan.md) 已记录该修正）：
+
+- `screen.timeoutS`（0=永不息屏，默认 60s）+ `screen.idleBrightness`（默认 40）：`ui_service` 维护 `last_activity_ms`，输入（BOOT/摇杆）、AI 收发活跃、消息展示与控制确认画面均视为活动；静置 ≥30s 降至待机亮度（两段亮度，不高于工作亮度），达到超时后关背光并跳过绘制，任一活动点亮并整帧重绘；MQTT/成长定时不受息屏影响。
+- `sfxVolume`（0-100，默认 25）：`svc_ai_agent` 新增 `sfx_volume_pct` 与 `pet_ai_agent_set_sfx_volume`，消息提示音（notification tone）改用该通道音量，与 TTS 人声 `volume` 分离；旧档解析缺失 `sfxVolume` 时沿用原 `volume`，提示音响度不变。`app.c` 两条 agent 启动路径与 `ui_service` settings_tick 均下发该值。
+- 管线同步：`device-config.schema.json` 增 `screen`/`sfxVolume`（非 required）→ `tools/schema_codegen.py` 再生成 `config_generated.h` 与 `pet-contracts.ts`；`config_codec.c` 解析（top 键集 10、screen 子键集、范围校验）与格式化输出新字段；`device-config.example.json` 更新。诊断 JSON 的 config 块原样内嵌新字段，服务端契约无顶层变更。
+
+验证（2026-11-23，本机 macOS）：`bash tools/ci/test_config_host.sh` 通过；`bash tools/ci/test_host.sh` 全部通过（新增 codec 往返/旧档兼容/越界拒绝/生成宏断言与 `pet_ai_agent_set_sfx_volume` 断言；唯一失败项 `test_build_matrix.py` 因本机 git 输出为中文、断言英文 'dubious ownership'，属环境既有 locale 问题，`LC_ALL=C` 下通过，与本切片无关，主分支同样存在）；`bash tools/ci/test_ui_host.sh` 10/10 通过。`ui_service.c`/`ai_startup.c`/`app.c` 未被主机测试编译，已用本地 stub 头 `-fsyntax-only -Wall -Wextra -Werror` 逐文件核查通过。未执行 ESP-IDF 目标编译与实机验证（本机无 idf 环境，待 CI/实机切片），息屏与提示音行为未在真机确认。

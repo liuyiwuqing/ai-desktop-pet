@@ -524,7 +524,7 @@ static bool notification_tick(agent_t *owner)
     }
     const uint32_t length=sound==PET_MESSAGE_SOUND_ALERT?5760:3840;
     int16_t pcm[PET_AUDIO_PLAYBACK_SAMPLES];
-    portENTER_CRITICAL(&status_lock);uint8_t volume=owner->status.volume_pct;portEXIT_CRITICAL(&status_lock);
+    portENTER_CRITICAL(&status_lock);uint8_t volume=owner->status.sfx_volume_pct;portEXIT_CRITICAL(&status_lock);
     size_t count=length-owner->tone_offset;if (count>PET_AUDIO_PLAYBACK_SAMPLES) count=PET_AUDIO_PLAYBACK_SAMPLES;
     for (size_t i=0;i<count;++i) {
         uint32_t at=owner->tone_offset+(uint32_t)i;
@@ -654,6 +654,7 @@ static bool valid_audio(const pet_audio_device_t *audio)
 esp_err_t pet_ai_agent_start(const pet_ai_agent_config_t *config)
 {
     if (config == NULL || !valid_audio(config->audio) || config->volume_pct > 100 ||
+        config->sfx_volume_pct > 100 ||
         (!config->notifications_only && (!config->transport.begin_turn || !config->transport.forward_pcm ||
         !config->transport.end_input || !config->transport.cancel_turn)) ||
         (config->notifications_only&&(config->frontend.open||config->frontend.detect_wake||config->frontend.classify_vad||config->frontend.preprocess)) ||
@@ -668,6 +669,7 @@ esp_err_t pet_ai_agent_start(const pet_ai_agent_config_t *config)
     (void)pet_audio_buffer_init(&owner->prebuffer,owner->prebuffer_pcm,PREBUFFER_CAPACITY_SAMPLES+PET_AUDIO_PLAYBACK_SAMPLES);
     owner->status.policy = config->initial_policy;
     owner->status.volume_pct = config->volume_pct;
+    owner->status.sfx_volume_pct = config->sfx_volume_pct;
     owner->status.voice_enabled = !config->notifications_only;
     owner->control_epoch = 1;
     owner->status.policy_pending = true;
@@ -781,6 +783,15 @@ esp_err_t pet_ai_agent_set_volume(uint8_t volume)
     agent_t *owner = available_agent();
     if (!owner) return ESP_ERR_INVALID_STATE;
     portENTER_CRITICAL(&status_lock); owner->status.volume_pct = volume; portEXIT_CRITICAL(&status_lock);
+    return ESP_OK;
+}
+
+esp_err_t pet_ai_agent_set_sfx_volume(uint8_t volume)
+{
+    if (volume > 100) return ESP_ERR_INVALID_ARG;
+    agent_t *owner = available_agent();
+    if (!owner) return ESP_ERR_INVALID_STATE;
+    portENTER_CRITICAL(&status_lock); owner->status.sfx_volume_pct = volume; portEXIT_CRITICAL(&status_lock);
     return ESP_OK;
 }
 

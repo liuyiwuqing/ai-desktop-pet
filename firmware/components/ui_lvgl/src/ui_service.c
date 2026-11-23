@@ -82,6 +82,8 @@ typedef struct {
     bool settings_valid;
     uint32_t home_updated_ms, feedback_until_ms;
     const char *feedback;
+    uint32_t last_activity_ms; /* 输入/语音/消息事件驱动；驱动息屏超时与待机亮度。 */
+    bool screen_off;
 #if CONFIG_PET_EXT_LIGHT_SENSOR
     pet_ambient_filter_t ambient_filter;
     uint32_t ambient_sampled_ms;
@@ -144,9 +146,22 @@ static void flush(lv_display_t *display, const lv_area_t *area, uint8_t *pixels)
     lv_display_flush_ready(display);
 }
 
+#define PET_UI_IDLE_DIM_MS 30000u /* 静置该时长后降到待机亮度（息屏超时之外的两段亮度）。 */
+
+/* 任一交互事件点亮息屏并重置静置计时；幂等，可在循环内多处调用。 */
+static void screen_activity(ui_context_t *ui)
+{
+    ui->last_activity_ms = now_ms();
+    if (ui->screen_off) {
+        ui->screen_off = false;
+        ui->home_rendered = false; /* 唤醒后强制整帧重绘。 */
+    }
+}
+
 static uint8_t brightness(ui_context_t *ui)
 {
     const uint8_t requested = ui->settings.config.brightness;
+    uint8_t applied = requested;
 #if CONFIG_PET_EXT_LIGHT_SENSOR
     const uint32_t now = now_ms();
     if (requested && ui->panel->ambient_read &&
@@ -158,15 +173,25 @@ static uint8_t brightness(ui_context_t *ui)
         ui->ambient_sampled = true;
         ui->ambient_sampled_ms = now;
     }
-    return pet_ambient_brightness(&ui->ambient_filter, ui->ambient_raw,
+    applied = pet_ambient_brightness(&ui->ambient_filter, ui->ambient_raw,
         ui->ambient_valid, now, requested);
 #else
-    return requested;
+    (void)requested;
 #endif
+    /* 两段亮度：静置超过 30s 后降至待机亮度（不把画面调亮过工作亮度）。 */
+    if (!ui->screen_off && now_ms() - ui->last_activity_ms >= PET_UI_IDLE_DIM_MS) {
+        const uint8_t idle = ui->settings.config.screen.idle_brightness;
+        if (idle < applied) applied = idle;
+    }
+    return applied;
 }
 
 static bool refresh(ui_context_t *ui)
 {
+    if (ui->screen_off) { /* 息屏：跳过绘制只保持背光关闭；唤醒由 screen_activity 触发整帧重绘。 */
+        ui->panel->backlight(0);
+        return true;
+    }
     const uint8_t applied_brightness = brightness(ui);
     ui->frame_failed = false;
     ui->strips = 0;
@@ -342,6 +367,7 @@ static void settings_tick(ui_context_t *ui, uint32_t epoch)
     if (ui->settings_token) dnd = ui->dnd; /* 保存期间保留用户刚提交的安全策略。 */
     if (ui->ai_available) {
         (void)pet_ai_agent_set_volume(ui->settings.config.volume);
+        (void)pet_ai_agent_set_sfx_volume(ui->settings.config.sfx_volume);
         if (ui->settings_valid) (void)pet_ai_agent_set_dnd(dnd);
     }
 #endif
@@ -382,6 +408,7 @@ static bool control_modal(ui_context_t *ui,bool pressed,const pet_message_view_t
     unsigned remaining=control.expires_ms>now?(unsigned)((control.expires_ms-now+999)/1000):0;
     pet_control_view_ui_show(&ui->control_view,control.request.device,control.request.argument,remaining);
     ui->control_was_visible=true;
+    screen_activity(ui); /* 控制确认画面属于交互事件，保持常亮。 */
 #if PET_UI_AI
     (void)pet_ai_agent_set_interrupted(true);
     ui->voice_panel=false;
@@ -565,6 +592,10 @@ static void ui_task(void *arg)
     for (;;) {
         const uint32_t epoch = ui->clock != NULL ? ui->clock() : 0;
         settings_tick(ui, epoch);
+        /* 息屏超时：无输入/语音/消息事件达到 screen.timeoutS 后关背光（0=永不）。 */
+        if (!ui->screen_off && ui->settings.config.screen.timeout_s &&
+            now_ms() - ui->last_activity_ms >= (uint32_t)ui->settings.config.screen.timeout_s * 1000u)
+            ui->screen_off = true;
         pet_message_hub_purge_expired(epoch);
         const size_t count = pet_message_hub_snapshot(ui->snapshot, PET_MESSAGE_QUEUE_CAPACITY);
         for (size_t i = 0; i < count; ++i)
@@ -572,6 +603,7 @@ static void ui_task(void *arg)
                 ui->snapshot[i].duration_ms = pet_message_display_duration_ms(
                     ui->snapshot[i].duration_ms, ui->settings.config.message.duration_ms);
         const bool pressed = ui->button->pressed();
+        if (pressed) screen_activity(ui);
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
         const bool navigation_was_valid = ui->navigation_sample.valid;
         ui->navigation_sample = (pet_navigation_sample_t){0};
@@ -580,6 +612,7 @@ static void ui_task(void *arg)
             ui->navigation_sample.valid = false;
             if (navigation_was_valid) ESP_LOGW(TAG, "joystick sample failed; using BOOT until neutral");
         }
+        if (ui->navigation_sample.valid && ui->navigation_sample.pressed) screen_activity(ui);
         const bool navigation_lost = navigation_was_valid && !ui->navigation_sample.valid;
 #endif
 #if CONFIG_PET_EXT_DEVICE_CONTROL
@@ -605,6 +638,7 @@ static void ui_task(void *arg)
 #endif
 #if PET_UI_AI
         ai_snapshot(ui);
+        if (ui->ai_available && ai_active(&ui->ai_snapshot)) screen_activity(ui);
         ui->growth_input.voice_active = ui->voice_panel;
         ui->growth_input.voice_ready = ui->ai_available && ui->ai_snapshot.voice_enabled && ui->ai_snapshot.ready && !ui->ai_snapshot.faulted;
         const bool voice_focused = ui->growth_input.holding ||
@@ -681,6 +715,7 @@ static void ui_task(void *arg)
 #endif
         if (selected < 0 && direction != PET_NAV_NONE)
             selected = pet_growth_input_navigate(&ui->growth_input, direction, navigation_blocked, now_ms());
+        if (menu_pressed || direction != PET_NAV_NONE || selected >= 0) screen_activity(ui);
 #if CONFIG_PET_SETUP_PORTAL_ENABLED
         if (selected==PET_GROWTH_MENU_NETWORK) {
             esp_err_t setup=pet_setup_request();
@@ -728,6 +763,7 @@ static void ui_task(void *arg)
         }
 #endif
         if (action.kind == PET_MESSAGE_SCREEN_SHOW) {
+            screen_activity(ui); /* 消息展示点亮屏幕并保持常亮。 */
 #if CONFIG_PET_MODULE_CLIMATE_ENABLED
             ui->climate_panel=false;lv_obj_add_flag(ui->climate_view.root,LV_OBJ_FLAG_HIDDEN);
 #endif
@@ -766,8 +802,8 @@ static void ui_task(void *arg)
                 ESP_LOGW(TAG, "frame failed: generation=%" PRIu32, action.generation);
             if (ui->view.missing_glyphs > 0)
                 ESP_LOGW(TAG, "replaced %u unsupported glyphs", ui->view.missing_glyphs);
-        } else if (action.kind == PET_MESSAGE_SCREEN_HIDE ||
-                   (ui->presenter.id[0] == '\0' && idle_count != count)) {
+        } else if ((action.kind == PET_MESSAGE_SCREEN_HIDE ||
+                   (ui->presenter.id[0] == '\0' && idle_count != count)) && !ui->screen_off) {
             idle(ui, count);
             idle_count = count;
         }
@@ -790,6 +826,7 @@ static void ui_task(void *arg)
             }
         }
         if (ui->presenter.visible) {
+            screen_activity(ui); /* 消息可见期间保持常亮。 */
             privacy_badge(ui);
             pet_message_view_ui_tick(&ui->view, now_ms());
             pet_message_view_ui_scroll(&ui->view, now_ms());
@@ -799,12 +836,13 @@ static void ui_task(void *arg)
             }
         }
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
-        if (ui->presenter.id[0] == '\0' &&
+        if (ui->presenter.id[0] == '\0' && !ui->screen_off &&
             (now_ms() - ui->home_updated_ms >= (voice_focused ? 100u : 200u) ||
              was_menu != ui->growth_input.menu || was_selection != ui->growth_input.selection || selected >= 0))
             idle(ui, (uint8_t)count);
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
-        else if (pet_growth_view_ui_tick(&ui->growth_view, now_ms(), ui->presenter.id[0] == '\0'))
+        else if (!ui->screen_off &&
+                 pet_growth_view_ui_tick(&ui->growth_view, now_ms(), ui->presenter.id[0] == '\0'))
             ui->home_rendered = refresh(ui);
 #endif
 #endif
