@@ -1,6 +1,6 @@
 # ACC-01 生产部署与数据库迁移执行计划
 
-2026-11-20 制定，2026-11-23 执行 G0–G4。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，执行结果回填在各节末尾**：G0 发布物（3.4）、G1 只读盘点（5.3）、G2 备份与隔离恢复（6.2）、G4 离线导入与升级（8.5）。生产仍未接真实设备消息，HTTPS/SSE 完整验收与 24 小时观测未完成；第 13 节保留空白模板供后续变更使用。
+2026-11-20 制定，2026-11-23 执行 G0–G4。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，执行结果回填在各节末尾**：G0 发布物（3.4）、G1 只读盘点（5.3）、G2 备份与隔离恢复（6.2）、G4 离线导入与升级（8.5）。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器登录/权限页/重启持久性、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。
 
 ## 1. 目标、范围与完成判定
 
@@ -509,14 +509,14 @@ docker logs -f --tail 200 "$(docker ps -q \
 结果：
 
 - 首次重建 07:32:22Z 启动，12 s 进入 healthy；Flyway 从 V23 顺序执行 V24–V28，07:32:27Z 完成，5 个迁移全部成功。因首次 compose 客户端路径为容器内 `/w/...`，07:34 用宿主真实路径强制重建一次修正 `com.docker.compose.project.config_files` 标签；第二次启动显示 “No migration necessary”。
-- `flyway_schema_history` 最高 `installed_rank=28`，`bool_and(success)=t`；`deliveries` 6 行，`device_telemetry_samples` 147 行（升级窗口内设备新增 1 行，非迁移造成）。
+- `flyway_schema_history` 最高 `installed_rank=28`，`bool_and(success)=t`；`deliveries` 6 行，`device_telemetry_samples` 147 行（迁移未改变行数；第 147 条是 CORE 启动时补入库的保留遥测，`observed_at=2026-11-18 16:43:37Z`、`received_at=2026-11-23 07:32:30.495093Z`，设备 `dodo-1` 自 2026-11-18 16:43:29Z 后未在线，不是升级窗口内的实时样本）。
 - 运行镜像 ID `sha256:a8f98e…`，`65534:65534`、只读根、1 GiB、`cap_drop: ALL`、重启计数 0。
 - 会话卷 `nexus-production_console-sessions` 已创建；容器内 `/var/lib/nexus/sessions` 为 `nobody:nogroup 700`，写入探测成功。
 - `https://pet.muyin.site/` 返回 200（管理台登录页），`/api/console/session` 与 `/api/v1/deliveries` 返回 401。
 - Mosquitto 日志显示 CORE 以 `nexus-core` 重新连接（172.20.0.2:49224），旧连接已断开。
 - 资源：宿主 available 约 1.0 GiB，根分区剩余约 14 GB。
 
-边界：本次是既有安装升级，不导入 init 镜像、不执行首次初始化；未重建 PostgreSQL/Mosquitto；未发送真实消息；未做 24 小时观测；设备 MQTT 改指 `pet.muyin.site:8883`、HTTPS/SSE 完整验收与实机联调仍待执行。回滚若跨越 V28，必须同时恢复 G2 备份，不能只换回旧镜像。
+边界：本次是既有安装升级，不导入 init 镜像、不执行首次初始化；未重建 PostgreSQL/Mosquitto；未发送真实消息；未做 24 小时观测；HTTPS/SSE 运行时检查见 10.2.1，设备 MQTT 改指 `pet.muyin.site:8883` 与实机联调仍待执行。回滚若跨越 V28，必须同时恢复 G2 备份，不能只换回旧镜像。
 
 ## 9. G5 数据库迁移验证
 
@@ -596,6 +596,23 @@ test -n "$CORE_ID" && test -n "$PG_ID"
 
 管理员令牌读取必须在受控终端完成，例如 `read -rsp 'Admin token: ' TOKEN; echo`，用完 `unset TOKEN`；不要把 `core.env` 输出到屏幕、日志或命令历史。
 
+### 10.2.1 G6 运行时检查（2026-11-23）
+
+在 G4 升级完成后执行；未发送真实消息，未修改 OpenResty 配置。
+
+| 检查 | 实测 |
+| --- | --- |
+| 状态 | 管理员令牌请求 `/api/v1/status` 返回 `{"mqttError":"","schemaVersion":1,"database":"ready","mqtt":"ready"}` |
+| 迁移 | `flyway_schema_history` 最高 V28，`failed=0` |
+| HTTPS | `GET https://pet.muyin.site/` 200（管理台 SPA）；`HEAD /` 401；HTTP 301 跳 HTTPS；HSTS `max-age=31536000` |
+| SSE | `/api/v1/events` HTTP/2 200、`content-type: text/event-stream`、`cache-control: no-store`、`x-nexus-role: admin`；`curl -N` 6 秒收到 `event:ready` 与多条 `event:heartbeat`，body 491 B，未发现代理缓冲 |
+| 端口 | `127.0.0.1:18088` 仅回环；5432 无公网监听 |
+| MQTT TLS | CN `pet.muyin.site`，issuer `NEXUS Local CA`，有效期至 2029-02-17，SAN 含 `pet.muyin.site`、`mqtt.muyin.site`、`mqtt`、`localhost`、`127.0.0.1` |
+
+SSE 的 `X-Accel-Buffering: no` 由 CORE `ConsoleSetupController` 设置，OpenResty 将其作为内部控制头消费、不转发给客户端；未额外配置 `proxy_buffering off` 时仍能持续收到事件，因此不修改 `pet.conf`/`root.conf`。
+
+未执行：浏览器管理员令牌登录、权限页签发、重启 CORE 后的会话持久性；设备 `dodo-1` 自 2026-11-18 16:43:29Z 后离线，`pet.muyin.site:8883` 的真实设备连接与遥测无法验证，不记为通过。24 小时观测见 10.3。
+
 ### 10.3 24 小时观测
 
 - 每 15 分钟检查一次容器健康与 `/api/v1/status`；至少覆盖一个业务低峰。
@@ -603,6 +620,14 @@ test -n "$CORE_ID" && test -n "$PG_ID"
 - 记录一次异机备份完成与校验结果。
 - 不启用真实清理、OTA、AI、Halo、Bridge、成长同步；这些默认关闭，ACC-01 不改变默认值。
 - 实机在线时长、声学、断网掉电与传感器稳定性属于 ACC-02，不以 24 小时管理台观测替代。
+
+### 10.3.1 观测执行状态（2026-11-23）
+
+- 观测脚本 `~/nexus-observe/observe.sh`（`nexus-deploy`，`nohup setsid` 后台，PID 937021），日志 `~/nexus-observe/observe-20261123T074228Z.ndjson`，07:42:28Z 启动，每 900 s 一条，计划到 2026-11-24 07:42Z。
+- 每条记录：CORE/PostgreSQL/Mosquitto 状态与重启计数、`/api/v1/status`、根分区可用量与使用率、PostgreSQL 连接数、CORE 内存、16 分钟内 MQTT 重连数、access.log 最近 200 行 5xx 数、HTTPS/MQTT 证书到期时间。
+- 首条样本：三服务正常（CORE/PostgreSQL healthy、MQTT running，重启 0），status `database=ready`、`mqtt=ready`，根分区可用 16,356,420 kB（已用 81%），PostgreSQL 连接 12，CORE 223.7 MiB/1 GiB，MQTT 重连 0，5xx 0，HTTPS 证书至 2027-02-13，MQTT 证书至 2029-02-17。
+- 异机备份：服务器 `~/nexus-backups/acc01-observe-20261123T074441Z.dump`，107,230 B，SHA-256 `258df4d00bc085f442d030389afc33f7c92875f050723b7931a89936e1f05998`，`pg_restore --list` 含 42 个 TABLE DATA 段；已复制到观测工作站 `~/.nexus-evidence/acc01/`，本地哈希一致。
+- 状态：观测进行中，24 小时未满，不记为通过；设备 `dodo-1` 仍离线，实机 MQTT/遥测不由本观测替代。
 
 ## 11. 回滚
 

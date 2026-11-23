@@ -134,10 +134,10 @@
 | OVERVIEW-STAT-DRILL-01 | 概览在线/离线计数直达设备筛选 | 软件本地已验证：顶部「设备在线/设备离线」数字改为按钮，复用设备页 `state=online/offline` 筛选，与告警钻取同样清掉单设备选择与顶栏搜索；数字排版不变，只有悬停/聚焦显示下划线，读屏名称带筛选说明；CORE check/build、04 概览浏览器 149 项（新增 8 项）通过；见文末 | 计数仍按整张设备表统计；不新增接口或筛选维度；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | OVERVIEW-STAT-DRILL-02 | 概览停用计数直达已停用筛选 | 软件本地已验证：设备总数说明行里的「停用 N 台」改为按钮，钻取设备页 `state=disabled`，与在线/离线计数共用同一套复位和数字样式；停用只按 `!enabled`，不混入启用但离线设备；CORE check/build、04 概览浏览器 157 项通过；见文末 | 计数仍按整张设备表统计；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
 | DEVICE-DISCONNECT-EXPORT-01 | 最近断线导出 CSV | 软件本地已验证：「最近断线」底部新增导出按钮，点击按同一只读接口重取 `limit=100`（列表仍 20 条），浏览器生成含记录时间/断线时刻/原因码/原因名称的 CSV（UTF-8 BOM + CRLF）；读取失败或保留期内无记录时保留列表并提示，不下载空文件；CORE check/build、04 管理台浏览器 102 项（新增 4 项）通过；见文末 | 导出上限 100 条，仍是读时快照；原因名称由管理台映射，未知码写数字；未连真实 CORE/PostgreSQL/Broker/设备；推送与 CI 见文末 |
-| ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C；2026-11-20 制定[执行计划](29-acc01-production-deployment-plan.md)，2026-11-23 执行 G0–G4；G1 只读盘点确认现有 `nexus-production`（CORE `230c809`、PostgreSQL 17、Mosquitto 2.0.22），数据库 V23；G2 备份（94,826 B）与隔离恢复（6/146 行一致）通过；G4 因 GHCR 拉取缓慢改为本地导出 tar→SCP→`docker load`→本地 tag `acc01-d2711f7`，8 层 diffID 与 `revision=d2711f7` 一致，编排改用本地 tag + `pull_policy: never` 并补 `console-sessions` 卷；CORE 已升级并 healthy，Flyway V24–V28 全部成功（最高 V28），`deliveries` 6 行、`device_telemetry_samples` 147 行，API 401、MQTT 重连；未发送真实消息、未做 24h 观测 | [ACC-01 执行记录](29-acc01-production-deployment-plan.md)、[1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
+| ACC-01 | 真实云端与常在线部署 | 用户已提供 Debian/1Panel 部署信息与域名；新版镜像交付见 CONSOLE-12-C；2026-11-20 制定[执行计划](29-acc01-production-deployment-plan.md)，2026-11-23 执行 G0–G4；G1 只读盘点确认现有 `nexus-production`（CORE `230c809`、PostgreSQL 17、Mosquitto 2.0.22），数据库 V23；G2 备份（94,826 B）与隔离恢复（6/146 行一致）通过；G4 因 GHCR 拉取缓慢改为本地导出 tar→SCP→`docker load`→本地 tag `acc01-d2711f7`，8 层 diffID 与 `revision=d2711f7` 一致，编排改用本地 tag + `pull_policy: never` 并补 `console-sessions` 卷；CORE 已升级并 healthy，Flyway V24–V28 全部成功（最高 V28），`deliveries` 6 行、`device_telemetry_samples` 147 行（第 147 条为 CORE 启动补入库的 11-18 保留遥测，设备已离线，非升级窗口实时样本），API 401、MQTT 重连；G6 运行时检查：status 双 ready、SSE 200/ready/heartbeat、HTTPS 200/HSTS、MQTT TLS 至 2029；未发送真实消息、24h 观测进行中、未实机联调 | [ACC-01 执行记录](29-acc01-production-deployment-plan.md)、[1Panel 部署](27-1panel-quickstart.md)、[部署预检](../deployment/server-release.md)、[云端步骤](12-cloud-interop.md) |
 | ACC-02 | 实机及稳定性 | HW-04 完成基础烧录与显示/BOOT 菜单/提示音/语音录入回放；尚无联网语音与长期稳定性结论 | P1–P7 完整场景、NVS 掉电、真实 OTA/回滚、24h/7d 仍待验收，见 [07](07-roadmap-acceptance.md) |
 
-04 当前版本 `0.4.0-dev`、CORE `0.1.0-SNAPSHOT`，均为开发版本；目标机 `nexus-production` 已于 2026-11-23 离线升级到 CORE `d2711f7`（本地 tag `acc01-d2711f7`，Flyway V28），生产消息、HTTPS/SSE 完整验收与实机联调仍无结论。误回退的 22 文件已恢复；覆盖来源未查明，见 [17](17-voice-bridge-regression.md)，不把恢复成功写成原因调查完成。
+04 当前版本 `0.4.0-dev`、CORE `0.1.0-SNAPSHOT`，均为开发版本；目标机 `nexus-production` 已于 2026-11-23 离线升级到 CORE `d2711f7`（本地 tag `acc01-d2711f7`，Flyway V28），生产消息、浏览器登录/权限页/重启持久性、24 小时观测与实机联调仍无结论。误回退的 22 文件已恢复；覆盖来源未查明，见 [17](17-voice-bridge-regression.md)，不把恢复成功写成原因调查完成。
 
 ## 每项工作必须闭环
 
@@ -1716,4 +1716,14 @@ ACC-01 一直停在“用户已提供 Debian/1Panel 与域名、尚未连接目�
 
 编排仅改 CORE 四处（本地 tag、禁止拉取、`NEXUS_AUTH_SESSION_DIRECTORY`、`console-sessions` 卷），旧文件备份到 `/home/nexus-deploy/backups/`，新旧 SHA-256 记录在[执行计划](29-acc01-production-deployment-plan.md)。`nexus-deploy` 无免密 sudo 但属 docker 组，使用一次性 root 容器挂载宿主 socket、docker CLI 与 compose 插件执行 `docker compose ... up -d --no-deps --force-recreate core`；只读确认 1Panel `composes` 表只存路径不存 YAML，直接改文件不会产生第二份编排。
 
-CORE 首次重建 12 s healthy，Flyway V24–V28 于 07:32:27Z 全部成功；因首次 compose 客户端路径为容器内路径，随后用宿主真实路径强制重建一次修正项目标签，第二次启动无新迁移。运行镜像 ID `sha256:a8f98e…`，`65534:65534`、只读根、1 GiB；会话卷 `nexus-production_console-sessions` 属主 `nobody:nogroup 700` 且写入成功；`deliveries` 6 行、`device_telemetry_samples` 147 行（升级窗口设备新增 1 行）；`/api/console/session` 与 `/api/v1/deliveries` 返回 401；Mosquitto 记录 CORE 重连。未发送真实消息、未做 24h 观测；回滚跨 V28 必须同时恢复 G2 备份。
+CORE 首次重建 12 s healthy，Flyway V24–V28 于 07:32:27Z 全部成功；因首次 compose 客户端路径为容器内路径，随后用宿主真实路径强制重建一次修正项目标签，第二次启动无新迁移。运行镜像 ID `sha256:a8f98e…`，`65534:65534`、只读根、1 GiB；会话卷 `nexus-production_console-sessions` 属主 `nobody:nogroup 700` 且写入成功；`deliveries` 6 行、`device_telemetry_samples` 147 行（第 147 条是 CORE 启动时补入库的保留遥测：`observed_at=2026-11-18 16:43:37Z`、`received_at=2026-11-23 07:32:30Z`；设备 `dodo-1` 最后在线 2026-11-18 16:43:29Z，之后离线，不是升级窗口内的实时样本）；`/api/console/session` 与 `/api/v1/deliveries` 返回 401；Mosquitto 记录 CORE 重连。未发送真实消息、未做 24h 观测；回滚跨 V28 必须同时恢复 G2 备份。
+
+## ACC-01-G6-01 · HTTPS/SSE/MQTT TLS 运行时检查（2026-11-23）
+
+G4 升级后执行，未发送真实消息、未修改 OpenResty 配置。管理员令牌请求 `/api/v1/status` 返回 `database=ready`、`mqtt=ready`、`mqttError` 为空；`flyway_schema_history` 最高 V28 且 `failed=0`。`GET https://pet.muyin.site/` 返回 200（管理台 SPA），`HEAD /` 返回 401，HTTP 自动 301 跳 HTTPS，响应含 HSTS `max-age=31536000`；`127.0.0.1:18088` 仅回环监听，5432 无公网监听。
+
+`/api/v1/events` 返回 HTTP/2 200、`content-type: text/event-stream`、`cache-control: no-store`、`x-nexus-role: admin`；`curl -N` 6 秒内收到 `event:ready` 与多条 `event:heartbeat`，body 491 B，未出现代理缓冲。CORE 设置的 `X-Accel-Buffering: no` 被 OpenResty 作为内部控制头消费、不转发给客户端，未额外添加 `proxy_buffering off`。
+
+MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 2029-02-17，SAN 含 `pet.muyin.site`、`mqtt.muyin.site`、`mqtt`、`localhost`、`127.0.0.1`。未执行：浏览器管理员令牌登录、权限页签发、重启 CORE 后的会话持久性；设备 `dodo-1` 自 2026-11-18 16:43:29Z 后离线，`pet.muyin.site:8883` 的真实设备连接与遥测无法验证，不记为通过。24 小时观测见[执行计划](29-acc01-production-deployment-plan.md) 10.3。
+
+同日 07:42:28Z 启动 24 小时观测（`~/nexus-observe/`，每 15 分钟一条，计划到 11-24 07:42Z）：首条样本三服务正常、status 双 ready、根分区 16,356,420 kB 可用（81%）、PostgreSQL 连接 12、CORE 223.7 MiB/1 GiB、MQTT 重连 0、5xx 0；并生成异机备份 `acc01-observe-20261123T074441Z.dump`（107,230 B，SHA-256 `258df4d…`，42 个 TABLE DATA 段），本地副本哈希一致。24 小时未满，不记为通过。
