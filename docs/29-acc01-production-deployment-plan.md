@@ -611,7 +611,7 @@ test -n "$CORE_ID" && test -n "$PG_ID"
 
 SSE 的 `X-Accel-Buffering: no` 由 CORE `ConsoleSetupController` 设置，OpenResty 将其作为内部控制头消费、不转发给客户端；未额外配置 `proxy_buffering off` 时仍能持续收到事件，因此不修改 `pet.conf`/`root.conf`。
 
-未执行：浏览器管理员令牌登录、权限页签发、重启 CORE 后的会话持久性；设备 `dodo-1` 自 2026-11-18 16:43:29Z 后离线，`pet.muyin.site:8883` 的真实设备连接与遥测无法验证，不记为通过。24 小时观测见 10.3。
+会话与重启：`POST /api/v1/session`（`remember=true`）返回 200、`role=admin`、`persisted=true`、到期 2026-11-23T15:46:05Z；带 Cookie `GET /api/v1/session` 200，无 Cookie 401。07:46:12Z 主动重启 CORE 做持久性检查，14 s 后 healthy；Cookie 仍返回 200 且到期时间不变，MQTT 于 07:46:20Z 重连，`/api/v1/status` 双 ready。本次重启是有意验收，观测日志在该时刻后使用新的容器启动时间。未执行：浏览器 UI 登录、权限页签发；设备 `dodo-1` 自 2026-11-18 16:43:29Z 后离线，`pet.muyin.site:8883` 的真实设备连接与遥测无法验证，不记为通过。24 小时观测见 10.3。
 
 ### 10.3 24 小时观测
 
@@ -627,6 +627,7 @@ SSE 的 `X-Accel-Buffering: no` 由 CORE `ConsoleSetupController` 设置，OpenR
 - 每条记录：CORE/PostgreSQL/Mosquitto 状态与重启计数、`/api/v1/status`、根分区可用量与使用率、PostgreSQL 连接数、CORE 内存、16 分钟内 MQTT 重连数、access.log 最近 200 行 5xx 数、HTTPS/MQTT 证书到期时间。
 - 首条样本：三服务正常（CORE/PostgreSQL healthy、MQTT running，重启 0），status `database=ready`、`mqtt=ready`，根分区可用 16,356,420 kB（已用 81%），PostgreSQL 连接 12，CORE 223.7 MiB/1 GiB，MQTT 重连 0，5xx 0，HTTPS 证书至 2027-02-13，MQTT 证书至 2029-02-17。
 - 异机备份：服务器 `~/nexus-backups/acc01-observe-20261123T074441Z.dump`，107,230 B，SHA-256 `258df4d00bc085f442d030389afc33f7c92875f050723b7931a89936e1f05998`，`pg_restore --list` 含 42 个 TABLE DATA 段；已复制到观测工作站 `~/.nexus-evidence/acc01/`，本地哈希一致。
+- 07:46:12Z 为验证会话持久性主动重启 CORE 一次，14 s 恢复，MQTT 07:46:20Z 重连，status 双 ready；该时刻是计划内中断，后续样本使用新的容器启动时间。
 - 状态：观测进行中，24 小时未满，不记为通过；设备 `dodo-1` 仍离线，实机 MQTT/遥测不由本观测替代。
 
 ## 11. 回滚
