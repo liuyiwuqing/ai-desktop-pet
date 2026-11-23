@@ -89,6 +89,7 @@ typedef struct {
     const char *feedback;
     uint32_t last_activity_ms; /* 输入/语音/消息事件驱动；驱动息屏超时与待机亮度。 */
     bool screen_off;
+    bool focus_running; /* 专注陪伴值守：运行中立即降待机亮度并抑制普通消息提示音。 */
 #if CONFIG_PET_EXT_LIGHT_SENSOR
     pet_ambient_filter_t ambient_filter;
     uint32_t ambient_sampled_ms;
@@ -189,8 +190,10 @@ static uint8_t brightness(ui_context_t *ui)
 #else
     (void)requested;
 #endif
-    /* 两段亮度：静置超过 30s 后降至待机亮度（不把画面调亮过工作亮度）。 */
-    if (!ui->screen_off && now_ms() - ui->last_activity_ms >= PET_UI_IDLE_DIM_MS) {
+    /* 两段亮度：静置超过 30s 后降至待机亮度（不把画面调亮过工作亮度）；
+     * 专注陪伴值守期间不等静置，立即降为待机亮度（消息展示时保持工作亮度可读）。 */
+    if (!ui->screen_off && ui->presenter.id[0] == '\0' && (ui->focus_running ||
+        now_ms() - ui->last_activity_ms >= PET_UI_IDLE_DIM_MS)) {
         const uint8_t idle = ui->settings.config.screen.idle_brightness;
         if (idle < applied) applied = idle;
     }
@@ -528,10 +531,22 @@ static void handle_selection(ui_context_t *ui, int selected, uint32_t epoch)
     }
 #endif
     if (selected >= PET_GROWTH_MENU_FOCUS && selected <= PET_GROWTH_MENU_FOCUS_CANCEL) {
-        esp_err_t focus = selected == PET_GROWTH_MENU_FOCUS ? pet_focus_begin(epoch) :
-            selected == PET_GROWTH_MENU_FOCUS_PAUSE ? pet_focus_pause() :
-            selected == PET_GROWTH_MENU_FOCUS_RESUME ? pet_focus_resume() : pet_focus_stop();
-        feedback(ui, focus == ESP_OK ? "专注状态已更新" : "操作未完成，请检查计时和对时", false);
+        esp_err_t focus;
+        const char *text;
+        if (selected == PET_GROWTH_MENU_FOCUS) {
+            focus = pet_focus_begin(epoch);
+            text = "专注开始，宠物陪你值守";
+        } else if (selected == PET_GROWTH_MENU_FOCUS_PAUSE) {
+            focus = pet_focus_pause();
+            text = "专注已暂停";
+        } else if (selected == PET_GROWTH_MENU_FOCUS_RESUME) {
+            focus = pet_focus_resume();
+            text = "专注继续";
+        } else {
+            focus = pet_focus_stop();
+            text = "专注已取消";
+        }
+        feedback(ui, focus == ESP_OK ? text : "操作未完成，请检查计时和对时", false);
         return;
     }
     if (selected == PET_MENU_MESSAGES_BROWSE) {
@@ -853,6 +868,12 @@ static void ui_task(void *arg)
     for (;;) {
         const uint32_t epoch = ui->clock != NULL ? ui->clock() : 0;
         settings_tick(ui, epoch);
+        /* 专注陪伴状态：仅运行中触发值守亮度与提示音抑制；快照拿不到锁时保守视为不专注。 */
+        {
+            pet_focus_t focus;
+            ui->focus_running = pet_focus_snapshot(&focus) == ESP_OK &&
+                                focus.state == PET_FOCUS_RUNNING;
+        }
         /* 息屏超时：无输入/语音/消息事件达到 screen.timeoutS 后关背光（0=永不）。 */
         if (!ui->screen_off && ui->settings.config.screen.timeout_s &&
             now_ms() - ui->last_activity_ms >= (uint32_t)ui->settings.config.screen.timeout_s * 1000u)
@@ -1039,7 +1060,9 @@ static void ui_task(void *arg)
             if (pet_message_presenter_rendered(&ui->presenter, action.generation, rendered,
                                                now_ms())) {
 #if PET_UI_AI
+                /* 专注陪伴静音：普通消息不发声，紧急消息仍提醒；消息显示不受影响。 */
                 if (shown->state==PET_MESSAGE_STATE_RECEIVED && !ui->muted && !ui->dnd &&
+                    (!ui->focus_running || shown->priority==PET_MESSAGE_PRIORITY_CRITICAL) &&
                     shown->sound!=PET_MESSAGE_SOUND_NONE) (void)pet_ai_agent_notify(shown->sound,
                         shown->priority==PET_MESSAGE_PRIORITY_CRITICAL);
 #endif

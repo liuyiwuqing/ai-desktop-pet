@@ -1785,3 +1785,13 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 - 开关与兼容：`PET_AI_CONVERSATION`（默认 y，依赖 `PET_AI_XIAOZHI_ON_BOOT`），agent 配置 `conversation=false` 或会话配置 `conversation_window_ms=0` 保持旧的播完即回待机行为；离线语音模拟器状态/原因名表同步扩展，既有场景断言不变。
 
 验证（2026-11-23，本机 macOS）：新增 `test_ai_session::check_conversation_window/check_conversation_exits`（开窗动作与续轮、短噪声清零、窗口超时、按住说话续轮不重启采集、取消/静音/失败退出、轮次与总时长上限、配置缺轮次判无效）与 `test_ai_runtime::check_conversation_runtime_flow`（端口调用序：drain=停播/清音频/保持采集，续轮=仅 BEGIN，超时=停采集/清音频）；`LC_ALL=C bash tools/ci/test_host.sh` 全部通过（含既有 `test_ai_session`、`test_ai_runtime`、42 个 agent 场景与离线语音模拟器）、`test_ui_host.sh` 10/10、`test_config_host.sh`、`test_board_codegen.py` 通过。`test_build_matrix.py` 在本机因 git 中文输出与英文断言不匹配失败，`LC_ALL=C` 下通过，属已知环境问题与本次改动无关。目标侧改动文件已用本地 stub 在双 sdkconfig 下 `-fsyntax-only -Wall -Wextra -Werror` 核查通过。未执行 ESP-IDF 目标编译；真实多轮对话（不重唤醒且回答引用上文）、窗口期功耗与误续轮待实机验收。
+
+## INT-01-S5 · 专注陪伴结合息屏与静音（2026-11-23，仅主机测试）
+
+落地 [30 §6 #1](30-interaction-feature-expansion-plan.md) 专注陪伴模式（番茄钟）的 P0 增强，改动收敛在目标侧 `ui_service.c`，不改 `svc_focus` 契约、奖励结算与菜单结构：
+
+- 值守亮度（息屏联动）：专注 `RUNNING` 时主页立即降为待机亮度（`screen.idle_brightness`），不等 30 s 静置；消息展示期间（`presenter.id` 非空）保持工作亮度可读，息屏超时与按键唤醒行为不变；暂停/取消/完成后恢复常规亮度逻辑。
+- 提示音抑制（静音联动）：专注运行中普通消息不发声（消息照常展示与回执），紧急消息仍按既有 critical 提醒；不改变用户静音/DND 设置，AI 会话提示音门控沿用现状。专注状态每轮取 `pet_focus_snapshot`（trylock 拿不到时保守视为不专注，下轮恢复）。
+- 交互反馈：专注开始（“专注开始，宠物陪你值守”）/暂停/继续/取消反馈文案区分，失败提示保留原对时检查文案。
+
+验证（2026-11-23，本机 macOS）：`LC_ALL=C bash tools/ci/test_host.sh` 全部通过（含既有 `test_focus` 引擎回归）、`test_ui_host.sh` 10/10、`test_config_host.sh`、`test_board_codegen.py` 通过；`ui_service.c` 已用本地 stub 在双 sdkconfig 下 `-fsyntax-only -Wall -Wextra -Werror` 核查通过。未执行 ESP-IDF 目标编译；实机值守亮度观感、普通消息静音与紧急消息仍响、专注奖励结算联动待实机验收。
