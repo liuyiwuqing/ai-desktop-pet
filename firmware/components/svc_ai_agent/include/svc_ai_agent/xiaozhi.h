@@ -2,8 +2,9 @@
 
 #include "svc_ai_agent/session.h"
 
-/* 03 默认的 WebSocket v1：一条物理连接只承载一个本地轮次。 */
-#define PET_XZ_TEXT_BYTES 1024u
+/* 03 默认的 WebSocket v1：一条物理连接只承载一个本地轮次。
+ * 文本上限覆盖服务端音乐/天气等 MCP 与 LLM 大载荷，超限仍按协议拒绝。 */
+#define PET_XZ_TEXT_BYTES 4096u
 #define PET_XZ_CONTROL_BYTES 512u
 #define PET_XZ_PACKET_BYTES 1500u
 #define PET_XZ_SESSION_BYTES 64u

@@ -5,6 +5,7 @@
 
 #include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
+#include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
 #include "esp_websocket_client.h"
@@ -20,6 +21,7 @@
 #define TX_DEPTH 128u
 #define RX_DEPTH 32u
 #define RX_CHUNK_BYTES 512u
+#define AI_WSS_LOG_TAG "pet_xz_wss"
 #define HANDSHAKE_MS 5000u
 #define ASSEMBLY_MS 2000u
 #define PLAYBACK_BLOCK_MS 500u
@@ -70,8 +72,9 @@ struct wss_owner {
     uint8_t packet[PET_XZ_PACKET_BYTES];
     char control[PET_XZ_CONTROL_BYTES];
     char *tool_response;
-    /* 一个完整应用消息；SDK 分块和 RFC continuation 都只能顺序追加。 */
-    uint8_t message[PET_XZ_PACKET_BYTES];
+    /* 一个完整应用消息；SDK 分块和 RFC continuation 都只能顺序追加。
+     * 文本帧可到 PET_XZ_TEXT_BYTES（MCP 大载荷），二进制包保持 PET_XZ_PACKET_BYTES。 */
+    uint8_t message[PET_XZ_TEXT_BYTES];
     size_t message_bytes, frame_bytes, frame_expected;
     uint8_t message_opcode, frame_opcode;
     bool message_active, message_ready, frame_fin;
@@ -300,6 +303,8 @@ static bool close_turn(wss_owner_t *owner, bool abort)
 
 static void fail_turn(wss_owner_t *owner, esp_err_t error, bool codec_failed)
 {
+    ESP_LOGW(AI_WSS_LOG_TAG, "wss: turn %u failed err=%s codec_failed=%d",
+        (unsigned)owner->active_turn, esp_err_to_name(error), (int)codec_failed);
     owner->failure_turn = owner->active_turn;
     portENTER_CRITICAL(&status_lock);
     owner->status.last_error = error;
@@ -379,8 +384,12 @@ static esp_err_t assemble(wss_owner_t *owner, const rx_item_t *item)
         owner->frame_opcode = item->opcode;
         owner->frame_fin = item->fin;
         const size_t limit = owner->message_opcode == 1 ? PET_XZ_TEXT_BYTES : PET_XZ_PACKET_BYTES;
-        if ((size_t)item->payload_length > limit - owner->message_bytes)
+        if ((size_t)item->payload_length > limit - owner->message_bytes) {
+            ESP_LOGW(AI_WSS_LOG_TAG, "wss: message too large opcode=%u len=%d have=%u limit=%u",
+                owner->message_opcode, item->payload_length,
+                (unsigned)owner->message_bytes, (unsigned)limit);
             return ESP_ERR_INVALID_SIZE;
+        }
     } else if (!owner->message_active || owner->frame_opcode != item->opcode ||
                owner->frame_fin != item->fin || owner->frame_expected != (size_t)item->payload_length ||
                owner->frame_bytes != (size_t)item->offset) return ESP_ERR_INVALID_ARG;
@@ -403,11 +412,17 @@ static esp_err_t mcp_failed(wss_owner_t *owner,esp_err_t error)
 
 static esp_err_t receive_message(wss_owner_t *owner)
 {
-    pet_xz_result_t result;
+    pet_xz_result_t result = PET_XZ_IGNORED;
     if (owner->message_opcode == 1) {
         pet_xz_event_t event;
         result = pet_xz_receive_text(&owner->protocol, owner->binding.epoch,
             (const char *)owner->message, owner->message_bytes, &event);
+        /* IGNORED/STALE 是正常分类（表情、sentence_end、旧会话）；只记录真实异常。 */
+        if (result != PET_XZ_OK && result != PET_XZ_IGNORED && result != PET_XZ_STALE)
+            ESP_LOGW(AI_WSS_LOG_TAG, "wss: rx text result=%d bytes=%u head=%.*s",
+                (int)result, (unsigned)owner->message_bytes,
+                (int)(owner->message_bytes < 120 ? owner->message_bytes : 120),
+                (const char *)owner->message);
         if (result == PET_XZ_OK && event.kind == PET_XZ_EVENT_HELLO) {
             size_t bytes = 0;
             result = pet_xz_start_input(&owner->protocol, owner->binding.epoch,
@@ -419,6 +434,8 @@ static esp_err_t receive_message(wss_owner_t *owner)
         } else if (result == PET_XZ_OK && event.kind == PET_XZ_EVENT_RESPONSE_BEGIN) {
             owner->response_pending = true;
         } else if (result==PET_XZ_OK && event.kind==PET_XZ_EVENT_TOOL && tools_handler) {
+            ESP_LOGI(AI_WSS_LOG_TAG, "wss: mcp request epoch=%u bytes=%u",
+                event.epoch, (unsigned)strlen(event.rpc));
             portENTER_CRITICAL(&status_lock);
             ++owner->status.mcp_received;
             portEXIT_CRITICAL(&status_lock);
@@ -445,7 +462,12 @@ static esp_err_t receive_message(wss_owner_t *owner)
         } else if (result==PET_XZ_OK && (event.kind==PET_XZ_EVENT_TRANSCRIPT || event.kind==PET_XZ_EVENT_REPLY)) {
             (void)pet_ai_agent_text(event.turn_id,event.kind==PET_XZ_EVENT_TRANSCRIPT ?
                 PET_AI_TEXT_USER : PET_AI_TEXT_ASSISTANT,event.text);
-        } else if (result == PET_XZ_OK && event.kind == PET_XZ_EVENT_REMOTE_FAILED) return ESP_FAIL;
+        } else if (result == PET_XZ_OK && event.kind == PET_XZ_EVENT_REMOTE_FAILED) {
+            ESP_LOGW(AI_WSS_LOG_TAG, "wss: remote failed: %.*s",
+                (int)(owner->message_bytes < 120 ? owner->message_bytes : 120),
+                (const char *)owner->message);
+            return ESP_FAIL;
+        }
     } else {
         result = pet_xz_receive_audio(&owner->protocol, owner->binding.epoch,
                                       owner->message, owner->message_bytes);

@@ -6,7 +6,7 @@
 
 实现为小智 WebSocket v1，头字段 Authorization/Protocol-Version/Device-Id/Client-Id，Opus 上行 16 kHz、下行 24 kHz、mono/60 ms。hello 仅在正式注册工具后声明 features.mcp；MCP 内层为 JSON-RPC 2.0，initialize 响应 protocolVersion=2024-11-05。基础形状已对照 [上游 WebSocket](https://github.com/78/xiaozhi-esp32/blob/main/docs/websocket.md)、[MCP 流程](https://github.com/78/xiaozhi-esp32/blob/main/docs/mcp-protocol.md)及 mcp_server.cc，实际供应商行为仍须联调。
 
-设备侧入站文本/RPC 上限 1024 字节，RPC id 为 1–4294967295 的整数；工具响应缓冲 8192 字节。设备没有实现 MCP 字符串/零 ID、流式 HTTP、分页工具发现、图片上传、云端重启或任意固件 URL。工具注册表很小且一次返回；不要把它当作通用 MCP Server。供应商如使用不同形状，应捕获脱敏协议证据后新增针对性兼容测试，不能放宽工具参数或取消权限门控来凑成功。
+设备侧入站文本/RPC 上限 4096 字节（覆盖服务端音乐/天气等 MCP 与 LLM 大载荷，超限整条拒绝并关闭本轮），RPC id 为 1–4294967295 的整数；工具响应缓冲 8192 字节。接收失败路径带 WARN 级协议日志（结果码、长度、消息头 120 字节）与轮次失败日志，便于按串口证据定位。设备没有实现 MCP 字符串/零 ID、流式 HTTP、分页工具发现、图片上传、云端重启或任意固件 URL。工具注册表很小且一次返回；不要把它当作通用 MCP Server。供应商如使用不同形状，应捕获脱敏协议证据后新增针对性兼容测试，不能放宽工具参数或取消权限门控来凑成功。
 
 默认注册 self.get_context/self.get_status/self.get_unread/self.focus；成长、温湿度与设备/舵机工具按编译开关出现。以 tools/list 为准，不假设扩展总可用。self.get_context 返回人设、当前状态和已经实际播放完成的最近对话；RAM 最多 8 轮及有界提取式摘要，不含消息正文、音频或凭据。静音/DND/中断、五分钟空闲与主动清除都会清除本地上下文，不能删除供应商历史。
 

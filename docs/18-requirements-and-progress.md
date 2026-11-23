@@ -1799,3 +1799,15 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 ### INT-01 远程 CI 补记（2026-11-23）
 
 切片 S3/S4/S5 推送后的远程 CI 在 default/full/voice/tones/duplex 五预设失败（off 通过）：根因是 S3 起 `ui_service.c` 在 `CONFIG_PET_MODULE_UI_ENABLED` 下新增 `#include "esp_app_desc.h"`，但 `ui_lvgl` 组件 CMakeLists 未声明 `esp_app_format` 依赖；主机 stub 语法检查覆盖不到 CMake include 路径，off 预设关闭 UI 因此未暴露。修复 `76400e5`（`PRIV_REQUIRES` 增加 `esp_app_format`）推送后，远程 CI [45172746240](https://github.com/liuyiwuqing/ai-desktop-pet/actions/runs/45172746240) 八个 job 全部成功；本机亦以 ESP-IDF v6.1 完成全部六预设构建（build-evidence 各目录）。教训：涉及组件依赖或新头文件的改动，推送前应本机跑至少一个含 UI 的目标预设构建，stub 语法检查不能替代。S3/S4/S5 的失败运行（45157984021/45163257944/45164745714）仅因该依赖缺失，主机测试结论不变。
+
+## INT-01-S6 · 小智协议大载荷放宽与失败诊断日志（2026-11-23，实机验收）
+
+实机验收 INT-01-S1–S5 时发现：天气/音乐等由小智服务端侧完成的请求触发“连接失败，麦克风已开启”，且唤醒对话中断。串口日志证据链：Wi-Fi/MQTT/SNTP/TLS 全部正常、WakeNet 正常触发、每轮说话正常发起 WSS 连接，失败点在服务端下发大文本时。根因：设备协议层入站文本上限 `PET_XZ_TEXT_BYTES 1024` 与 `bounded_json`/组装缓冲按 1024 截断，服务端音乐/天气的 MCP 与 LLM 大载荷整条被拒（`INVALID`），WSS 层按协议失败关闭本轮。
+
+修复（提交见台账末尾）：`PET_XZ_TEXT_BYTES` 1024→4096（`pet_xz_event_t.rpc` 同步扩大，worker 栈 40 KiB 足够；WSS 拥有者 `message` 缓冲按文本上限扩到 PSRAM 结构内），超限仍整条拒绝；`xiaozhi_wss.c` 新增诊断日志——轮次失败（`esp_err_to_name`）、接收异常（结果码/长度/消息头 120 字节，IGNORED/STALE 正常分类不打）、MCP 请求（epoch/字节数）、服务端主动失败（消息头）。`test_xiaozhi.c` 新增 `large_mcp_payload_boundary`：约 4 KB 的 `tools/call` 载荷完整解析为 `PET_XZ_EVENT_TOOL`，超限整条拒绝。
+
+验证（2026-11-23）：`LC_ALL=C bash tools/ci/test_host.sh` 全套通过（含新用例与 `test_ai_wss` 既有回归）；voice 预设 ESP-IDF v6.1 真实增量构建通过；烧录实测（用户操作 + 串口日志）：蚌埠五河县实时天气完整回复送达、音乐多轮对话（问歌名/报歌手/版权未收录提示）全程无“连接失败”、无轮次失败与协议异常日志，MCP `tools/call`（270/54/58 字节）正常往返。边界：音乐搜索结果由小智服务端决定（许嵩等版权缺失为服务侧行为，设备侧不改变）；“连接失败”横幅本身仍是设计内的传输失败提示；修复后的固件需长期观察其他大载荷场景。
+
+### INT-01 实机验收记录（2026-11-23）
+
+烧录 INT-01-S1–S5 修复版（voice 预设，`0x20000` 应用 3.59 MB，hash 校验通过）后用户实机操作与串口日志核对：开机 SNTP 约 37 s 同步（期间说话会因等待时间同步报连接失败，属启动窗口已知行为）；S4 连续对话、S5 专注陪伴（值守亮度/消息提示音抑制）、S3 两级菜单、S1 设置项的完整实机验收清单仍在进行，本节先记录 S6 修复与天气/音乐场景结论；三键（S2）未接线未验。

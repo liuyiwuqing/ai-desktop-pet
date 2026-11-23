@@ -350,6 +350,27 @@ static void truncation_and_pending_end(void)
     assert(pet_xz_peek_playback(&client, epoch, &chunk) == PET_XZ_NOT_READY);
 }
 
+static void large_mcp_payload_boundary(void)
+{
+    /* 服务端音乐/天气等 MCP 载荷可达数 KB：上限内必须完整送达，超限整条拒绝。 */
+    codec_boundary_t boundary = {0}; uint32_t epoch;
+    pet_xz_t client = waiting(&boundary, &epoch);
+    pet_xz_event_t event;
+    char text[PET_XZ_TEXT_BYTES + 128];
+    int n = snprintf(text, sizeof(text),
+        "{\"type\":\"mcp\",\"payload\":{\"method\":\"tools/call\",\"id\":7,"
+        "\"jsonrpc\":\"2.0\",\"params\":{\"name\":\"music_search\",\"arguments\":{\"songs\":[");
+    while (n < (int)PET_XZ_TEXT_BYTES - 96)
+        n += snprintf(text + n, 32, "{\"song\":\"s%05d\"},", n);
+    n += snprintf(text + n, sizeof(text) - (size_t)n, "{\"song\":\"end\"}]}}}}");
+    assert(n > 2048 && n <= (int)PET_XZ_TEXT_BYTES);
+    assert(pet_xz_receive_text(&client, epoch, text, (size_t)n, &event) == PET_XZ_OK);
+    assert(event.kind == PET_XZ_EVENT_TOOL && strstr(event.rpc, "music_search") &&
+           strstr(event.rpc, "\"end\""));
+    memset(text, 'x', sizeof(text));
+    assert(pet_xz_receive_text(&client, epoch, text, sizeof(text), &event) == PET_XZ_INVALID);
+}
+
 int main(void)
 {
     conversation_text();
@@ -358,6 +379,7 @@ int main(void)
     stale_connection_and_cancel();
     invalid_handshake_and_json();
     escaped_session_and_ignored_extensions();
+    large_mcp_payload_boundary();
     malformed_audio_and_codec_failures();
     encoded_packet_limit();
     truncation_and_pending_end();
