@@ -1775,7 +1775,7 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 
 验证（2026-11-23，本机 macOS）：`bash tools/ci/test_host.sh` 全部 C 测试通过，含新增 `test_menu_def`（页表结构/叶子动作/深度约束/动作唯一性）与按页模型重写的 `test_growth_input`（ROOT 门控跳过、子页进出与返回、RETURN/ABOUT/设置激活、30s 超时与计时刷新、voice_only 直达 AI 页、PTT 起止与取消、阻塞抢占、开机按住不执行）；`bash tools/ci/test_ui_host.sh` 10/10 通过（`test_message_view` 同步改为页索引并链接 menu_def/growth_input）；`tools/ci/test_config_host.sh` 通过。`ui_service.c`/`growth_view.c`/`ai_view.c`/`key_actions.c` 未被主机测试编译，已用本地 stub 头在“全功能开启（growth/AI/climate/setup/设备控制/三键）”与“仅 UI 最小配置”两种 sdkconfig 下 `-fsyntax-only -Wall -Wextra -Werror` 逐文件核查通过。未执行 ESP-IDF 目标编译；三键实体未接线，实机菜单导航与按键手感待接线后按 [27](27-hardware-and-input.md) 验收。
 
-## INT-01-S4 · 语音 M1 会话保持（AI_CONVERSATION，2026-11-23，仅主机测试）
+## INT-01-S4 · 语音 M1 会话保持（AI_CONVERSATION，2026-11-23，主机+实机验收）
 
 落地 [30 §5.2](30-interaction-feature-expansion-plan.md) M1 免唤醒多轮：
 
@@ -1784,9 +1784,9 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 - UI：`ai_view` 新增“继续对话”页（状态/页脚/电平条），`ai_snapshot` 会话期间保持语音面板、超时回待机关面板，`key_scene` 将 `CONVERSATION` 归入 AI 对话场景（A 短按结束、C 按住续说、C 长按静音），隐私徽标同步。
 - 开关与兼容：`PET_AI_CONVERSATION`（默认 y，依赖 `PET_AI_XIAOZHI_ON_BOOT`），agent 配置 `conversation=false` 或会话配置 `conversation_window_ms=0` 保持旧的播完即回待机行为；离线语音模拟器状态/原因名表同步扩展，既有场景断言不变。
 
-验证（2026-11-23，本机 macOS）：新增 `test_ai_session::check_conversation_window/check_conversation_exits`（开窗动作与续轮、短噪声清零、窗口超时、按住说话续轮不重启采集、取消/静音/失败退出、轮次与总时长上限、配置缺轮次判无效）与 `test_ai_runtime::check_conversation_runtime_flow`（端口调用序：drain=停播/清音频/保持采集，续轮=仅 BEGIN，超时=停采集/清音频）；`LC_ALL=C bash tools/ci/test_host.sh` 全部通过（含既有 `test_ai_session`、`test_ai_runtime`、42 个 agent 场景与离线语音模拟器）、`test_ui_host.sh` 10/10、`test_config_host.sh`、`test_board_codegen.py` 通过。`test_build_matrix.py` 在本机因 git 中文输出与英文断言不匹配失败，`LC_ALL=C` 下通过，属已知环境问题与本次改动无关。目标侧改动文件已用本地 stub 在双 sdkconfig 下 `-fsyntax-only -Wall -Wextra -Werror` 核查通过。未执行 ESP-IDF 目标编译；真实多轮对话（不重唤醒且回答引用上文）、窗口期功耗与误续轮待实机验收。
+验证（2026-11-23，本机 macOS）：新增 `test_ai_session::check_conversation_window/check_conversation_exits`（开窗动作与续轮、短噪声清零、窗口超时、按住说话续轮不重启采集、取消/静音/失败退出、轮次与总时长上限、配置缺轮次判无效）与 `test_ai_runtime::check_conversation_runtime_flow`（端口调用序：drain=停播/清音频/保持采集，续轮=仅 BEGIN，超时=停采集/清音频）；`LC_ALL=C bash tools/ci/test_host.sh` 全部通过（含既有 `test_ai_session`、`test_ai_runtime`、42 个 agent 场景与离线语音模拟器）、`test_ui_host.sh` 10/10、`test_config_host.sh`、`test_board_codegen.py` 通过。`test_build_matrix.py` 在本机因 git 中文输出与英文断言不匹配失败，`LC_ALL=C` 下通过，属已知环境问题与本次改动无关。目标侧改动文件已用本地 stub 在双 sdkconfig 下 `-fsyntax-only -Wall -Wextra -Werror` 核查通过。实机验收见下方「INT-01 实机验收记录」：续轮免唤醒、会话窗口交互与上文衔接经用户确认正常；窗口期功耗与误续轮率仍属长稳观察项。
 
-## INT-01-S5 · 专注陪伴结合息屏与静音（2026-11-23，仅主机测试）
+## INT-01-S5 · 专注陪伴结合息屏与静音（2026-11-23，主机+实机验收）
 
 落地 [30 §6 #1](30-interaction-feature-expansion-plan.md) 专注陪伴模式（番茄钟）的 P0 增强，改动收敛在目标侧 `ui_service.c`，不改 `svc_focus` 契约、奖励结算与菜单结构：
 
@@ -1794,7 +1794,7 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 - 提示音抑制（静音联动）：专注运行中普通消息不发声（消息照常展示与回执），紧急消息仍按既有 critical 提醒；不改变用户静音/DND 设置，AI 会话提示音门控沿用现状。专注状态每轮取 `pet_focus_snapshot`（trylock 拿不到时保守视为不专注，下轮恢复）。
 - 交互反馈：专注开始（“专注开始，宠物陪你值守”）/暂停/继续/取消反馈文案区分，失败提示保留原对时检查文案。
 
-验证（2026-11-23，本机 macOS）：`LC_ALL=C bash tools/ci/test_host.sh` 全部通过（含既有 `test_focus` 引擎回归）、`test_ui_host.sh` 10/10、`test_config_host.sh`、`test_board_codegen.py` 通过；`ui_service.c` 已用本地 stub 在双 sdkconfig 下 `-fsyntax-only -Wall -Wextra -Werror` 核查通过。未执行 ESP-IDF 目标编译；实机值守亮度观感、普通消息静音与紧急消息仍响、专注奖励结算联动待实机验收。
+验证（2026-11-23，本机 macOS）：`LC_ALL=C bash tools/ci/test_host.sh` 全部通过（含既有 `test_focus` 引擎回归）、`test_ui_host.sh` 10/10、`test_config_host.sh`、`test_board_codegen.py` 通过；`ui_service.c` 已用本地 stub 在双 sdkconfig 下 `-fsyntax-only -Wall -Wextra -Werror` 核查通过。实机验收见下方「INT-01 实机验收记录」：值守亮度、消息提示音抑制与暂停/取消经用户确认正常；专注奖励结算联动以既有 `svc_growth` 结算路径为准未单独复测。
 
 ### INT-01 远程 CI 补记（2026-11-23）
 
@@ -1810,4 +1810,4 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 
 ### INT-01 实机验收记录（2026-11-23）
 
-烧录 INT-01-S1–S5 修复版（voice 预设，`0x20000` 应用 3.59 MB，hash 校验通过）后用户实机操作与串口日志核对：开机 SNTP 约 37 s 同步（期间说话会因等待时间同步报连接失败，属启动窗口已知行为）；S4 连续对话、S5 专注陪伴（值守亮度/消息提示音抑制）、S3 两级菜单、S1 设置项的完整实机验收清单仍在进行，本节先记录 S6 修复与天气/音乐场景结论；三键（S2）未接线未验。
+烧录 INT-01-S1–S6 修复版（voice 预设，`0x20000` 应用 hash 校验通过）后实机验收：**S4 连续对话与 S5 专注陪伴经用户实机操作确认正常**（续轮免唤醒、会话窗口交互、专注值守亮度/提示音抑制/暂停取消均按设计工作）；串口日志交叉核对——多次 WakeNet 唤醒触发、每轮 WSS 连接与 TLS 均成功建立、无轮次失败与协议异常日志，S4 多轮连续会话与 S5 专注期间对话均未出现“连接失败”。已知瞬时异常：一次 `esp-aes` 内存分配失败导致 TLS 读错误并关闭单条连接（`E (557845) esp-aes: Failed to allocate memory`），紧随其后的会话与后续全部轮次正常，未影响验收结论，长期复现概率待观察。S1 设置项与 S3 两级菜单在实机上随手可用（用户经菜单进入专注），未单独逐项打分；S2 三键未接线未验。遗留：声学打断（M2）、专注时长设置化、三键接线验收单列。
