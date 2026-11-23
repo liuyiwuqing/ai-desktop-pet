@@ -32,7 +32,7 @@ idf_component_register(
     INCLUDE_DIRS "include"
     PRIV_INCLUDE_DIRS "src"
     REQUIRES "contracts" "pet_hal"
-    PRIV_REQUIRES "presentation" "svc_growth" "svc_ai_agent" "svc_config" "svc_climate" "svc_focus" "svc_message_hub" "svc_setup" "lvgl__lvgl" "esp_timer" "heap" "device_control"
+    PRIV_REQUIRES "presentation" "svc_growth" "svc_ai_agent" "svc_config" "svc_climate" "svc_focus" "svc_message_hub" "svc_setup" "lvgl__lvgl" "esp_timer" "heap" "device_control" "esp_app_format"
 )
 # 字体超过 LVGL 默认 64 KB 内存池；使用 IDF malloc（大块分配到 PSRAM）。
 # 固定配置也覆盖旧 sdkconfig，关闭 UI 后不残留无效的内存文件系统盘符。
