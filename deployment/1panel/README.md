@@ -71,7 +71,7 @@ docker compose -p nexus-production -f /root/docker-compose.yml ps
 
 edge 网络在项目名为 `nexus-production` 时通常叫 `nexus-production_edge`，以面板实际名称为准；bridge 容器内的 `127.0.0.1` 指向 OpenResty 自身。为 `/api/v1/events` 保留流式响应，关闭代理缓冲/缓存，读取超时至少 30 秒。
 
-用安全编辑器读取 `/etc/nexus/docker/core.env` 的 `NEXUS_ADMIN_TOKEN` 登录管理台，确认数据库和 MQTT 均为 `ready`。未带令牌访问 `/api/v1/status` 应返回 401。开放云安全组及主机防火墙的 80/443；需要接入设备时再开放 TCP 8883，并将 `mqtt.muyin.site` 直连解析到服务器。
+生产已切换为受保护文件模式：管理员令牌在 `/etc/nexus/docker/core-auth/tokens.json` 的 `admin.current.token`，`core.env` 的 `NEXUS_ADMIN_TOKEN` 不再生效。用安全方式读取当前令牌登录管理台，确认数据库和 MQTT 均为 `ready`。未带令牌访问 `/api/v1/status` 应返回 401。开放云安全组及主机防火墙的 80/443；需要接入设备时再开放 TCP 8883，并将 `mqtt.muyin.site` 直连解析到服务器。
 
 `device.json` 提供设备的 Broker 地址、专属凭据和 CA；登记设备不等于设备已联网。AI/Halo/记忆/Bridge/清理/OTA/成长同步沿用现有默认开关，不会因部署本文件自动开启。
 
@@ -131,7 +131,7 @@ docker compose -p nexus-production -f compose.1panel.yml ps
 
 启用步骤：
 
-1. 在源码机（本机）生成 store——服务器上没有 Python，初始化镜像只打包了 `init_docker.py`/`init_local.py`/`broker_policy.py`，不能就地生成。`init` 会**保留现有管理员令牌原值**，只把它挪进文件，`adminActor` 取其 SHA-256，所以既有审计归属和登录令牌都不变。命令只从环境读秘密，不接受 `--token` 参数，也不打印秘密：
+1. 在能运行 Python 3 的受控环境生成 store（本次生产宿主为 Python 3.11.2；初始化镜像只打包了 `init_docker.py`/`init_local.py`/`broker_policy.py`，不含该工具）。`init` 会**保留现有管理员令牌原值**，只把它挪进文件，`adminActor` 取其 SHA-256，所以既有审计归属和登录令牌都不变。命令只从环境读秘密，不接受 `--token` 参数，也不打印秘密：
 
 ```sh
 NEXUS_ADMIN_TOKEN='<服务器 core.env 里那个值>' \
@@ -159,6 +159,10 @@ install -m 600 -o 65534 -g 65534 tokens.json.lock /etc/nexus/auth/tokens.json.lo
 父目录必须是 0700 且属主为 65534，文件 0600；容器只读根不影响 bind 挂载。若不想开放网页改写，把挂载改为 `/etc/nexus/auth:/var/lib/nexus/auth:ro`，此时页面会提示“凭据文件不可写”，轮换继续走 CLI。
 
 4. 重建 CORE（`up -d`，不是 `restart`）。首次切换需要这一次重启，之后轮换和网页修改都不再重启。
+
+本次 ACC-01 生产采用：宿主 `/etc/nexus/docker/core-auth`（0700，`65534:65534`）挂到容器 `/etc/nexus/core-auth`，`NEXUS_AUTH_TOKEN_FILE=/etc/nexus/core-auth/tokens.json`；`tokens.json` 与 `tokens.json.lock` 均为 0600、属主 65534。2026-11-23 切换后 `GET /api/v1/access/admin-token` 返回 `{"mode":"file","editable":true,"revision":1}`，CORE healthy，管理员登录 200。切换后 `core.env` 的 `NEXUS_ADMIN_TOKEN` 不再参与校验，只保留用于回滚。
+
+网页自定义管理员令牌：用当前令牌登录 `https://pet.muyin.site/`，进入“权限”，点“修改管理员令牌”，填入当前令牌与新令牌（32–256 个可见 ASCII 字符），保存后旧令牌立即失效，**不需要重启 CORE**。新令牌只显示在输入框中，页面不回显历史值；请用受保护方式保存。
 
 三个必须知道的失败方式：文件必须是**绝对路径**且能被 65534 读到，否则 CORE **启动即失败**（日志 `NEXUS_AUTH_TOKEN_FILE is unavailable or invalid`），不是降级运行；文件损坏或不安全更新在请求期固定返回 503，不回退到 env；容器健康检查也读 `admin.current.token`，文件配错会让容器一直 unhealthy 反复重启。
 

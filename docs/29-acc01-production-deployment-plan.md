@@ -1,6 +1,6 @@
 # ACC-01 生产部署与数据库迁移执行计划
 
-2026-11-20 制定，2026-11-23 执行 G0–G4。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，执行结果回填在各节末尾**：G0 发布物（3.4）、G1 只读盘点（5.3）、G2 备份与隔离恢复（6.2）、G4 离线导入与升级（8.5）。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器登录/权限页/重启持久性、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。
+2026-11-20 制定，2026-11-23 执行 G0–G4。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，执行结果回填在各节末尾**：G0 发布物（3.4）、G1 只读盘点（5.3）、G2 备份与隔离恢复（6.2）、G4 离线导入与升级（8.5）、G6 运行时检查（10.2.1）与 24 小时观测（10.3.1）。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。
 
 ## 1. 目标、范围与完成判定
 
@@ -613,6 +613,8 @@ SSE 的 `X-Accel-Buffering: no` 由 CORE `ConsoleSetupController` 设置，OpenR
 
 会话与重启：`POST /api/v1/session`（`remember=true`）返回 200、`role=admin`、`persisted=true`、到期 2026-11-23T15:46:05Z；带 Cookie `GET /api/v1/session` 200，无 Cookie 401。07:46:12Z 主动重启 CORE 做持久性检查，14 s 后 healthy；Cookie 仍返回 200 且到期时间不变，MQTT 于 07:46:20Z 重连，`/api/v1/status` 双 ready。本次重启是有意验收，观测日志在该时刻后使用新的容器启动时间。未执行：浏览器 UI 登录、权限页签发；设备 `dodo-1` 自 2026-11-18 16:43:29Z 后离线，`pet.muyin.site:8883` 的真实设备连接与遥测无法验证，不记为通过。24 小时观测见 10.3。
 
+管理员令牌模式：2026-11-23 将管理员令牌从 env 切换为受保护文件模式。编排新增 `NEXUS_AUTH_TOKEN_FILE=/etc/nexus/core-auth/tokens.json` 和宿主 `/etc/nexus/docker/core-auth` 目录挂载；宿主目录/`tokens.json`/`tokens.json.lock` 属主 65534:65534，权限 700/600/600。旧编排备份 `docker-compose.yml.bak-auth-20261123`（SHA-256 `b7760ab…`），新编排 `ad3d737…`；令牌文件由当前令牌初始化（revision=1、actor `cf739d…`），CORE 07:52:41Z healthy，`GET /api/v1/access/admin-token` 返回 `{"mode":"file","editable":true,"revision":1}`，管理员登录 200。`core.env` 的旧 `NEXUS_ADMIN_TOKEN` 在文件模式下不再校验，仅保留用于回滚；管理台“权限 → 修改管理员令牌”现可自定义新令牌，保存后立即生效、无需重启。
+
 ### 10.3 24 小时观测
 
 - 每 15 分钟检查一次容器健康与 `/api/v1/status`；至少覆盖一个业务低峰。
@@ -623,7 +625,8 @@ SSE 的 `X-Accel-Buffering: no` 由 CORE `ConsoleSetupController` 设置，OpenR
 
 ### 10.3.1 观测执行状态（2026-11-23）
 
-- 观测脚本 `~/nexus-observe/observe.sh`（`nexus-deploy`，`nohup setsid` 后台，PID 937021），日志 `~/nexus-observe/observe-20261123T074228Z.ndjson`，07:42:28Z 启动，每 900 s 一条，计划到 2026-11-24 07:42Z。
+- 观测脚本 `~/nexus-observe/observe.sh`（`nexus-deploy`，`nohup setsid` 后台，PID 946298），日志 `~/nexus-observe/observe-20261123T074228Z.ndjson`，07:42:28Z 启动，每 900 s 一条，计划到 2026-11-24 07:42Z。
+- 07:52:03Z 更新脚本后以同一日志续跑：令牌优先从容器内 `/etc/nexus/core-auth/tokens.json` 读取，缺失时回退 `NEXUS_ADMIN_TOKEN`；重启后首条样本三服务正常、status 双 ready，`http5xx_last200=2` 来自 07:46Z 计划内重启窗口的 502/503，不是新增故障。
 - 每条记录：CORE/PostgreSQL/Mosquitto 状态与重启计数、`/api/v1/status`、根分区可用量与使用率、PostgreSQL 连接数、CORE 内存、16 分钟内 MQTT 重连数、access.log 最近 200 行 5xx 数、HTTPS/MQTT 证书到期时间。
 - 首条样本：三服务正常（CORE/PostgreSQL healthy、MQTT running，重启 0），status `database=ready`、`mqtt=ready`，根分区可用 16,356,420 kB（已用 81%），PostgreSQL 连接 12，CORE 223.7 MiB/1 GiB，MQTT 重连 0，5xx 0，HTTPS 证书至 2027-02-13，MQTT 证书至 2029-02-17。
 - 异机备份：服务器 `~/nexus-backups/acc01-observe-20261123T074441Z.dump`，107,230 B，SHA-256 `258df4d00bc085f442d030389afc33f7c92875f050723b7931a89936e1f05998`，`pg_restore --list` 含 42 个 TABLE DATA 段；已复制到观测工作站 `~/.nexus-evidence/acc01/`，本地哈希一致。
