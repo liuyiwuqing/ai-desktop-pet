@@ -1733,3 +1733,9 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 生产 CORE 从 `NEXUS_ADMIN_TOKEN` env 模式切换为 `NEXUS_AUTH_TOKEN_FILE` 受保护文件模式，保留当前令牌与审计归属（revision=1、actor `cf739d…`）。宿主 `/etc/nexus/docker/core-auth`（0700，65534:65534）挂到容器 `/etc/nexus/core-auth`，`tokens.json` 与 `tokens.json.lock` 均 0600；编排新增 `NEXUS_AUTH_TOKEN_FILE=/etc/nexus/core-auth/tokens.json`。旧编排备份 `docker-compose.yml.bak-auth-20261123`（SHA-256 `b7760ab…`），新编排 `ad3d737…`；CORE 07:52:41Z healthy，`GET /api/v1/access/admin-token` 返回 `mode=file`、`editable=true`、`revision=1`，管理员登录 200，日志无鉴权错误；切换重建窗口对应 07:52:42/45 两条 502，无其他 5xx。`core.env` 的旧令牌不再校验，仅保留用于回滚。
 
 管理台“权限 → 修改管理员令牌”现已可用：输入当前令牌与新令牌（32–256 个可见 ASCII 字符），保存后旧令牌立即失效、无需重启。观测脚本同日改为优先从 `tokens.json` 读取管理员令牌，以同一日志续跑至 11-24 07:42Z。
+
+## PLAN-INT-01 · 交互与功能拓展设计方案（2026-11-23，仅文档）
+
+基于真实源码摸底（`svc_config` 设置项、`ui_lvgl/growth_input.h` 菜单动作、`svc_intent` 工具注册表、`contracts/pet/growth.h` 玩法数值、`boards/dodo-s3-lcd/board.json` 引脚占用）制定六个方向的设计方案，见 [30](30-interaction-feature-expansion-plan.md)：设备设置项拓展 10 项（settings_v1→v2 增量字段，P0 为息屏/待机亮度/免打扰时段/提示音量）、语音玩法拓展（场景化/多步联动/情感反馈三层）、三物理按键交互方案（KEY_A=确认 GPIO13、KEY_B=方向 GPIO14、KEY_C=语音 GPIO41，含场景×按键映射矩阵与组合键，BOOT 运行期语义保留、启动维护门控不变）、菜单体系（8 个一级分类、深度≤2、表驱动）、语音连续对话分阶段（M1 会话保持免唤醒多轮→M2 按键+语音打断→M3 上下文增强）与创新功能 10 项（P0 专注陪伴番茄钟），并给出 P0/P1/P2 汇总路线图。
+
+验证（2026-11-23，本机 macOS）：仅文档新增与索引登记；核对方案引用的现状（设置项清单、BOOT 按键语义、成长动作枚举、空闲引脚 13/14/41/47）与当前源码一致，docs/README 链接目标存在。未改任何代码与 schema，方案中标注的引脚、字段、状态机均属设计建议，实现切片落地时再行评审并在本台账逐项记账。本文不构成实现完成或实机验收证据。

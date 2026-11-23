@@ -46,6 +46,8 @@
 
 手机热点配网、Wi-Fi-only 和小智官方绑定见 [28-device-web-setup](28-device-web-setup.md)。
 
+设备设置项拓展、语音玩法、三按键交互、菜单体系、连续对话与创新功能的设计方案见 [30-interaction-feature-expansion-plan](30-interaction-feature-expansion-plan.md)；后续按切片实现并在 [18](18-requirements-and-progress.md) 记账，方案本身不是完成记录。
+
 ## 评审方式
 
 每个模块按以下顺序确认，避免边写边改：
