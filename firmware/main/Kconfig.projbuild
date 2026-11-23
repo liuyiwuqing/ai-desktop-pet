@@ -90,6 +90,18 @@ config PET_AI_XIAOZHI_ON_BOOT
       initialization; only a wake-word or deliberate input starts a cloud turn.
       Mutually exclusive with boot audio diagnostics and boot DND.
 
+config PET_AI_CONVERSATION
+    bool "Enable continuous conversation window after each reply"
+    depends on PET_AI_XIAOZHI_ON_BOOT
+    default y
+    help
+      M1 session keep-alive: after a reply finishes playing, keep the WSS
+      connection and capture running for a bounded window (10 s, max 20
+      rounds / 5 minutes per episode). Speech detected in the window starts
+      the next turn without a new wake word; timeout, mute, cancel or a
+      deliberate END_TALK input returns to idle. The provider keeps the
+      dialogue context; the device never uploads PCM while only waiting.
+
 config PET_AI_DSP_ENABLED
     bool "Enable ESP-SR noise-suppression frontend"
     depends on PET_MODULE_AI_ENABLED && PET_MODULE_AUDIO_ENABLED && SPIRAM && !PET_AUDIO_FAKE

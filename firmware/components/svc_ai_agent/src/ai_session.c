@@ -12,6 +12,8 @@ pet_ai_result_t pet_ai_session_init(pet_ai_session_t *session,
     const pet_ai_session_config_t selected = config == NULL ? defaults : *config;
     if (selected.energy_on_rms == 0 || selected.energy_on_rms > 32768 ||
         selected.energy_off_rms >= selected.energy_on_rms) return PET_AI_INVALID;
+    if (selected.conversation_window_ms != 0 && selected.conversation_max_rounds == 0)
+        return PET_AI_INVALID;
     *session = (pet_ai_session_t){.config = selected, .last_now_ms = now_ms, .ready = true};
     return PET_AI_OK;
 }
@@ -58,7 +60,8 @@ static void finish_input(pet_ai_session_t *session, pet_ai_reason_t reason,
 
 static void cancel_turn(const pet_ai_session_t *session, pet_ai_step_t *step)
 {
-    if (session->view.state == PET_AI_LISTENING) step->actions |= PET_AI_ACTION_STOP_CAPTURE;
+    if (session->view.state == PET_AI_LISTENING || session->view.state == PET_AI_CONVERSATION)
+        step->actions |= PET_AI_ACTION_STOP_CAPTURE;
     if (session->view.state == PET_AI_SPEAKING) step->actions |= PET_AI_ACTION_STOP_PLAYBACK;
     if (session->view.state == PET_AI_LISTENING || session->view.state == PET_AI_THINKING ||
         session->view.state == PET_AI_SPEAKING) {
@@ -66,6 +69,31 @@ static void cancel_turn(const pet_ai_session_t *session, pet_ai_step_t *step)
         step->cancelled_turn_id = session->view.turn_id;
     }
     step->actions |= PET_AI_ACTION_CLEAR_AUDIO;
+}
+
+/* 会话保持的轮次与总时长记账；退出会话（超时/取消/静音/失败/上限）必须调用 conv_end。 */
+static void conv_end(pet_ai_session_t *session)
+{
+    session->conv_active = false;
+    session->conv_rounds = 0;
+}
+
+static bool conv_open(pet_ai_session_t *session, uint64_t now)
+{
+    if (session->config.conversation_window_ms == 0) return false;
+    if (session->conv_active) {
+        if (now - session->conv_start_ms >= PET_AI_CONV_TOTAL_MS ||
+            session->conv_rounds >= session->config.conversation_max_rounds) {
+            conv_end(session);
+            return false;
+        }
+    } else {
+        session->conv_start_ms = now;
+        session->conv_active = true;
+        session->conv_rounds = 0;
+    }
+    ++session->conv_rounds;
+    return true;
 }
 
 static bool turn_scoped(pet_ai_input_kind_t kind)
@@ -85,6 +113,19 @@ static bool expire(pet_ai_session_t *session, uint64_t now, pet_ai_step_t *step)
         }
         if (now - session->listen_start_ms >= PET_AI_MAX_LISTEN_MS) {
             finish_input(session, PET_AI_REASON_LIMIT, now, step);
+            return true;
+        }
+    } else if (session->view.state == PET_AI_CONVERSATION) {
+        if (now - session->last_frame_ms > PET_AI_FRAME_GAP_MS) {
+            cancel_turn(session, step);
+            conv_end(session);
+            state(session, PET_AI_ERROR, PET_AI_REASON_INPUT_GAP, now, step);
+            return true;
+        }
+        if (now - session->state_start_ms >= session->config.conversation_window_ms) {
+            cancel_turn(session, step);
+            conv_end(session);
+            state(session, PET_AI_IDLE, PET_AI_REASON_CONV_TIMEOUT, now, step);
             return true;
         }
     } else if (session->view.state == PET_AI_THINKING &&
@@ -125,6 +166,8 @@ pet_ai_result_t pet_ai_session_handle(pet_ai_session_t *session,
             session->last_wake_ms = input->now_ms;
         }
         cancel_turn(session, step);
+        if (session->view.state == PET_AI_CONVERSATION)
+            step->actions &= ~PET_AI_ACTION_STOP_CAPTURE; /* 窗口内采集已开启，续轮不重启采集。 */
         ++session->view.turn_id;
         session->view.speech_ms = session->view.silence_ms = 0;
         session->view.push_to_talk = input->kind == PET_AI_TALK_PRESS;
@@ -149,11 +192,22 @@ pet_ai_result_t pet_ai_session_handle(pet_ai_session_t *session,
     case PET_AI_PLAYBACK_DRAINED:
         if (session->view.state != PET_AI_SPEAKING) return PET_AI_IGNORED;
         step->actions = PET_AI_ACTION_STOP_PLAYBACK | PET_AI_ACTION_CLEAR_AUDIO;
-        state(session, PET_AI_IDLE, PET_AI_REASON_DRAINED, input->now_ms, step);
+        if (conv_open(session, input->now_ms)) {
+            step->actions |= PET_AI_ACTION_START_CAPTURE; /* 会话窗口保持采集，等待 VAD 续轮。 */
+            /* 采集即将重启；以当前时刻重置帧锚点，避免窗口首个 TICK 误判输入中断。 */
+            session->last_frame_ms = input->now_ms;
+            /* 上一轮的语音累计不参与续轮判定，窗口内重新累计。 */
+            session->view.speech_ms = session->view.silence_ms = 0;
+            session->energy_speech = false;
+            state(session, PET_AI_CONVERSATION, PET_AI_REASON_DRAINED, input->now_ms, step);
+        } else {
+            state(session, PET_AI_IDLE, PET_AI_REASON_DRAINED, input->now_ms, step);
+        }
         break;
     case PET_AI_MUTE:
         if (session->view.state == PET_AI_MUTED) return PET_AI_IGNORED;
         cancel_turn(session, step);
+        conv_end(session);
         state(session, PET_AI_MUTED, PET_AI_REASON_MUTED, input->now_ms, step);
         break;
     case PET_AI_UNMUTE:
@@ -162,14 +216,17 @@ pet_ai_result_t pet_ai_session_handle(pet_ai_session_t *session,
         break;
     case PET_AI_CANCEL:
         cancel_turn(session, step);
+        conv_end(session);
         if (session->view.state != PET_AI_MUTED)
             state(session, PET_AI_IDLE, PET_AI_REASON_CANCELLED, input->now_ms, step);
         break;
     case PET_AI_AUDIO_FAILED:
     case PET_AI_TRANSPORT_FAILED:
         if (session->view.state != PET_AI_LISTENING && session->view.state != PET_AI_THINKING &&
-            session->view.state != PET_AI_SPEAKING) return PET_AI_IGNORED;
+            session->view.state != PET_AI_SPEAKING && session->view.state != PET_AI_CONVERSATION)
+            return PET_AI_IGNORED;
         cancel_turn(session, step);
+        conv_end(session);
         state(session, PET_AI_ERROR, input->kind == PET_AI_AUDIO_FAILED ?
               PET_AI_REASON_AUDIO_ERROR : PET_AI_REASON_TRANSPORT_ERROR, input->now_ms, step);
         break;
@@ -195,14 +252,16 @@ pet_ai_result_t pet_ai_session_audio(pet_ai_session_t *session,
     /* 先拒绝旧轮次，迟到的云端包/PCM 不能推进新轮次的时钟或计数。 */
     if (input->turn_id != session->view.turn_id || input->now_ms < session->last_now_ms)
         return PET_AI_STALE;
-    if (session->view.state != PET_AI_LISTENING) return PET_AI_IGNORED;
+    if (session->view.state != PET_AI_LISTENING && session->view.state != PET_AI_CONVERSATION)
+        return PET_AI_IGNORED;
     if (input->now_ms - session->last_frame_ms < PET_AUDIO_FRAME_MS) return PET_AI_STALE;
     if (input->now_ms - session->last_frame_ms > PET_AI_FRAME_GAP_MS) {
         expire(session, input->now_ms, step);
         session->last_now_ms = input->now_ms;
         return PET_AI_OK;
     }
-    if (input->now_ms - session->listen_start_ms > PET_AI_MAX_LISTEN_MS) {
+    if (session->view.state == PET_AI_LISTENING &&
+        input->now_ms - session->listen_start_ms > PET_AI_MAX_LISTEN_MS) {
         finish_input(session, PET_AI_REASON_LIMIT, input->now_ms, step);
         session->last_now_ms = input->now_ms;
         return PET_AI_OK;
@@ -222,6 +281,23 @@ pet_ai_result_t pet_ai_session_audio(pet_ai_session_t *session,
             session->view.speech_ms < PET_AI_MIN_SPEECH_MS) session->view.speech_ms = 0;
     }
     session->view.level_pct = level.level_pct;
+    if (session->view.state == PET_AI_CONVERSATION) {
+        /* 会话窗口只做 VAD 监听：不转发 PCM，检测到足够语音后原采集续开一轮。 */
+        step->actions = 0;
+        if (session->view.speech_ms >= PET_AI_CONV_RESUME_MS) {
+            if (session->view.turn_id == UINT32_MAX) return PET_AI_ID_EXHAUSTED;
+            ++session->view.turn_id;
+            session->view.speech_ms = session->view.silence_ms = 0;
+            session->view.push_to_talk = false;
+            session->listen_start_ms = input->now_ms;
+            session->energy_speech = true;
+            step->actions = PET_AI_ACTION_BEGIN_TURN;
+            state(session, PET_AI_LISTENING, PET_AI_REASON_CONV_SPEECH, input->now_ms, step);
+        }
+        session->last_now_ms = session->last_frame_ms = input->now_ms;
+        step->view = session->view;
+        return PET_AI_OK;
+    }
     step->actions = PET_AI_ACTION_FORWARD_PCM;
     if (input->now_ms - session->listen_start_ms >= PET_AI_MAX_LISTEN_MS) {
         finish_input(session, PET_AI_REASON_LIMIT, input->now_ms, step);

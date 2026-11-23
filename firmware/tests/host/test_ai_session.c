@@ -312,6 +312,133 @@ static void check_activity_labels_hysteresis_and_arguments(void)
     assert_same_view(before, after);
 }
 
+static void check_conversation_window(void)
+{
+    pet_ai_session_t session;
+    assert(pet_ai_session_init(&session, &(pet_ai_session_config_t){.energy_on_rms = 800,
+        .energy_off_rms = 400, .conversation_window_ms = 1000}, 0) == PET_AI_INVALID);
+    const pet_ai_session_config_t config = {.energy_on_rms = 800, .energy_off_rms = 400,
+        .conversation_window_ms = 1000, .conversation_max_rounds = 2};
+    assert(pet_ai_session_init(&session, &config, 0) == PET_AI_OK);
+
+    command(&session, PET_AI_TALK_PRESS, 0, 0);
+    for (uint64_t now = 20; now <= 300; now += 20) audio(&session, 1, now, 1200);
+    command(&session, PET_AI_TALK_RELEASE, 1, 310);
+    command(&session, PET_AI_RESPONSE_BEGIN, 1, 400);
+    pet_ai_step_t step = command(&session, PET_AI_PLAYBACK_DRAINED, 1, 500);
+    assert(step.view.state == PET_AI_CONVERSATION && step.view.reason == PET_AI_REASON_DRAINED);
+    assert(step.actions == (PET_AI_ACTION_STOP_PLAYBACK | PET_AI_ACTION_CLEAR_AUDIO |
+                            PET_AI_ACTION_START_CAPTURE | PET_AI_ACTION_STATE_CHANGED));
+    /* 窗口内只有 RMS 监听：不转发 PCM；短噪声不足 200 ms 不续轮。 */
+    step = command(&session, PET_AI_TICK, 0, 520);
+    assert(step.view.state == PET_AI_CONVERSATION && step.actions == 0);
+    step = audio(&session, 1, 540, 1200);
+    assert(step.view.state == PET_AI_CONVERSATION && step.actions == 0);
+    assert(step.view.speech_ms == 20 && step.view.level_pct > 0);
+    for (uint64_t now = 560; now <= 840; now += 20) step = audio(&session, 1, now, 0);
+    assert(step.view.speech_ms == 0); /* 不足 MIN_SPEECH 的噪声在长静音后清零。 */
+    for (uint64_t now = 860; now <= 1040; now += 20) step = audio(&session, 1, now, 1200);
+    assert(step.view.state == PET_AI_LISTENING && step.view.turn_id == 2 &&
+        step.view.reason == PET_AI_REASON_CONV_SPEECH);
+    assert(step.actions == (PET_AI_ACTION_BEGIN_TURN | PET_AI_ACTION_STATE_CHANGED));
+    /* 续轮复用已开启的采集；语音正常转发并按静音端点结束。 */
+    for (uint64_t now = 1060; now <= 1600; now += 20) step = audio(&session, 2, now, 1200);
+    assert(step.actions == PET_AI_ACTION_FORWARD_PCM);
+    for (uint64_t now = 1620; now <= 1900; now += 20) step = audio(&session, 2, now, 0);
+    assert(step.view.state == PET_AI_THINKING && (step.actions & PET_AI_ACTION_END_INPUT));
+    command(&session, PET_AI_RESPONSE_BEGIN, 2, 2000);
+    step = command(&session, PET_AI_PLAYBACK_DRAINED, 2, 2100);
+    assert(step.view.state == PET_AI_CONVERSATION); /* 第二轮仍在窗口。 */
+    /* 第二次续轮后轮次上限到达：drain 回到 IDLE，不再进入窗口。 */
+    for (uint64_t now = 2120; now <= 2300; now += 20) audio(&session, 2, now, 1200);
+    for (uint64_t now = 2320; now <= 2700; now += 20) step = audio(&session, 3, now, 1200);
+    assert(step.view.state == PET_AI_LISTENING && step.view.turn_id == 3);
+    for (uint64_t now = 2720; now <= 3000; now += 20) step = audio(&session, 3, now, 0);
+    assert(step.view.state == PET_AI_THINKING);
+    command(&session, PET_AI_RESPONSE_BEGIN, 3, 3100);
+    step = command(&session, PET_AI_PLAYBACK_DRAINED, 3, 3200);
+    assert(step.view.state == PET_AI_IDLE && step.view.reason == PET_AI_REASON_DRAINED);
+    assert(step.actions == (PET_AI_ACTION_STOP_PLAYBACK | PET_AI_ACTION_CLEAR_AUDIO |
+                            PET_AI_ACTION_STATE_CHANGED));
+}
+
+static void check_conversation_exits(void)
+{
+    pet_ai_session_t session;
+    const pet_ai_session_config_t config = {.energy_on_rms = 800, .energy_off_rms = 400,
+        .conversation_window_ms = 500, .conversation_max_rounds = 10};
+    assert(pet_ai_session_init(&session, &config, 0) == PET_AI_OK);
+    command(&session, PET_AI_TALK_PRESS, 0, 0);
+    for (uint64_t now = 20; now <= 300; now += 20) audio(&session, 1, now, 1200);
+    command(&session, PET_AI_TALK_RELEASE, 1, 310);
+    command(&session, PET_AI_RESPONSE_BEGIN, 1, 400);
+    command(&session, PET_AI_PLAYBACK_DRAINED, 1, 500);
+    /* 窗口超时回待机：停采集、清音频、会话记账归零。采集仍在跑时帧会持续刷新锚点。 */
+    for (uint64_t now = 520; now <= 1000; now += 20) audio(&session, 1, now, 0);
+    pet_ai_step_t step = command(&session, PET_AI_TICK, 0, 1010);
+    assert(step.view.state == PET_AI_IDLE && step.view.reason == PET_AI_REASON_CONV_TIMEOUT);
+    assert(step.actions == (PET_AI_ACTION_STOP_CAPTURE | PET_AI_ACTION_CLEAR_AUDIO |
+                            PET_AI_ACTION_STATE_CHANGED));
+
+    /* 超时后再次 drain 属于新会话：重新开窗。 */
+    command(&session, PET_AI_TALK_PRESS, 0, 1200);
+    for (uint64_t now = 1220; now <= 1500; now += 20) audio(&session, 2, now, 1200);
+    command(&session, PET_AI_TALK_RELEASE, 2, 1510);
+    command(&session, PET_AI_RESPONSE_BEGIN, 2, 1600);
+    command(&session, PET_AI_PLAYBACK_DRAINED, 2, 1700);
+    pet_ai_view_t view;
+    assert(pet_ai_session_snapshot(&session, &view) && view.state == PET_AI_CONVERSATION);
+    /* 按住说话续轮：不重复启停采集。 */
+    step = command(&session, PET_AI_TALK_PRESS, 0, 1750);
+    assert(step.view.state == PET_AI_LISTENING && step.view.turn_id == 3 && step.view.push_to_talk);
+    assert(step.actions == (PET_AI_ACTION_BEGIN_TURN | PET_AI_ACTION_START_CAPTURE |
+                            PET_AI_ACTION_CLEAR_AUDIO | PET_AI_ACTION_STATE_CHANGED));
+    /* 窗口内取消与静音都要真正停掉采集。 */
+    step = command(&session, PET_AI_CANCEL, 0, 1800);
+    assert(step.view.state == PET_AI_IDLE && step.view.reason == PET_AI_REASON_CANCELLED);
+    assert((step.actions & (PET_AI_ACTION_STOP_CAPTURE | PET_AI_ACTION_CLEAR_AUDIO)) ==
+        (PET_AI_ACTION_STOP_CAPTURE | PET_AI_ACTION_CLEAR_AUDIO));
+    command(&session, PET_AI_TALK_PRESS, 0, 1850);
+    for (uint64_t now = 1870; now <= 2150; now += 20) audio(&session, 4, now, 1200);
+    command(&session, PET_AI_TALK_RELEASE, 4, 2160);
+    command(&session, PET_AI_RESPONSE_BEGIN, 4, 2200);
+    command(&session, PET_AI_PLAYBACK_DRAINED, 4, 2300);
+    assert(pet_ai_session_snapshot(&session, &view) && view.state == PET_AI_CONVERSATION);
+    step = command(&session, PET_AI_MUTE, 0, 2350);
+    assert(step.view.state == PET_AI_MUTED);
+    assert(step.actions & PET_AI_ACTION_STOP_CAPTURE);
+    /* 静音后不开麦，窗口帧被忽略；恢复也回待机而不是窗口。 */
+    int16_t pcm[PET_AUDIO_CAPTURE_SAMPLES] = {0};
+    const pet_ai_audio_input_t frame = {.turn_id = 4, .now_ms = 2370, .pcm = pcm,
+                                        .samples = PET_AUDIO_CAPTURE_SAMPLES};
+    assert(pet_ai_session_audio(&session, &frame, &(pet_ai_step_t){0}) == PET_AI_IGNORED);
+    step = command(&session, PET_AI_UNMUTE, 0, 2400);
+    assert(step.view.state == PET_AI_IDLE && step.view.reason == PET_AI_REASON_UNMUTED);
+    command(&session, PET_AI_TALK_PRESS, 0, 2450);
+    for (uint64_t now = 2470; now <= 2750; now += 20) audio(&session, 5, now, 1200);
+    command(&session, PET_AI_TALK_RELEASE, 5, 2760);
+    command(&session, PET_AI_RESPONSE_BEGIN, 5, 2800);
+    command(&session, PET_AI_PLAYBACK_DRAINED, 5, 2900);
+    assert(pet_ai_session_snapshot(&session, &view) && view.state == PET_AI_CONVERSATION);
+    /* 会话总时长达到上限后 drain 回到 IDLE，不再续窗（episode 自 2900 ms 起）。 */
+    command(&session, PET_AI_TALK_PRESS, 0, 301000);
+    for (uint64_t now = 301020; now <= 301300; now += 20) audio(&session, 6, now, 1200);
+    command(&session, PET_AI_TALK_RELEASE, 6, 301310);
+    command(&session, PET_AI_RESPONSE_BEGIN, 6, 301400);
+    step = command(&session, PET_AI_PLAYBACK_DRAINED, 6, 302910);
+    assert(step.view.state == PET_AI_IDLE && step.view.reason == PET_AI_REASON_DRAINED);
+    /* 音频/传输失败也退出会话并锁为错误，不是静默续窗。 */
+    command(&session, PET_AI_TALK_PRESS, 0, 303000);
+    for (uint64_t now = 303020; now <= 303300; now += 20) audio(&session, 7, now, 1200);
+    command(&session, PET_AI_TALK_RELEASE, 7, 303310);
+    command(&session, PET_AI_RESPONSE_BEGIN, 7, 303400);
+    step = command(&session, PET_AI_PLAYBACK_DRAINED, 7, 303500);
+    assert(step.view.state == PET_AI_CONVERSATION);
+    step = command(&session, PET_AI_TRANSPORT_FAILED, 7, 303600);
+    assert(step.view.state == PET_AI_ERROR && step.view.reason == PET_AI_REASON_TRANSPORT_ERROR);
+    assert(step.actions & PET_AI_ACTION_STOP_CAPTURE);
+}
+
 int main(void)
 {
     check_voice_then_silence();
@@ -321,5 +448,7 @@ int main(void)
     check_old_turns_duplicates_and_invalid_input();
     check_deadlines_gaps_and_wake_cooldown();
     check_activity_labels_hysteresis_and_arguments();
+    check_conversation_window();
+    check_conversation_exits();
     puts("AI session: endpoints, controls, correlation, deadlines, VAD and input boundaries passed");
 }

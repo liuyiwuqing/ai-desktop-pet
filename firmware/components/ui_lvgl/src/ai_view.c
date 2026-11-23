@@ -52,10 +52,13 @@ void pet_ai_view_ui_show(pet_ai_view_ui_t *v, const pet_ai_screen_t *m,
     const bool listening = m->available && m->ready && !m->faulted && !m->pending && !private &&
         m->capture_active && m->session.state == PET_AI_LISTENING;
     const bool speaking=m->available && m->ready && !m->faulted && !m->pending && !private && m->playback_active;
+    const bool conv = m->available && m->ready && !m->faulted && !m->pending && !private &&
+        m->session.state == PET_AI_CONVERSATION;
     const unsigned level = listening ? (m->session.level_pct>100 ? 100 : m->session.level_pct) :
-        speaking ? (m->playback_level_pct>100 ? 100 : m->playback_level_pct) : 0;
+        speaking ? (m->playback_level_pct>100 ? 100 : m->playback_level_pct) :
+        conv ? (m->session.level_pct>100 ? 100 : m->session.level_pct) : 0;
     lv_bar_set_value(v->level, (int)level, LV_ANIM_OFF);
-    if ((listening || speaking) && !input->menu) lv_obj_remove_flag(v->level, LV_OBJ_FLAG_HIDDEN);
+    if ((listening || speaking || conv) && !input->menu) lv_obj_remove_flag(v->level, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(v->level, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_y(v->detail, input->menu ? 216 : 236);
     const char *title = "语音就绪", *status = "长按打开语音菜单";
@@ -88,6 +91,10 @@ void pet_ai_view_ui_show(pet_ai_view_ui_t *v, const pet_ai_screen_t *m,
     } else if (m->session.state == PET_AI_SPEAKING) {
         title = "正在说话";
         status = "正在播放回复";
+        face = PET_GROWTH_HAPPY;
+    } else if (conv) {
+        title = "继续对话";
+        status = "说句话继续，稍后自动退出";
         face = PET_GROWTH_HAPPY;
     } else if (m->session.state == PET_AI_ERROR) {
         title = "暂时无法对话";
@@ -133,6 +140,7 @@ void pet_ai_view_ui_show(pet_ai_view_ui_t *v, const pet_ai_screen_t *m,
         m->faulted ? "短按返回 · 长按菜单" :
         listening && m->session.push_to_talk ? "松开发送" :
         listening ? "安静片刻后发送" :
+        conv ? "说话继续 · 短按结束" :
         !private && !m->pending && (m->session.state == PET_AI_THINKING || m->session.state == PET_AI_SPEAKING ||
             m->session.state == PET_AI_ERROR) ? "短按取消 · 长按菜单" :
         m->dismissible ? "短按返回 · 长按菜单" : "短按消息 · 长按菜单");

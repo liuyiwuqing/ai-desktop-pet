@@ -153,6 +153,8 @@
 - 设备不重建 WSS 连接、不清 `svc_intent` recent 去重表；上下文由小智供应商侧保留（符合 [16](16-voice-memory-tools.md) 边界：设备静音/清除只影响本地）。
 - 轮次计数与总时长上限（默认 20 轮 / 5 分钟）防误触发耗流量。
 
+**交付状态（INT-01-S4，2026-11-23，主机交付）**：`AI_CONVERSATION` 状态机已落地（`svc_ai_agent` 会话层 + runtime 端口序 + agent 发布/采集保持 + UI"继续对话"页）。drain 后开窗（10 s），窗口内仅 VAD 监听不转发 PCM，累计 200 ms 语音原连接续轮；超时/取消/静音/失败/20 轮/5 分钟退出；开关 `PET_AI_CONVERSATION`（默认 y），会话配置 `conversation_window_ms=0` 保持旧行为。与设计的差异：“说‘再见/退出’”语义退出未实现（属 ASR 意图，需供应商侧配合，暂以按键结束/超时为准）；窗口时长为编译期常量，运行期可配置留待设置切片；窗口内提示音被抑制。新增会话级/runtime 级主机测试（`test_ai_session::check_conversation_*`、`test_ai_runtime::check_conversation_runtime_flow`），全量主机/LVGL/agent 场景通过；真实多轮（不重唤醒且回答引用上文）待实机验收。
+
 **M2 播放中打断（按键兜底 + 语音 barge-in，P1）**
 
 - 按键打断：KEY_C 短按立即停止 TTS 播放、转入录音（不依赖 AEC，先交付）。

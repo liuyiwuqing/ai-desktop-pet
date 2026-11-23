@@ -71,6 +71,8 @@ typedef struct {
 typedef struct {
     uint16_t energy_on_rms;  /* 默认 800；仅桌面/半双工回退起点，实机需校准。 */
     uint16_t energy_off_rms; /* 默认 400；必须小于 on，避免门槛附近反复翻转。 */
+    uint16_t conversation_window_ms; /* 0 禁用连续对话；启用时回复播完后保持该窗口等待续轮。 */
+    uint8_t conversation_max_rounds; /* 会话内最多轮次（每完成一次播报计 1）；0 视为无效配置。 */
 } pet_ai_session_config_t;
 
 /* 调用方持有存储；仅由下面 API 修改，单一任务串行拥有，不跨任务共享裸结构。 */
@@ -78,7 +80,9 @@ typedef struct {
     pet_ai_view_t view;
     pet_ai_session_config_t config;
     uint64_t last_now_ms, listen_start_ms, last_frame_ms, state_start_ms, last_wake_ms;
-    bool ready, energy_speech, have_wake;
+    uint64_t conv_start_ms; /* 会话起点；窗口内统计轮次与总时长，退出后归零重开。 */
+    uint32_t conv_rounds;
+    bool ready, energy_speech, have_wake, conv_active;
 } pet_ai_session_t;
 
 /* config=NULL 使用默认值。重新 init 前必须停止旧音频、丢弃全部旧异步事件。 */

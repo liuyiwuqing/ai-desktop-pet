@@ -16,8 +16,8 @@ enum {
 };
 
 typedef struct {
-    unsigned calls[64];
-    uint32_t turns[64];
+    unsigned calls[256];
+    uint32_t turns[256];
     size_t count;
     bool wake;
     pet_ai_activity_t activity;
@@ -312,6 +312,78 @@ static void check_failed_old_turn_blocks_new_turn(void)
     assert(ports.calls[before + 1] == CALL_CLEAR && ports.turns[before + 1] == 1);
 }
 
+static pet_ai_runtime_t make_conversation_runtime(fake_ports_t *ports, uint16_t window,
+                                                  uint8_t rounds)
+{
+    const pet_ai_session_config_t config = {.energy_on_rms = 800, .energy_off_rms = 400,
+        .conversation_window_ms = window, .conversation_max_rounds = rounds};
+    const pet_ai_runtime_sink_t sink = {
+        .context = ports, .begin_turn = begin_turn, .start_capture = start_capture,
+        .stop_capture = stop_capture, .forward_pcm = forward_pcm, .end_input = end_input,
+        .cancel_turn = cancel_turn, .start_playback = start_playback,
+        .stop_playback = stop_playback, .clear_audio = clear_audio,
+    };
+    const pet_ai_runtime_frontend_t frontend = {
+        .context = ports, .detect_wake = detect_wake, .classify_vad = classify_vad,
+    };
+    pet_ai_runtime_t runtime;
+    assert(pet_ai_runtime_init(&runtime, &config, &sink, &frontend, 0) == PET_AI_RUNTIME_OK);
+    return runtime;
+}
+
+static void check_conversation_runtime_flow(void)
+{
+    fake_ports_t ports = {.activity = PET_AI_ACTIVITY_SPEECH};
+    pet_ai_runtime_t runtime = make_conversation_runtime(&ports, 1000, 5);
+    int16_t pcm[PET_AUDIO_CAPTURE_SAMPLES] = {1200};
+    pet_ai_runtime_step_t step;
+
+    handle(&runtime, PET_AI_TALK_PRESS, 0, 20);
+    for (uint64_t now = 40; now <= 320; now += 20) frame(&runtime, pcm, now);
+    handle(&runtime, PET_AI_TALK_RELEASE, 1, 330);
+    handle(&runtime, PET_AI_RESPONSE_BEGIN, 1, 340);
+    /* drain 后进入会话窗口：停播放、清音频、保持采集。 */
+    const size_t before_drain = ports.count;
+    step = handle(&runtime, PET_AI_PLAYBACK_DRAINED, 1, 360);
+    assert(step.session_step.view.state == PET_AI_CONVERSATION &&
+           step.session_step.view.reason == PET_AI_REASON_DRAINED);
+    assert(ports.count == before_drain + 3);
+    assert(ports.calls[before_drain] == CALL_PLAYBACK_STOP);
+    assert(ports.calls[before_drain + 1] == CALL_CLEAR);
+    assert(ports.calls[before_drain + 2] == CALL_CAPTURE_START);
+    /* 窗口内语音只触发 BEGIN 续轮，不重启采集、不转发 PCM。 */
+    const size_t before_resume = ports.count;
+    const size_t samples_before_resume = ports.forwarded_samples;
+    for (uint64_t now = 380; now <= 560; now += 20) step = frame(&runtime, pcm, now);
+    assert(step.session_step.view.state == PET_AI_LISTENING &&
+           step.session_step.view.turn_id == 2 &&
+           step.session_step.view.reason == PET_AI_REASON_CONV_SPEECH);
+    assert(ports.count == before_resume + 1);
+    assert(ports.calls[before_resume] == CALL_BEGIN && ports.turns[before_resume] == 2);
+    assert(ports.forwarded_samples == samples_before_resume);
+    /* 续轮正常转发并按静音端点结束，第二轮 drain 后仍在窗口。 */
+    for (uint64_t now = 580; now <= 1180; now += 20) frame(&runtime, pcm, now);
+    ports.activity = PET_AI_ACTIVITY_SILENCE;
+    for (uint64_t now = 1200; now <= 1480; now += 20) frame(&runtime, pcm, now);
+    handle(&runtime, PET_AI_RESPONSE_BEGIN, 2, 1490);
+    const size_t before_drain2 = ports.count;
+    step = handle(&runtime, PET_AI_PLAYBACK_DRAINED, 2, 1500);
+    assert(step.session_step.view.state == PET_AI_CONVERSATION);
+    assert(ports.count == before_drain2 + 3);
+    assert(ports.calls[before_drain2] == CALL_PLAYBACK_STOP);
+    assert(ports.calls[before_drain2 + 1] == CALL_CLEAR);
+    assert(ports.calls[before_drain2 + 2] == CALL_CAPTURE_START);
+    /* 窗口静默期帧仅监听；超时 TICK 停采集回待机。 */
+    for (uint64_t now = 1520; now <= 2510; now += 20) frame(&runtime, pcm, now);
+    const size_t before_timeout = ports.count;
+    step = handle(&runtime, PET_AI_TICK, 0, 2530);
+    assert(step.session_step.view.state == PET_AI_IDLE &&
+           step.session_step.view.reason == PET_AI_REASON_CONV_TIMEOUT);
+    assert(ports.count == before_timeout + 2);
+    assert(ports.calls[before_timeout] == CALL_CAPTURE_STOP);
+    assert(ports.calls[before_timeout + 1] == CALL_CLEAR);
+}
+
 int main(void)
 {
     check_owner_flow_and_order();
@@ -320,5 +392,6 @@ int main(void)
     check_arguments_and_optional_frontend();
     check_cleanup_failure_is_bounded();
     check_failed_old_turn_blocks_new_turn();
+    check_conversation_runtime_flow();
     puts("AI runtime: single-owner ordering, frontend injection, stale events, port failures and bounded cleanup passed");
 }

@@ -247,7 +247,8 @@ static void privacy_badge(ui_context_t *ui)
     /* AI 主画面已有完整状态；角标只补充被消息/成长画面遮挡的信息。 */
     const bool full_status = ui->ai_snapshot.faulted || (ui->ai_available && ui->ai_snapshot.ready &&
         (ui->ai_snapshot.policy_pending || ui->muted || ui->dnd ||
-         ui->ai_snapshot.view.state == PET_AI_LISTENING || ui->ai_snapshot.view.state == PET_AI_SPEAKING));
+         ui->ai_snapshot.view.state == PET_AI_LISTENING || ui->ai_snapshot.view.state == PET_AI_SPEAKING ||
+         ui->ai_snapshot.view.state == PET_AI_CONVERSATION));
     if (!lv_obj_has_flag(ui->ai_view.root, LV_OBJ_FLAG_HIDDEN) && full_status)
         text = "";
 #endif
@@ -262,7 +263,8 @@ static void privacy_badge(ui_context_t *ui)
 static bool ai_active(const pet_ai_agent_snapshot_t *snapshot)
 {
     return snapshot->view.state == PET_AI_LISTENING || snapshot->view.state == PET_AI_THINKING ||
-           snapshot->view.state == PET_AI_SPEAKING || snapshot->ptt_requested;
+           snapshot->view.state == PET_AI_SPEAKING || snapshot->view.state == PET_AI_CONVERSATION ||
+           snapshot->ptt_requested;
 }
 
 static esp_err_t ai_policy(ui_context_t *ui, bool interrupted)
@@ -295,8 +297,9 @@ static void ai_snapshot(ui_context_t *ui)
         (ui->ai_snapshot.view.state == PET_AI_ERROR && previous != PET_AI_ERROR) ||
         (ui->ai_snapshot.faulted && !faulted))) ui->voice_panel = true;
     if (!ai_active(&ui->ai_snapshot)) ui->dismiss_pending = false;
-    if (ui->ai_snapshot.view.state == PET_AI_IDLE &&
-        ui->ai_snapshot.view.reason == PET_AI_REASON_DRAINED && previous != PET_AI_IDLE)
+    if (ui->ai_snapshot.view.state == PET_AI_IDLE && previous != PET_AI_IDLE &&
+        (ui->ai_snapshot.view.reason == PET_AI_REASON_DRAINED ||
+         ui->ai_snapshot.view.reason == PET_AI_REASON_CONV_TIMEOUT))
         ui->voice_panel = false;
 }
 
@@ -566,8 +569,10 @@ static pet_ui_scene_t key_scene(const ui_context_t *ui)
     if (ui->screen_off) return PET_UI_SCENE_SCREEN_OFF;
     if (ui->presenter.id[0] != '\0') return PET_UI_SCENE_MESSAGE;
 #if PET_UI_AI
+    /* 会话窗口与 LISTENING 同场景：A=结束会话，C 按住续说，C 长按静音。 */
     if (ui->ai_available && ui->ai_snapshot.capture_active &&
-        ui->ai_snapshot.view.state == PET_AI_LISTENING) return PET_UI_SCENE_AI_TALK;
+        (ui->ai_snapshot.view.state == PET_AI_LISTENING ||
+         ui->ai_snapshot.view.state == PET_AI_CONVERSATION)) return PET_UI_SCENE_AI_TALK;
     if (ui->ai_available && ui->ai_snapshot.playback_active) return PET_UI_SCENE_TTS_PLAYBACK;
 #endif
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI

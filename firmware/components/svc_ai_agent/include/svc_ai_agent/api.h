@@ -28,6 +28,7 @@ typedef struct {
     uint8_t sfx_volume_pct; /* 消息提示音音量，与 TTS 人声分离。 */
     pet_ai_policy_t initial_policy;
     bool notifications_only; /* 无传输、无前端、不开麦；只拥有提示音输出。 */
+    bool conversation; /* M1 连续对话：回复播完后保持 10 s 窗口与采集，VAD 语音续轮。 */
     void (*on_completed)(uint32_t turn_id); /* 音频拥有者仅发送有界完成通知，不得阻塞。 */
 } pet_ai_agent_config_t;
 

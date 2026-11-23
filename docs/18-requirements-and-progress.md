@@ -1774,3 +1774,14 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 - 边界：睡眠场景暂按主页场景处理，矩阵中睡眠专属动作与消息详情/清除、上一条、重播未接线；数值连发未实现；成长总览/环境历史/网络状态页属后续切片（[30 §4.1](30-interaction-feature-expansion-plan.md) 已记录差异）。
 
 验证（2026-11-23，本机 macOS）：`bash tools/ci/test_host.sh` 全部 C 测试通过，含新增 `test_menu_def`（页表结构/叶子动作/深度约束/动作唯一性）与按页模型重写的 `test_growth_input`（ROOT 门控跳过、子页进出与返回、RETURN/ABOUT/设置激活、30s 超时与计时刷新、voice_only 直达 AI 页、PTT 起止与取消、阻塞抢占、开机按住不执行）；`bash tools/ci/test_ui_host.sh` 10/10 通过（`test_message_view` 同步改为页索引并链接 menu_def/growth_input）；`tools/ci/test_config_host.sh` 通过。`ui_service.c`/`growth_view.c`/`ai_view.c`/`key_actions.c` 未被主机测试编译，已用本地 stub 头在“全功能开启（growth/AI/climate/setup/设备控制/三键）”与“仅 UI 最小配置”两种 sdkconfig 下 `-fsyntax-only -Wall -Wextra -Werror` 逐文件核查通过。未执行 ESP-IDF 目标编译；三键实体未接线，实机菜单导航与按键手感待接线后按 [27](27-hardware-and-input.md) 验收。
+
+## INT-01-S4 · 语音 M1 会话保持（AI_CONVERSATION，2026-11-23，仅主机测试）
+
+落地 [30 §5.2](30-interaction-feature-expansion-plan.md) M1 免唤醒多轮：
+
+- 状态机：`pet_ai_state_t` 新增 `PET_AI_CONVERSATION`，原因新增 `CONV_SPEECH`/`CONV_TIMEOUT`，契约常量 `PET_AI_CONV_*`（窗口 10 s、续轮语音 200 ms、20 轮、总时长 5 分钟）。回复 drain 后开窗：保持 WSS 连接与采集（`START_CAPTURE`），重置帧锚点与上一轮语音累计；窗口内 `session_audio` 仅做 VAD 监听、不转发 PCM，累计 200 ms 语音原连接 `BEGIN_TURN` 续轮（复用既有单连接多轮 WSS 语义，未改传输层）。退出：窗口超时回 `IDLE/CONV_TIMEOUT` 并停采集、取消/静音/音频或传输失败退出会话并锁状态、每会话 20 轮或 5 分钟上限后 drain 回 `IDLE` 不再自动续窗。
+- 发布与采集：`ai_agent` 完成通知与上下文登记改为“上一状态 SPEAKING 且 reason=DRAINED（落 IDLE 或 CONVERSATION）”；循环采集保持条件放行 `CONVERSATION`；窗口内与活动会话一样抑制提示音；唤醒模型仍只在 IDLE/ERROR 常开。
+- UI：`ai_view` 新增“继续对话”页（状态/页脚/电平条），`ai_snapshot` 会话期间保持语音面板、超时回待机关面板，`key_scene` 将 `CONVERSATION` 归入 AI 对话场景（A 短按结束、C 按住续说、C 长按静音），隐私徽标同步。
+- 开关与兼容：`PET_AI_CONVERSATION`（默认 y，依赖 `PET_AI_XIAOZHI_ON_BOOT`），agent 配置 `conversation=false` 或会话配置 `conversation_window_ms=0` 保持旧的播完即回待机行为；离线语音模拟器状态/原因名表同步扩展，既有场景断言不变。
+
+验证（2026-11-23，本机 macOS）：新增 `test_ai_session::check_conversation_window/check_conversation_exits`（开窗动作与续轮、短噪声清零、窗口超时、按住说话续轮不重启采集、取消/静音/失败退出、轮次与总时长上限、配置缺轮次判无效）与 `test_ai_runtime::check_conversation_runtime_flow`（端口调用序：drain=停播/清音频/保持采集，续轮=仅 BEGIN，超时=停采集/清音频）；`LC_ALL=C bash tools/ci/test_host.sh` 全部通过（含既有 `test_ai_session`、`test_ai_runtime`、42 个 agent 场景与离线语音模拟器）、`test_ui_host.sh` 10/10、`test_config_host.sh`、`test_board_codegen.py` 通过。`test_build_matrix.py` 在本机因 git 中文输出与英文断言不匹配失败，`LC_ALL=C` 下通过，属已知环境问题与本次改动无关。目标侧改动文件已用本地 stub 在双 sdkconfig 下 `-fsyntax-only -Wall -Wextra -Werror` 核查通过。未执行 ESP-IDF 目标编译；真实多轮对话（不重唤醒且回答引用上文）、窗口期功耗与误续轮待实机验收。

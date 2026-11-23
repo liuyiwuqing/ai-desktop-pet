@@ -7,10 +7,11 @@
 
 #include "svc_ai_agent/session.h"
 
-static const char *const states[] = {"idle", "listening", "thinking", "speaking", "muted", "error"};
+static const char *const states[] = {"idle", "listening", "thinking", "speaking", "conversation",
+    "muted", "error"};
 static const char *const reasons[] = {"none", "wake", "press", "silence", "release", "limit",
     "no_speech", "response", "drained", "cancelled", "muted", "unmuted", "response_timeout",
-    "input_gap", "audio_error", "transport_error"};
+    "input_gap", "audio_error", "transport_error", "conv_speech", "conv_timeout"};
 static const char *const results[] = {"ok", "ignored", "stale", "invalid", "not_ready", "id_exhausted"};
 static const char *const actions[] = {"state", "begin", "capture_start", "capture_stop", "forward",
     "end_input", "cancel", "playback_start", "playback_stop", "clear"};

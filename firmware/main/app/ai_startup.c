@@ -67,6 +67,9 @@ esp_err_t app_ai_start(uint8_t volume, uint8_t sfx_volume, bool muted, bool dnd,
         pet_ai_agent_config_t ai = {.audio = pet_bsp_audio(), .volume_pct = volume,
             .sfx_volume_pct = sfx_volume,
             .initial_policy = {.muted = muted, .dnd = dnd},.on_completed=completed};
+#if CONFIG_PET_AI_CONVERSATION
+        ai.conversation = true; /* M1：回复播完后保持会话窗口，VAD 续轮。 */
+#endif
 #if CONFIG_PET_AI_ESP_SR_ENABLED
         ai.frontend = pet_ai_sr_frontend(&speech_frontend);
 #endif

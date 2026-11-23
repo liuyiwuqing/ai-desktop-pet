@@ -74,13 +74,16 @@ static void publish_status(agent_t *owner)
     pet_ai_view_t view;
     (void)pet_ai_runtime_snapshot(&owner->runtime, &view);
     uint32_t completed=0;
-    portENTER_CRITICAL(&status_lock);
-    if (view.state==PET_AI_IDLE && view.reason==PET_AI_REASON_DRAINED && owner->status.view.state!=PET_AI_IDLE) completed=view.turn_id;
-    if (view.state==PET_AI_IDLE && view.reason==PET_AI_REASON_DRAINED &&
-        owner->status.view.state!=PET_AI_IDLE && (owner->status.transcript[0] || owner->status.reply[0])) {
+    /* 播报 drain 后可能进入连续对话窗口（CONVERSATION）或待机；两者都算一轮完成。 */
+    const bool drained_done = view.reason == PET_AI_REASON_DRAINED &&
+        owner->status.view.state == PET_AI_SPEAKING &&
+        (view.state == PET_AI_IDLE || view.state == PET_AI_CONVERSATION);
+    if (drained_done) completed=view.turn_id;
+    if (drained_done && (owner->status.transcript[0] || owner->status.reply[0])) {
         (void)pet_ai_context_add(&owner->context,view.turn_id,owner->status.transcript,owner->status.reply);
         owner->context_updated_ms=monotonic_ms();
     }
+    portENTER_CRITICAL(&status_lock);
     if (owner->status.policy.muted || owner->status.policy.dnd || owner->status.policy.interrupted ||
         (owner->context_updated_ms && monotonic_ms()-owner->context_updated_ms>=300000)) {
         pet_ai_context_clear(&owner->context); owner->context_updated_ms=0;
@@ -497,7 +500,9 @@ static bool notification_tick(agent_t *owner)
     uint64_t queued=owner->notification_ms;
     portEXIT_CRITICAL(&status_lock);
     pet_ai_view_t view;(void)pet_ai_runtime_snapshot(&owner->runtime,&view);
-    bool active=view.state==PET_AI_LISTENING||view.state==PET_AI_THINKING||view.state==PET_AI_SPEAKING;
+    /* 会话窗口保持采集等待续轮，与活动会话一样抑制提示音，避免抢占 RX。 */
+    bool active=view.state==PET_AI_LISTENING||view.state==PET_AI_THINKING||
+        view.state==PET_AI_SPEAKING||view.state==PET_AI_CONVERSATION;
     if (blocked||active||(interrupt&&!critical)) {
         if (owner->tone_active) {
             esp_err_t error=owner->config.audio->playback_stop();
@@ -565,7 +570,16 @@ static void agent_task(void *context)
         .classify_vad = owner->config.frontend.classify_vad != NULL ? frontend_vad : NULL,
         .preprocess = owner->config.frontend.preprocess ? frontend_preprocess : NULL,
     };
-    (void)pet_ai_runtime_init(&owner->runtime, NULL, &sink, &frontend, monotonic_ms());
+    pet_ai_session_config_t session_config = {0};
+    if (owner->config.conversation) {
+        session_config = (pet_ai_session_config_t){
+            .energy_on_rms = 800, .energy_off_rms = 400,
+            .conversation_window_ms = PET_AI_CONV_WINDOW_MS,
+            .conversation_max_rounds = PET_AI_CONV_MAX_ROUNDS,
+        };
+    }
+    (void)pet_ai_runtime_init(&owner->runtime, owner->config.conversation ? &session_config : NULL,
+                              &sink, &frontend, monotonic_ms());
     const esp_err_t error = owner->config.audio->init();
     if (error != ESP_OK) {
         fault(owner, error, ESP_OK);
@@ -613,7 +627,7 @@ static void agent_task(void *context)
         const bool wake_capture = owner->config.frontend.detect_wake != NULL &&
             !inhibited(owner) && !owner->tone_active && (view.state == PET_AI_IDLE || view.state == PET_AI_ERROR);
         if (owner->capturing && !wake_capture && view.state != PET_AI_LISTENING &&
-            capture_stop(owner, view.turn_id) != PET_AI_PORT_OK) {
+            view.state != PET_AI_CONVERSATION && capture_stop(owner, view.turn_id) != PET_AI_PORT_OK) {
             fault(owner, owner->hardware_error, ESP_OK);
             break;
         }

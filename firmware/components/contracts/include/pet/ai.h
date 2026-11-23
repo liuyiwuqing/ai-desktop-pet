@@ -9,12 +9,18 @@
 #define PET_AI_RESPONSE_TIMEOUT_MS 15000u
 #define PET_AI_FRAME_GAP_MS 100u
 #define PET_AI_WAKE_COOLDOWN_MS 3000u
+/* M1 连续对话：回复播完后保持的续轮窗口与总量上限（防误触发耗流量）。 */
+#define PET_AI_CONV_WINDOW_MS 10000u
+#define PET_AI_CONV_RESUME_MS 200u
+#define PET_AI_CONV_MAX_ROUNDS 20u
+#define PET_AI_CONV_TOTAL_MS 300000u
 
 typedef enum {
     PET_AI_IDLE,
     PET_AI_LISTENING,
     PET_AI_THINKING,
     PET_AI_SPEAKING,
+    PET_AI_CONVERSATION, /* 回复播完后的续轮窗口：保持连接与采集，VAD 检测语音续轮。 */
     PET_AI_MUTED,
     PET_AI_ERROR,
     PET_AI_STATE_COUNT,
@@ -37,6 +43,8 @@ typedef enum {
     PET_AI_REASON_INPUT_GAP,
     PET_AI_REASON_AUDIO_ERROR,
     PET_AI_REASON_TRANSPORT_ERROR,
+    PET_AI_REASON_CONV_SPEECH, /* 会话窗口内检测到语音，续开一轮。 */
+    PET_AI_REASON_CONV_TIMEOUT, /* 会话窗口超时，回待机。 */
 } pet_ai_reason_t;
 
 /* 逻辑会话快照；状态描述控制意图，不能据此宣称物理麦克风/功放已启停。 */
