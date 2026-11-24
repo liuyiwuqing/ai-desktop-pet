@@ -1114,3 +1114,59 @@ docker create --name rollback-acc03-3fdca79 --entrypoint /bin/true ghcr.io/liuyi
 | `acc04-c88957e` | `c88957e` | `V29__companion_space.sql` | V29 |
 
 结论：acc02/03/04 三者之间可以只改 `image` 切换（同为 V29，无迁移差异），回退到 acc01 则必须同时回到 V28 的库。这比 §19.4 里那句「改 tag 即可」精确——**同 schema 才叫只改 tag**。
+
+## 20. ACC-05：线上复核与固件烧录（2026-11-24 22:39–23:10）
+
+用户要求「把最新功能更新到线上并烧录 ESP32」。执行顺序是：先核对线上是否已有最新提交，再把固件构建并烧进去，最后用线上数据验证设备行为。
+
+### 20.1 线上：已经在最新，不需要再部署
+
+| 核对项 | 结果 |
+| --- | --- |
+| 线上镜像 | `ghcr.io/liuyiwuqing/nexus-core:acc04-c88957e`，`running/healthy`，`StartedAt=2026-11-24T13:50:42Z`，`RestartCount=0` |
+| CORE 仓 | `c88957e` = `origin/codex/core-baseline`，工作区干净，无未推送提交 |
+| 04 仓 | `6e40a62` = `origin/main`，工作区干净 |
+
+镜像 tag 里的 `c88957e` 与仓库 HEAD 是同一个提交，21:50 之后容器没有再重建过，所以「更新到线上」这一步没有可做的工作——再部署一次只会多一次无意义的停机。
+
+### 20.2 固件：构建与烧录
+
+- 配置：在设备现有配置上打开 `CONFIG_PET_GROWTH_SYNC_ENABLED` 与 `CONFIG_PET_COMPANION_SYNC_ENABLED`（后者依赖前者）。`sdkconfig` 是本地文件（已被 `.gitignore` 忽略），因此新增 `firmware/profiles/companion.defaults` 记录这两个开关，换机器时用 `SDKCONFIG_DEFAULTS="sdkconfig.defaults;profiles/companion.defaults"` 复现。
+- 构建：`idf.py build` 通过，app 3,035,472 B；`srmodels.bin` 4 B（ESP-SR 未启用）。
+- 烧录：`idf.py -p /dev/cu.usbmodem11201 flash`，idf 自动用 `--diff-with` 只写变化块（本次 app 段写 1,200,128 B），`Hash of data verified`，硬复位。写的是 bootloader/分区表/otadata/app，**没有擦除 NVS**，Wi-Fi、MQTT 凭据与屏幕/提示音设置都保留。
+
+### 20.3 第一次烧录后成长与伙伴同步全是 0——两端都在静默丢
+
+设备上线、遥测正常，但 `device_growth_observations`、`device_companion_observations` 一行为 0。查到两个静默点，任意一个都足以让数据消失且不留日志：
+
+1. **固件侧绑错设备 ID**：`app_growth_sync_init(s_device_id)` 原先在 `pet_growth_start()` 旁边调用（`app.c` 第 504 行），而 `load_net_config()` 在第 533 行才把 NVS 里的真实 ID 读进 `s_device_id`。于是初始化拿到的是编译期默认值 `pet-dev-01`，增长/伙伴快照被发布到 `nexus/v1/devices/pet-dev-01/...`。
+2. **CORE 侧静默丢弃**：`CompanionService.observation` / `DeviceGrowthService.observation` 第一件事是按 `device_id` 查 `devices` 表，查不到直接 `return`——不抛异常、不写日志。Broker 的 `pattern write nexus/v1/devices/%u/...` 对 `pet-dev-01` 也不匹配，但拒绝发布同样不写日志、不断连接。
+
+所以现象是「设备在线、遥测照常、同步恒为 0、日志干净」。这和 §10.3.3 里那次 23 小时 401 是同一类问题：**失败发生在没有人观察的通道上**。
+
+修复（两处一起）：
+
+- `app.c`：把 `app_growth_sync_init(s_device_id)` 移到 `load_net_config()` 之后，并注释说明原因。
+- `app_growth_sync.c`：`app_growth_sync_init` 允许用真实 ID **重新绑定**（此前一旦设过就直接 return）。重绑时保留 `bootId`、重置 `sequence` 与 `last_report`，避免用旧序列号发到新主题。
+
+### 20.4 复验
+
+重新编译并差分烧录后（第二次写入 1,200,128 B，hash verified）：
+
+| 证据 | 值 |
+| --- | --- |
+| 成长观测 | `device_growth_observations.observed_at = 2026-11-24T15:08:22Z`，持续刷新 |
+| 伙伴观测 | `device_companion_observations.received_at = 15:08:23Z`，`revision=323` |
+| 引导登记 | `device_growth_boots`、`device_companion_boots` 各 1 行（新的 `bootId`） |
+| CORE 拒绝 | 最近 90 秒 0 条 `MQTT input rejected` |
+| 遥测 | 30 秒一条持续入库 |
+
+过渡期 `15:04:00`–`15:04:29` 有 25 条 `MQTT input rejected: IllegalArgumentException`：那是重绑前后 `bootId`/`reportSequence` 切换的几分钟，之后自愈。CORE 只打异常类名不打消息体，所以这 25 条没有把原因说出来——这是日志可诊断性的一个缺口，见 20.5。
+
+### 20.5 边界
+
+- **未做 appearance 端到端**：没有向设备下发换装命令（会改设备外观并写 NVS），需要用户授权；本轮只证明「快照上行通了」。
+- **主机测试覆盖不到这条**：`tools/ci/test_host.sh` 退出 0（含 `test_growth_sync`），但它编译的是组件源码，不包含 `app.c` 的初始化顺序；这个缺陷只能靠实机验证抓到。
+- **差分烧录**只写变化块，没做整片擦写与回读校验；若怀疑镜像不一致，应改用 `esptool write-flash` 全量写入后回读比对。
+- **日志缺口**：CORE 对 `MQTT input rejected` 只记录异常类名。`IllegalArgumentException` 的消息其实是 `invalid_growth_state`、`device_mismatch` 这类原因码，不含隐私，值得单独改一次，让下次同类问题不用再从两端代码里猜。
+- `sdkconfig` 不入库，设备当前的功能开关只体现在 `firmware/profiles/companion.defaults` 与本机 `sdkconfig` 里；在别的机器重建不会自动带上。

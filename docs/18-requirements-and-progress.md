@@ -1929,3 +1929,15 @@ README 记下四条真实踩过的坑：令牌不能从 `docker cp` 的 tar 流�
 OPS-ARCHIVE-01 后续（同日 22:31Z）：三个刚恢复的镜像在 6 分钟后被外部 `prune` 清掉（`docker events` 记到 22:31:08 与 22:31:16 两轮，untag+delete 的正是 acc01/02/03 与我临时用的 `alpine:3`），§19.4 的「可切回 4 个版本」当场失效。触发源未归因：宿主机跑 `1panel-core`/`1panel-agent`，`/opt/1panel` 用 root 容器挂不到内容，`1panel-mcp` 无日志；两次相隔 8 秒，像面板「清理镜像」的两步。已用开发机镜像经 `docker save | ssh docker load` 流式恢复（每个约 51 秒、共约 2.6 分钟、三版只占 80 MB），并用三个 `Created` 状态容器 `rollback-acc01/02/03` 把镜像钉住（`image prune` 会跳过被任何容器引用的镜像，但 `container prune` 会先删掉它们）。
 
 顺带实测出回滚矩阵：`acc01-d2711f7` 最高迁移 `V28`，`acc02/acc03/acc04` 均为 `V29`——所以只有 acc02/03/04 之间能「只改 image」，回退 acc01 必须同时回到 V28 的库。证据见 [ACC-01 §19.5](29-acc01-production-deployment-plan.md)。
+
+## ACC-05-01 · 线上复核、固件烧录与成长/伙伴同步修复（2026-11-24，已烧录）
+
+用户要求「把最新功能更新到线上并烧录 ESP32」。线上复核结论是不需要部署：CORE 仓 HEAD `c88957e` 与线上镜像 tag `acc04-c88957e` 是同一提交，容器 `running/healthy`、`StartedAt=13:50:42Z`、`RestartCount=0`，21:50 之后没再重建过；04 仓 `6e40a62` 也已推送、工作区干净。
+
+固件侧在本机现有配置上打开 `CONFIG_PET_GROWTH_SYNC_ENABLED` + `CONFIG_PET_COMPANION_SYNC_ENABLED`，`idf.py build` 通过（app 3,035,472 B），`idf.py -p /dev/cu.usbmodem11201 flash` 差分写入并 `Hash of data verified`，未擦 NVS。
+
+烧完发现成长/伙伴同步计数恒 0，定位到两端各有一个静默失败：固件里 `app_growth_sync_init(s_device_id)` 在 `load_net_config()` 之前调用（app.c 504 vs 533），拿到编译期默认 `pet-dev-01`，快照被发到不存在的设备主题；CORE 的 `CompanionService`/`DeviceGrowthService.observation` 先查 `devices` 表，查不到直接 return，不抛异常不记日志；Broker ACL 的 `%u` 不匹配也只是丢弃。修法是 init 移到配置加载之后，并让 `app_growth_sync_init` 能用真实 ID 重绑定（保留 bootId、重置 sequence/last_report）；新增 `firmware/profiles/companion.defaults` 记录这两个开关（`sdkconfig` 已被忽略，换机器无法自动复现）。
+
+复验：重烧后 `device_growth_observations` 与 `device_companion_observations` 开始入库并持续刷新（`15:08:22Z`、companion `revision=323`），`device_growth_boots`/`device_companion_boots` 各 1 行，CORE 最近 90 秒 0 条拒绝；`tools/ci/test_host.sh` 退出 0。
+
+边界：未下发换装命令（appearance 端到端仍缺实机证据，需授权）；主机测试不覆盖 `app.c` 初始化顺序，此缺陷只有实机能抓到；差分烧录未做全量擦写与回读；CORE 的 `MQTT input rejected` 只记录异常类名，本次 25 条过渡期拒绝没能自证原因，已列为待改项。证据见 [ACC-01 §20](29-acc01-production-deployment-plan.md)。
