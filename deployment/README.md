@@ -98,3 +98,7 @@ DEL-03 在相同包上使用 `--auth-rotation` 验证实际 Linux 私有卷和 U
 
 
 管理台 RSS / 天气已提供默认关闭的镜像内连接器；按 [拉取来源说明](../../nexus-core/docs/pull-connectors.md) 修改私有 core.env 并重新创建 CORE。已有安装不要重新初始化。
+
+## 生产观测采集
+
+每轮发布窗口的 24 小时观测用 [observe/](observe/README.md) 里的两段只读脚本：服务端窗口（15 分钟一条：容器状态与重启数、`/api/v1/status`、磁盘、连接数、内存、MQTT 重连、近 200 条 5xx、证书到期）与设备连通性（5 分钟一条：`fresh_online`/`last_seen`/RSSI/断连事件）。两份文件与目标机在跑版本逐字节相同（哈希见该目录 README），因为它们此前只存在于服务器上、不受版本控制，直到一次令牌抓取静默失效让 ACC-01 的 23 小时观测全部 401 才被发现。结论用 `python3 tools/observe_report.py <窗口.ndjson> --device <设备.ndjson>` 生成，退出码 0/2/1 分别对应通过/待复核/失败。
