@@ -75,3 +75,5 @@ A7：`test_host.sh` 覆盖 PTT/隐私/抢占与独立策略更新，`test_ui_hos
 远程 OTA 检查：`PET_HOST_SANITIZE=1 bash tools/ci/test_ota_remote_host.sh`、`PET_HOST_SANITIZE=1 python3 tools/ci/test_remote_ota_contract.py`、`bash tools/ci/test_remote_ota_ui.sh`。分别覆盖实际 C 事务、真实 CORE/数据库/Broker 与 C 回环、真实 Vue/浏览器 + HTTP 边界夹具；均不烧录、不执行真实升级，见 [19](../docs/19-remote-ota.md)。
 
 CORE `tools/credential_store.py` 提供受保护文件的 init/status/rotate/revoke/export-memory；04 发布包 format=2 纳入此 CLI，预检/probe 支持文件模式，verifier 保留 format=1 兼容。秘密仅在权限文件中流转，不进入 CLI 参数/输出。详见 [20](../docs/20-credential-rotation.md)。
+
+`observe_report.py`：读服务端观测窗口 ndjson（`~/nexus-observe/observe-*.ndjson`，可选 `--device` 读设备侧日志），输出覆盖/断档/重启/通道/资源/5xx/证书与逐项判定；把「服务不健康」与「采集通道 401」分开，避免把采集器故障当成停机。退出码 0 通过、2 待复核、1 失败。`ci/test_observe_report.py` 覆盖全绿窗口、401 通道、断档+重启+未闭环、非法日志与设备离线段；用法与结论见 [ACC-01 §10.3.3](../docs/29-acc01-production-deployment-plan.md)。
