@@ -1843,3 +1843,11 @@ CORE「伙伴」新增四分区：伙伴空间、衣橱与小舱、回忆与收�
 验证：CORE全量 `python3 tools/run_local.py build` 通过（196项、0失败、6环境跳过）；最终页面变更后Vue类型/token/Vite/打包复验通过。Playwright+本机Chrome使用隔离HTTP fixture与伙伴数据，1440×1000、390×844检查无横向溢出，覆盖设备选择、预览、离线禁止提交、版本冲突、等待/保存结果、回忆、CORE专注入口、只读角色、键盘与减少动态，页面无运行异常。截图 `/tmp/qitomo-desktop.png`、`/tmp/qitomo-mobile.png`。真实LVGL复验10/10通过。旧成长UI回归脚本同步新页签路径（该ego-browser脚本本次未执行，页面以Playwright验证）。未烧录/部署/真实设备操作，实屏性能、接线、功耗与真实联网验收仍待硬件验证。
 
 同步切片已推送并核验：固件 `236faee36d385d210a6fd56ed8f15ee041b0adf8`，配套CORE `c0c0e064a93a6d963292756211436eda247d9f04`。控制台切片分别提交于两仓，具体提交见Git历史。
+
+## CONSOLE-DEPLOY-01 · 管理台与伙伴空间上线（2026-11-24，真实部署）
+
+把 CORE `88d2e90`（「伙伴」四分区控制台、小舱/衣橱、回忆与收藏）与 V29 迁移部署到 `pet.muyin.site`，并按用户决定同时启用伙伴后端。发布运行 [45393714296](https://github.com/liuyiwuqing/nexus-core/actions/runs/45393714296) 成功，7 项镜像冒烟通过；服务器到 GHCR 仍 TLS 超时，继续离线导入 `linux/amd64` 镜像（tag `acc02-88d2e90`）。编排只改 CORE 的 `image` 与新增 `NEXUS_COMPANION_ENABLED: "true"`；Broker 按 `tools/broker_policy.py` 现行标准增补 `companion_status`/`appearance_acks`/`appearance` 规则，`message_size_limit` 2048→3072 后 SIGHUP 重载（容器未重建）。
+
+验证（本机 macOS + `nexus-deploy` 只读/受控操作）：升级前 dump 与私有目录备份完成且隔离恢复一致（V28、1/6/149 行）；停机约 64 s，Flyway V28→V29（0.081 s），`failed=0`，三张伙伴表建立；`/api/v1/status` 双 ready；`GET /api/v1/devices/dodo-1/companion` 返回 `enabled=true`（设备离线）；HTTPS 200、SSE 200 `text/event-stream` 含 ready/heartbeat；18088 仅回环；MQTT TLSv1.3 校验 0（CN `pet.muyin.site`）；CORE 仍是 65534/只读/1 GiB/cap_drop ALL、`RestartCount=0`；主动重启 9 s healthy 且 `No migration necessary`。证据与哈希回填在 [ACC-01 §15](29-acc01-production-deployment-plan.md)。
+
+边界与遗留：设备 `dodo-1` 自 2026-11-23T14:42Z 离线，换装端到端、设备侧 `CONFIG_PET_COMPANION_SYNC_ENABLED` 与真实 MQTT 发布未验证，ACL 只做配置级核对，未发测试消息、未烧录；未做浏览器 UI 登录/权限页与 24 小时观测。另发现既有契约缺口：固件 `0.4.0-dev` 遥测 `config` 含 `sfxVolume`/`screen`，CORE `ManagementCodec.config()` 严格字段集不含，每次启动 1 条 `MQTT input rejected: IllegalArgumentException`，新遥测因此不入库（`device_telemetry_samples` 最新 `observed_at` 2026-11-23 12:56:47Z），需在 nexus-core 放宽字段集后重新发布升级，本次未改。

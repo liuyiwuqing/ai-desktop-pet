@@ -69,3 +69,7 @@ v5 存档为 256 字节、CRC32、双槽提交；兼容读取 v1/v2/v3/v4。旧�
 ## 控制台伙伴空间（PET-CONSOLE-01）
 
 「伙伴」页选择设备后，可查看小舱、三游戏纪录与最近回忆；「衣橱与小舱」预览穿戴、主题及三摆放位，未拥有内容仅预览。在线管理员应用后等待设备保存确认，离线仅当前面板草案；切换设备保留各自草案，整页刷新不保留。设备版本冲突需加载最新外观后重选。手机同样支持设备搜索，网页招手是本地形象互动。CORE专注档案独立页签保留原奖励与最近记录，不向设备发奖励。配置、接口与验收见配套CORE `docs/companion-space.md`。
+
+### 上线状态（2026-11-24）
+
+`pet.muyin.site` 已升级到 CORE `88d2e90`（V29），编排开启 `NEXUS_COMPANION_ENABLED`，Broker ACL 与 3072 字节消息上限同步生效；伙伴接口返回 `enabled=true`，页面与静态资源已可访问。设备 `dodo-1` 当时离线，换装端到端与设备侧 `CONFIG_PET_COMPANION_SYNC_ENABLED` 未验证；另外发现旧固件遥测 `config` 新增字段被 CORE 拒绝（每次启动 1 条 `unknown_management_field` 告警，新遥测不入库），属 CORE 契约缺口，需单独修复。执行证据见 [ACC-01 §15](29-acc01-production-deployment-plan.md)。

@@ -1,6 +1,8 @@
 # 1Panel：直接拉取镜像部署管理台
 
-2026-11-15 已验证版本：CORE `230c809`，支持 `linux/amd64`、`linux/arm64`。发布与按 digest 回拉的 [运行 43620052738](https://github.com/liuyiwuqing/nexus-core/actions/runs/43620052738) 全部成功，7 项无源码初始化/编排/鉴权/静态资源/TLS/重建持久性检查通过。当前发布物为 CORE `d2711f7`（含 V27/V28），发布运行 [45103288550](https://github.com/liuyiwuqing/nexus-core/actions/runs/45103288550)，digest 见下方命令；完整门禁与迁移步骤见 [ACC-01 执行计划](29-acc01-production-deployment-plan.md)。以下供部署者在自己的 Debian/1Panel 执行；本项目未连接或部署该服务器。
+2026-11-15 已验证版本：CORE `230c809`，支持 `linux/amd64`、`linux/arm64`。发布与按 digest 回拉的 [运行 43620052738](https://github.com/liuyiwuqing/nexus-core/actions/runs/43620052738) 全部成功，7 项无源码初始化/编排/鉴权/静态资源/TLS/重建持久性检查通过。当前发布物为 CORE `88d2e90`（含 V29 伙伴空间与「伙伴」控制台页面），发布运行 [45393714296](https://github.com/liuyiwuqing/nexus-core/actions/runs/45393714296)，digest 见下方命令；此前基线为 `d2711f7`（V28），运行 [45103288550](https://github.com/liuyiwuqing/nexus-core/actions/runs/45103288550)。2026-11-24 已按本页在 `pet.muyin.site` 完成既有安装升级（离线导入、V29、伙伴空间启用），执行证据见 [ACC-01 §15](29-acc01-production-deployment-plan.md)。完整门禁与迁移步骤同见该计划。
+
+下文命令中的 digest 为历史基线，部署前按发布运行产物替换。
 
 ## 首次安装
 
@@ -47,5 +49,7 @@ docker run --rm --read-only --cap-drop ALL \
 先备份原私有目录与 PostgreSQL 卷/数据库，并在独立库验证恢复。保留原项目名、卷、凭据、CA、设备配置和原编排；只把 CORE 的 image 改为上述 CORE digest，然后拉取/重新创建 CORE。**不再运行初始化镜像，不混用新密码与旧数据库卷。** 新镜像会按 Flyway 顺序补齐缺失迁移（当前分支最新 V28）；升级前核对 `flyway_schema_history`，完整备份、迁移与回滚步骤见 [ACC-01 执行计划](29-acc01-production-deployment-plan.md)。旧镜像回退前必须确认数据库兼容，换镜像不等于回退数据库。
 
 RSS/Atom 和室外天气默认关闭。按 [拉取来源配置](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/pull-connectors.md) 修改私有 `core.env` 的 `NEXUS_PULL_FEEDS_JSON` 后重新创建 CORE，再在接入页测试/启用；单纯 restart 不重新读取 env。Webhook 来源凭据在管理台创建后仅显示一次。Halo/AI/记忆/Bridge/清理/OTA/成长同步仍遵循各自默认开关，不因本次升级自动接入真实服务。
+
+伙伴空间（V29 起）默认关闭。开启需同时满足三处，缺一项都无法换装：编排加 `NEXUS_COMPANION_ENABLED: "true"`；Broker ACL 按 `tools/broker_policy.py` 的当前标准增加 `companion_status`/`appearance_acks` 读、`appearance` 写（含设备侧 `pattern`），并把 `message_size_limit` 提到至少 3072 后 SIGHUP 重载；设备固件开启 `CONFIG_PET_COMPANION_SYNC_ENABLED`。只改 CORE 环境变量会出现“页面可见但不能应用”。
 
 完整使用、备份及恢复见 [CORE 镜像部署](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/1panel-deployment.md)。真实部署、生产迁移/HTTPS、供应商、设备与长期稳定性验收尚未执行。

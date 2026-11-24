@@ -1,6 +1,6 @@
 # ACC-01 生产部署与数据库迁移执行计划
 
-2026-11-20 制定，2026-11-23 执行 G0–G4。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，执行结果回填在各节末尾**：G0 发布物（3.4）、G1 只读盘点（5.3）、G2 备份与隔离恢复（6.2）、G4 离线导入与升级（8.5）、G6 运行时检查（10.2.1）与 24 小时观测（10.3.1）。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。
+2026-11-20 制定，2026-11-23 执行 G0–G4。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，执行结果回填在各节末尾**：G0 发布物（3.4）、G1 只读盘点（5.3）、G2 备份与隔离恢复（6.2）、G4 离线导入与升级（8.5）、G6 运行时检查（10.2.1）与 24 小时观测（10.3.1）。2026-11-24 追加执行 ACC-02 变更（CORE `d2711f7` → `88d2e90`、V29、伙伴空间启用），记录见第 15 节，当前生产基线以该节为准。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。
 
 ## 1. 目标、范围与完成判定
 
@@ -754,3 +754,83 @@ docker compose -p nexus-rollback -f /etc/nexus/docker/compose.rollback.yml up -d
 - [CORE Docker 部署、升级与恢复](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/docker-deployment.md)
 - [云端互通步骤](12-cloud-interop.md)
 - [CORE 实时更新与代理要求](https://github.com/liuyiwuqing/nexus-core/blob/codex/core-baseline/docs/console-events-and-setup.md)
+
+## 15. ACC-02 变更记录：管理台与伙伴空间升级（2026-11-24）
+
+范围：把 SPA 控制台更新（「伙伴」四分区、小舱与衣橱、回忆与收藏）与 CORE V29 伙伴空间迁移部署到 `pet.muyin.site`，并同时开启伙伴后端与 Broker 策略。场景判定为**既有安装升级**，项目名、卷、CA、设备配置与凭据均不变；未执行初始化镜像。
+
+### 15.1 发布物（G0）
+
+| 项 | 值 |
+| --- | --- |
+| 发布提交 | CORE `88d2e90`（含 `c0c0e06`；迁移新增 `V29__companion_space.sql`） |
+| 发布运行 | [45393714296](https://github.com/liuyiwuqing/nexus-core/actions/runs/45393714296) `success`（validate 真实 Compose 部署检查 + 双架构发布） |
+| CORE digest | `ghcr.io/liuyiwuqing/nexus-core@sha256:12b44f30377d745ea845d40f0d149b8780e0a0d1df032b9f281539ab582477ff` |
+| init digest | `ghcr.io/liuyiwuqing/nexus-core-init@sha256:d30c5f91f49914e19334837e1ea8cff6c165f587510017ef82a9d40d094ea7c5`（本次未使用） |
+| 冒烟 | 7/7 通过，报告 `published-image-smoke.json`（产物落 `/tmp/nexus-publish-45393714296`，本机临时目录，不入库） |
+| 镜像内容核对 | 拉取 `linux/amd64` 后解出 `/app/core.jar`，`BOOT-INF/classes/db/migration` 含 V1–V29 共 29 个；`V29__companion_space.sql` SHA-256 `2ec44175…7cd9` 与源码一致 |
+
+服务器到 GHCR 仍不可用（`pkg-containers.githubusercontent.com` 的 `TLS handshake timeout`，本次复现），继续走离线导入：
+
+| 项 | 值 |
+| --- | --- |
+| 本机归档 | `/tmp/nexus-core-acc02-amd64.tar`，319,070,720 B，SHA-256 `baf76eb57a9d47e0197b3a0b800a56da7148131fecea0396f460240b3d51b02c` |
+| 服务器归档 | `/home/nexus-deploy/images/nexus-core-acc02-amd64.tar`，尺寸与哈希一致 |
+| `docker load` | 成功；镜像 ID `sha256:a68b4cbc941e5ecb31f7c9c2d63f755665ee987783af16f0c7b450631ce80e8e`，`linux/amd64`，`revision=88d2e90484a9…`，`RepoDigests=[]` |
+| 本地 tag | `ghcr.io/liuyiwuqing/nexus-core:acc02-88d2e90`（编排按 tag + `pull_policy: never` 引用） |
+
+### 15.2 备份与隔离恢复（G2）
+
+- 备份前现状：迁移 V28、`devices` 1 行、`deliveries` 6 行、`device_telemetry_samples` 149 行；CORE 镜像 `sha256:a8f98e…`（`acc01-d2711f7`）。
+- CORE 于 `2026-11-24T12:35:14Z` 停止写入；数据库 dump `~/nexus-backups/nexus-acc02-before-20261124T123517Z.dump`，108,281 B，SHA-256 `8c0dccbe114f4c9b72fe0294d25cf9d71859040d5099e901ea4f360f673a627a`。
+- 私有目录包 `~/nexus-backups/nexus-private-20261124T123517Z.tar.gz`，10,330 B，SHA-256 `b5f5d8ad6da12e8220687e3fb7ba1dac28f0f8a7765d02e3afd0d2704714c80e`（内容为 `/etc/nexus/docker`，含令牌/密码/CA，仅留存本机回滚用，不入库不外传）。
+- 隔离恢复：`--network none` 临时容器 + 临时卷 `nexus-restore-check-<epoch>`，`pg_restore --no-owner --exit-on-error` 退出 0；恢复后 V28 且 `devices`/`deliveries`/`device_telemetry_samples` 与备份前一致（1/6/149）；临时容器与卷已删除。
+
+### 15.3 Broker 策略升级（先于 CORE 启动）
+
+按 `tools/broker_policy.py` 当前标准（`GROWTH_V1_ACL` → 现行 `MANAGEMENT_ACL`）对在线 ACL 做受控升级，只增加下列规则，不改既有条目：
+
+```text
+topic read  nexus/v1/devices/+/companion_status
+topic read  nexus/v1/devices/+/appearance_acks
+topic write nexus/v1/devices/+/appearance
+pattern write nexus/v1/devices/%u/companion_status
+pattern write nexus/v1/devices/%u/appearance_acks
+pattern read  nexus/v1/devices/%u/appearance
+```
+
+`mosquitto.conf` 仅 `message_size_limit` 2048 → 3072（`allow_anonymous false`、TLS、`max_packet_size 4096` 未动）。写入后 `SIGHUP` 重载，容器**未重建**（`Up 6 days` 不变），日志 `Reloading config`，容器内核对 `message_size_limit 3072`、ACL 含 4 处 `appearance` 规则。原始文件备份：`~/nexus-backups/broker-20261124/acl.20261124`（SHA-256 `8fe91211…ec43`）、`mosquitto.conf.20261124`（`0ee38f34…7387`）。
+
+### 15.4 编排与重启
+
+只改 CORE 两处：`image` 由 `acc01-d2711f7` 换成 `acc02-88d2e90`；`environment` 增加 `NEXUS_COMPANION_ENABLED: "true"`。PostgreSQL、Mosquitto、网络、安全限制、会话卷、令牌文件挂载均未动。
+
+| 项 | 值 |
+| --- | --- |
+| 活动编排 | `/data/1panel/docker/compose/nexus-production/docker-compose.yml`（1Panel 文件驱动，未在面板另存旧内容） |
+| 旧编排 SHA-256 | `ad3d73736ee32de6404a441074a463f8b5e8e2b594aceacba55aa65cca03a1c2`，备份 `/compose/docker-compose.yml.bak-acc02-20261124` 与 `~/nexus-backups/nexus-production.docker-compose.yml.acc02-backup` |
+| 新编排 SHA-256 | `58c97511dc0b7f2a38f085d59af09a28b7b0bb5642d13172c15ee37f4943a029` |
+| 重建方式 | 以本地 CORE 镜像作一次性 root 客户端挂宿主 `docker.sock`、`docker`、compose 插件、编排目录与 `/etc/nexus/docker`，执行 `docker compose -p nexus-production -f <宿主真实路径> up -d --no-deps --force-recreate core` |
+| 停机窗口 | `12:35:14Z` 停 CORE → `12:36:18Z` 新容器启动 → `12:36:47Z` healthy，服务中断约 64 s（期间反代 502）；PostgreSQL/MQTT 全程运行 |
+
+### 15.5 迁移与部署后检查
+
+- Flyway：`Current version 28` → `Migrating to 29 - companion space` → `Successfully applied 1 migration`（0.081 s）；`flyway_schema_history` 最高 V29、`failed=0`；新建 `device_companion_observations`、`device_companion_boots`、`device_appearance_requests`；`devices`/`deliveries`/`device_telemetry_samples` 仍为 1/6/149（迁移不改行数）。
+- `/api/v1/status`：`{"database":"ready","mqtt":"ready"}`；无令牌 401。
+- 伙伴接口：`GET /api/v1/devices/dodo-1/companion` → `{"enabled":true,"online":false,"fresh":false,"snapshot":null,"requests":[]}`（开关已生效，设备离线故无快照）。
+- 令牌文件模式保持：`GET /api/v1/access/admin-token` → `{"mode":"file","editable":true,"revision":2}`。
+- 静态资源：`https://pet.muyin.site/` 200、`ssl_verify_result=0`，入口脚本 `assets/index-B6SjEAb6.js`，包内含「伙伴」入口与 companion 逻辑。
+- SSE：`/api/v1/events` HTTP/2 200、`content-type: text/event-stream`、`cache-control: no-store`、`x-nexus-role: admin`；`curl -N` 收到 `event:ready` 与连续 `event:heartbeat`，无代理缓冲迹象。
+- 端口与安全：`127.0.0.1:18088` 仅回环，无 5432 外部监听；CORE `65534:65534`、只读根、1 GiB、`cap_drop: ALL`、`RestartCount=0`；`/var/lib/nexus/sessions` 为 `65534:65534 700`。
+- MQTT TLS（宿主 openssl 读私有 CA）：`TLSv1.3`、`subject=CN=pet.muyin.site`、`issuer=CN=NEXUS Local CA`、`Verify return code: 0 (ok)`；HTTPS 证书至 2027-02-13。
+- 重启复核：`12:39:04Z` 主动 `docker restart`，9 s healthy，Flyway 输出 `No migration necessary`，`RestartCount=0`，状态仍双 ready。
+- 资源：宿主 available 约 979 MiB，根分区 14 GB（84%）；CORE 227 MiB/1 GiB、PostgreSQL 44 MiB、Mosquitto 4.8 MiB。
+
+### 15.6 已知问题与边界（本次未修）
+
+1. **每次启动 1 条 `MQTT input rejected: IllegalArgumentException`**：由设备 retained `telemetry` 触发——固件 `0.4.0-dev` 上报的 `config` 含 `sfxVolume`、`screen`，而 CORE `ManagementCodec.config()` 的字段集仍为 `schemaVersion/timezone/language/volume/brightness/dnd/message`(+`muted`)，判定 `unknown_management_field` 后整条拒绝。影响：新格式遥测不入库（`device_telemetry_samples` 最新 `observed_at` 仍为 `2026-11-23 12:56:47Z`），`online`/`last_seen` 由 `state`/LWT 维护不受影响；该 WARN 与本次改动无关（catch 与登录路径自基线存在），修复属 CORE 契约缺口，需放宽字段集后重新发布再升级。
+2. 设备 `dodo-1` 自 `2026-11-23T14:42:34Z` 离线，**换装端到端（appearance 下发 → 设备 ACK → applied）没有真实设备验证**；Broker ACL 只做了配置级核对，未发测试消息、未做真实发布验证。
+3. 设备侧还需 `CONFIG_PET_COMPANION_SYNC_ENABLED` 才回传 `companion_status`，本次未烧录、未核对在网固件是否开启。
+4. 未执行：浏览器 UI 登录/权限页、24 小时观测、1Panel 面板内编排保存（本次直接改文件，面板读取的是同一路径）、ACC-02 硬件长稳。
+
+回滚：迁移 V29 只新建三张表，不改变既有表结构，可仅把编排 `image` 改回 `acc02-88d2e90`→`acc01-d2711f7`、去掉 `NEXUS_COMPANION_ENABLED` 后重建 CORE；若同时要回退 Broker，用 `~/nexus-backups/broker-20261124/` 两个文件覆盖并 SIGHUP。数据库回退按 11.3，不删除 `postgres-data`。
