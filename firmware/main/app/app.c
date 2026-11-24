@@ -276,6 +276,7 @@ static void on_net_message(const char *topic, const char *payload, size_t length
 {
     (void)context;
     if(app_ota_remote_message(topic,payload,length,retained,app_epoch_now()))return;
+    if(app_companion_message(topic,payload,length,retained,app_epoch_now()))return;
     char settings_topic[PET_NET_TOPIC_MAX];
     int written=snprintf(settings_topic,sizeof(settings_topic),PET_NEXUS_TOPIC_PREFIX "%s/config",s_device_id);
     if (written>0&&(size_t)written<sizeof(settings_topic)&&!strcmp(topic,settings_topic)) {

@@ -61,3 +61,7 @@ v5 存档为 256 字节、CRC32、双槽提交；兼容读取 v1/v2/v3/v4。旧�
 - 语音、重要消息、控制确认、显示异常、息屏或摇杆采样丢失暂停正在运行的游戏；恢复画面后需 A 主动继续。普通消息在游戏/装扮中延后。
 - 栖团采用 86 px 瓷白主体、墨绿面罩、非对称耳天线、薄荷眼睛和尾灯；首页画布 208×150。语音页缩小显示同一角色。12 个动作：回应、吃东西、摸头、庆祝、聆听、思考、说话、入睡、醒来、专注、失败反馈、招手；六种稀有待机：观星、整理天线、哈欠、追尾灯、翻手账、挥手。基础八状态和环境提示保留，动效最多 25 fps，遮挡停帧。
 - `bash tools/ci/test_ui_host.sh && python3 tools/export_pet_preview.py` 生成真实 LVGL 截图及 `firmware/build-ui-preview/pet-animation.html` 动画预览，图像来自实际固件绘制函数。它验证像素和交互状态，不代表实屏帧率、功耗或声学效果。
+
+## 跨端伙伴协议（PET-SYNC-01）
+
+状态/命令/结果分别使用 `companion_status`、`appearance`、`appearance_acks`，目录版本1，Schema 位于 `config/schemas`。管理员外观请求带UUID与版本，30秒有效；设备落盘后确认，丢ACK按持久命令身份回读核对。离线不排队，不远程更改成长数值。固件伙伴同步开关默认关闭，CORE启用 `NEXUS_COMPANION_ENABLED` 并升级ACL/3072字节消息限制。完整接口及配置见配套 CORE `docs/companion-space.md`。

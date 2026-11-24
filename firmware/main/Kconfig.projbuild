@@ -206,6 +206,14 @@ config PET_GROWTH_SYNC_ENABLED
       Publish non-retained growth display data every 15 seconds after time synchronization.
       This does not merge CORE rewards or replace the local save.
 
+config PET_COMPANION_SYNC_ENABLED
+    bool "Sync companion collection and accept versioned appearance commands"
+    depends on PET_GROWTH_SYNC_ENABLED
+    default n
+    help
+      Requires CORE companion support and per-device broker ACLs. Only owned
+      outfits/furnishings may be applied. Does not accept remote growth rewards.
+
 config PET_GROWTH_UTC_OFFSET_MINUTES
     int "Growth calendar UTC offset in minutes"
     depends on PET_MODULE_GROWTH_ENABLED

@@ -146,7 +146,7 @@ def main():
                 'CONFIG_PET_MODULE_AUDIO_ENABLED':'y','CONFIG_PET_MODULE_UI_ENABLED':'y',
                 'CONFIG_PET_MODULE_CLIMATE_ENABLED':'n','CONFIG_PET_EXT_DEVICE_CONTROL':'n',
                 'CONFIG_PET_EXT_SERVO':'n','CONFIG_PET_EXT_JOYSTICK':'n','CONFIG_PET_EXT_LIGHT_SENSOR':'n'},
-            'full':{'CONFIG_PET_AI_ESP_SR_ENABLED':'y','CONFIG_PET_OTA_ENABLED':'y','CONFIG_PET_EXT_SERVO':'y',
+            'full':{'CONFIG_PET_COMPANION_SYNC_ENABLED':'y','CONFIG_PET_AI_ESP_SR_ENABLED':'y','CONFIG_PET_OTA_ENABLED':'y','CONFIG_PET_EXT_SERVO':'y',
                 'CONFIG_PET_EXT_JOYSTICK':'y','CONFIG_PET_EXT_LIGHT_SENSOR':'y'}}[entry['profile']]
         for default in (FW/'sdkconfig.defaults',FW/'profiles'/f"{entry['profile']}.defaults"):
             expected.update(config_values(default))

@@ -44,6 +44,7 @@ SCHEMA_KEYWORDS = {
     "maxLength",
     "pattern",
     "items",
+    "prefixItems",
     "minItems",
     "maxItems",
     "default",
@@ -95,6 +96,12 @@ def check_schema(node: object, path: str) -> None:
             raise SchemaError(f"{path}: properties must be an object")
         for name, child in properties.items():
             check_schema(child, f"{path}.{name}")
+
+    if "prefixItems" in node:
+        if not isinstance(node["prefixItems"], list):
+            raise SchemaError(f"{path}: prefixItems must be an array")
+        for i, child in enumerate(node["prefixItems"]):
+            check_schema(child, f"{path}[{i}]")
 
     if "items" in node:
         check_schema(node["items"], f"{path}[]")
@@ -174,7 +181,7 @@ def _validate(value: object, schema: object, path: str, errors: list[str]) -> No
         if "maxItems" in schema and len(value) > schema["maxItems"]:
             errors.append(f"{path}: expected at most {schema['maxItems']} items")
         for index, item in enumerate(value):
-            _validate(item, schema.get("items", True), f"{path}[{index}]", errors)
+            _validate(item, schema.get("prefixItems", [])[index] if index < len(schema.get("prefixItems", [])) else schema.get("items", True), f"{path}[{index}]", errors)
     elif node_type == "string":
         if not isinstance(value, str):
             errors.append(f"{path}: expected string, got {type(value).__name__}")
@@ -346,6 +353,8 @@ def _ts_type(prop: dict, owner: str, raw_name: str, nested: list[str]) -> str:
         nested.extend(_render_interface(prop, nested_name))
         return nested_name
     if prop_type == "array":
+        if "prefixItems" in prop and prop.get("items") is False:
+            return "[" + ", ".join(_ts_type(item, owner, raw_name + str(i), nested) for i, item in enumerate(prop["prefixItems"])) + "]"
         items = prop.get("items", True)
         if isinstance(items, dict):
             item_type = _ts_type(items, owner, raw_name + "Item", nested)

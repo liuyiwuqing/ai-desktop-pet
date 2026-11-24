@@ -222,6 +222,7 @@ build_and_run test_growth_sync \
     "${repo_root}/firmware/tests/host/test_growth_sync.c"
 
 build_and_run test_growth_service \
+    -I "${repo_root}/firmware/managed_components/espressif__cjson/cJSON" \
     -pthread -I "${repo_root}/firmware/tests/host/support" \
     -I "${contracts_inc}" -I "${growth_priv_inc}" \
     -I "${repo_root}/firmware/components/core/include" \
@@ -229,10 +230,12 @@ build_and_run test_growth_service \
     -I "${repo_root}/firmware/components/svc_growth/include" \
     "${repo_root}/firmware/components/svc_growth/src/growth_engine.c" \
     "${repo_root}/firmware/components/svc_growth/src/companion_model.c" \
+    "${out_dir}/setup_cjson.o" \
+    "${repo_root}/firmware/components/svc_growth/src/companion_sync.c" \
     "${repo_root}/firmware/components/svc_growth/src/growth_store.c" \
     "${repo_root}/firmware/components/svc_growth/src/growth_service.c" \
     "${repo_root}/firmware/components/svc_growth/src/growth_environment.c" \
-    "${repo_root}/firmware/tests/host/test_growth_service.c"
+    "${repo_root}/firmware/tests/host/test_growth_service.c" -lm
 
 build_and_run test_growth_runtime \
     -I "${repo_root}/firmware/tests/host/support/growth_runtime" \

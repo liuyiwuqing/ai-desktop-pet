@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "catalogVersion",
+    "deviceId",
+    "bootId",
+    "reportSequence",
+    "observedAt",
+    "revision",
+    "appearanceRevision",
+    "owned",
+    "eligible",
+    "themes",
+    "writable",
+    "lastCommand",
+    "appearance",
+    "best",
+    "played",
+    "focusCompleted",
+    "memories"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "catalogVersion": {
+      "const": 1
+    },
+    "deviceId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,40}$"
+    },
+    "bootId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$"
+    },
+    "reportSequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4294967295
+    },
+    "observedAt": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4294967295
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "appearanceRevision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "owned": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4095
+    },
+    "eligible": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4095
+    },
+    "themes": {
+      "enum": [
+        1,
+        3,
+        5,
+        7
+      ]
+    },
+    "writable": {
+      "type": "boolean"
+    },
+    "lastCommand": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$"
+    },
+    "appearance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "theme",
+        "outfit",
+        "slots"
+      ],
+      "properties": {
+        "theme": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "outfit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "enum": [
+              0,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ]
+          },
+          "minItems": 3,
+          "maxItems": 3
+        }
+      }
+    },
+    "best": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        },
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 250
+        },
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "played": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "focusCompleted": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "memories": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "at",
+          "kind",
+          "detail",
+          "theme",
+          "outfit"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "at": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "kind": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "detail": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "theme": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "outfit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6
+          }
+        }
+      }
+    }
+  },
+  "title": "PetCompanionStatus"
+}

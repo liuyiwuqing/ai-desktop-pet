@@ -46,6 +46,11 @@ bool pet_companion_valid(const pet_companion_state_t *s)
         if (m->sequence > s->memory_sequence || m->kind > 8 || m->theme > 2 || m->outfit > 6 ||
             (m->sequence && (m->sequence % PET_COMPANION_MEMORIES != i || !m->kind))) return false;
     }
+    unsigned count=s->memory_sequence<PET_COMPANION_MEMORIES?s->memory_sequence:PET_COMPANION_MEMORIES;
+    for(unsigned i=0;i<count;++i) {
+        uint32_t seq=s->memory_sequence-i;
+        if(s->memories[seq%PET_COMPANION_MEMORIES].sequence!=seq)return false;
+    }
     return true;
 }
 uint16_t pet_companion_eligible(const pet_growth_model_t *m)
@@ -101,6 +106,7 @@ pet_companion_result_t pet_companion_apply(pet_growth_model_t *m, const pet_comp
         return result;
     }
     if (r->request_id <= m->last_request_id) {
+        if(remote) {result.result=PET_GROWTH_CONFLICT;return result;}
         result.result = r->request_id == m->last_request_id &&
             (m->last_action != PET_GROWTH_ACTION_COUNT || hash != m->companion.last_request_hash)
             ? PET_GROWTH_CONFLICT : PET_GROWTH_DUPLICATE;

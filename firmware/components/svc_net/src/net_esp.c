@@ -54,6 +54,9 @@ static uint32_t s_retry_delay_ms;
 static char s_status_topic[PET_NET_TOPIC_MAX];
 static char s_inbox_topic[PET_NET_TOPIC_MAX];
 static char s_config_topic[PET_NET_TOPIC_MAX];
+#if CONFIG_PET_COMPANION_SYNC_ENABLED
+static char s_appearance_topic[PET_NET_TOPIC_MAX];
+#endif
 #if CONFIG_PET_OTA_REMOTE_ENABLED
 static char s_ota_topic[PET_NET_TOPIC_MAX];
 #endif
@@ -398,6 +401,9 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base, int32_t event_i
         publish_status(true);
         (void)esp_mqtt_client_subscribe(s_mqtt, s_inbox_topic, 1);
         (void)esp_mqtt_client_subscribe(s_mqtt, s_config_topic, 1);
+#if CONFIG_PET_COMPANION_SYNC_ENABLED
+        (void)esp_mqtt_client_subscribe(s_mqtt,s_appearance_topic,1);
+#endif
 #if CONFIG_PET_OTA_REMOTE_ENABLED
         (void)esp_mqtt_client_subscribe(s_mqtt, s_ota_topic, 1);
 #endif
@@ -595,6 +601,9 @@ static esp_err_t esp_net_start(const pet_net_config_t *config)
         return ESP_ERR_INVALID_ARG;
     }
 
+#if CONFIG_PET_COMPANION_SYNC_ENABLED
+    if(!pet_net_topic_build(PET_NET_TOPIC_APPEARANCE,config->device_id,s_appearance_topic,sizeof(s_appearance_topic)))return ESP_ERR_INVALID_ARG;
+#endif
 #if CONFIG_PET_OTA_REMOTE_ENABLED
     if(!pet_net_topic_build(PET_NET_TOPIC_OTA,config->device_id,s_ota_topic,sizeof(s_ota_topic)))return ESP_ERR_INVALID_ARG;
 #endif

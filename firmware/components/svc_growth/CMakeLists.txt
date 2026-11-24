@@ -7,6 +7,7 @@ idf_component_register(
         "src/growth_service.c"
         "src/growth_runtime.c"
         "src/growth_sync.c"
+        "src/companion_sync.c"
     INCLUDE_DIRS
         "include"
     PRIV_INCLUDE_DIRS
@@ -17,4 +18,5 @@ idf_component_register(
         "core"
         "storage"
         "esp_timer"
+        "espressif__cjson"
 )

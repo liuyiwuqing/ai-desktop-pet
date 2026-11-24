@@ -9,6 +9,8 @@
 #include "pet/storage.h"
 #include "pet/event_bus.h"
 #include "svc_growth/api.h"
+#include "svc_growth/companion_sync.h"
+#include "cJSON.h"
 #include "fixtures/growth-v1.h"
 #include "fixtures/growth-v2.h"
 
@@ -721,8 +723,39 @@ static void check_companion_transactions(void)
     assert(companion().state.appearance_revision==2);
 }
 
+static void check_companion_wire(void)
+{
+    fresh();char reply[256],report[3072];
+    const char *command="{\"schemaVersion\":1,\"catalogVersion\":1,\"deviceId\":\"pet-test\",\"requestId\":\"11111111-1111-1111-1111-111111111111\",\"expectedRevision\":0,\"issuedAt\":100,\"expiresAt\":130,\"appearance\":{\"theme\":0,\"outfit\":0,\"slots\":[0,0,0]}}";
+    assert(pet_companion_remote("pet-test",command,strlen(command),true,110,now_ms,reply,sizeof(reply))!=PET_GROWTH_OK);
+    assert(pet_companion_remote("other-device",command,strlen(command),false,110,now_ms,reply,sizeof(reply))!=PET_GROWTH_OK);
+    assert(pet_companion_remote("pet-test",command,strlen(command),false,130,now_ms,reply,sizeof(reply))==PET_GROWTH_STALE_REQUEST);
+    fail_key="active";
+    assert(pet_companion_remote("pet-test",command,strlen(command),false,110,now_ms,reply,sizeof(reply))==PET_GROWTH_STORAGE_ERROR);
+    assert(companion().state.appearance_revision==0);
+    fail_key=NULL;
+    assert(pet_companion_remote("pet-test",command,strlen(command),false,110,now_ms,reply,sizeof(reply))==PET_GROWTH_OK);
+    unsigned before=writes;
+    assert(act(PET_GROWTH_PET,snapshot().next_request_id)==PET_GROWTH_OK);
+    before=writes;
+    assert(pet_companion_remote("pet-test",command,strlen(command),false,111,now_ms,reply,sizeof(reply))==PET_GROWTH_OK);
+    assert(writes==before && strstr(reply,"applied"));
+    pet_companion_view_t view=companion();
+    assert(pet_companion_sync_format("pet-test","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",1,now_epoch,snapshot().revision,&view,report,sizeof(report))>0);
+    cJSON *root=cJSON_Parse(report);assert(root);
+    assert(cJSON_GetObjectItem(root,"appearanceRevision")->valueint==1);
+    assert(!strcmp(cJSON_GetObjectItem(root,"lastCommand")->valuestring,"11111111111111111111111111111111"));
+    cJSON_Delete(root);
+    assert(pet_companion_sync_format("pet-test","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",1,now_epoch,1,&view,report,32)<0);
+    pet_growth_close();assert(pet_growth_init(&clock_source)==PET_GROWTH_OK);
+    assert(pet_companion_remote("pet-test",command,strlen(command),false,112,now_ms,reply,sizeof(reply))==PET_GROWTH_OK);
+    char invalid[768];snprintf(invalid,sizeof(invalid),"%s {}",command);
+    assert(pet_companion_remote("pet-test",invalid,strlen(invalid),false,110,now_ms,reply,sizeof(reply))==PET_GROWTH_INVALID);
+}
+
 int main(void)
 {
+    check_companion_wire();
     check_companion_transactions();
     check_backup_restore();
     check_first_care_achievement();

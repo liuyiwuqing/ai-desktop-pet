@@ -320,7 +320,12 @@ pet_companion_result_t pet_companion_submit(const pet_companion_request_t *reque
         result.result=advance_locked(now);
         if (result.result==PET_GROWTH_OK) {
             pet_growth_model_t candidate=s.model;
-            result=pet_companion_apply(&candidate,request);
+            pet_companion_request_t owned_request=*request;
+            bool remote=false;for(unsigned i=0;i<16;++i)remote|=request->command_id[i]!=0;
+            /* Allocate the local sequence while holding the same transaction lock.
+             * A concurrent care action must never turn a new remote command into a false duplicate. */
+            if(remote && candidate.last_request_id<UINT64_MAX)owned_request.request_id=candidate.last_request_id+1;
+            result=pet_companion_apply(&candidate,&owned_request);
             if (result.result==PET_GROWTH_OK) {
                 result.result=commit_locked(&candidate,now);
                 if (result.result==PET_GROWTH_OK) publish_locked();
