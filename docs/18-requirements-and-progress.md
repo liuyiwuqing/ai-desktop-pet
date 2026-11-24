@@ -1915,3 +1915,13 @@ README 记下四条真实踩过的坑：令牌不能从 `docker cp` 的 tar 流�
 同时列出三项待落地改进：两个脚本写 PID 文件并用 `--stop` 代替手工 kill；`device_watch.sh` 补 `DURATION_S` 并把设备/日志路径提成环境变量（当前写死 `dodo-1`，README 里如实写明，没有把没实现的参数写成可用）；`service_watch.sh` 记录容器 `StartedAt` 以识别窗口内重建。
 
 验证：`sha256sum` 两侧逐字节一致（本地 `deployment/observe/*.sh` 与服务器 `~/nexus-observe*.sh`）；README 中的启动/停止/自检命令与实际脚本行为逐条核对，发现并改掉了自己初稿里「`DEVICE=…` 可覆盖」的错误描述；未改动任何在跑进程（`observe-acc04-…ndjson` 窗口仍在写）。
+
+## OPS-ARCHIVE-01 · 清理离线归档并修回滚点（2026-11-24，用户授权）
+
+用户要求清掉服务器 `~/images` 的 1.2 GB 离线导入 tar。执行前先核对「tar 对应的镜像还在不在本机」，查出的问题比空间更严重：本机只有 `acc04-c88957e` 一个 tag，`acc01`/`acc02`/`acc03` 的镜像**都不存在**（`acc01` 那份 tar 保存时连 `RepoTags` 都是 `null`）。这意味着 §16/§17 写的「回滚＝把编排 `image` 改回 `acc03-3fdca79` 重建」当时根本跑不起来——编排是 `pull_policy: never`，本地没有该 tag，服务器拉 GHCR 又有 TLS 超时前科；那三份 tar 是这几个版本唯一的离线副本，直接删等于把回滚点一起删了。
+
+按用户选择的「先 load 再删」处理：`docker load` 三份归档（acc02/acc03 自带 tag，acc01 按 revision 补 `acc01-d2711f7`），用 `org.opencontainers.image.revision` 逐个核对为 `d2711f7…`/`88d2e90…`/`3fdca79…`/`c88957e…`；占用只涨 80 MB（7.607→7.687 GB，四版共享基础层）；随后删除四份 tar，acc04 那份在镜像已加载、容器 healthy 且 `RestartCount=0` 的前提下先删，哈希 `bc9db419…` 与 §17 记录一致。
+
+结果：`~/images` 1.2 GB → 4 KB；根分区 67 GB/13 GB（85%）→ 65 GB/15 GB（82%）；可切回版本从 1 个变 4 个，回滚从「需要 docker load 且已无 tar」变成「改 tag 重建」。运行态未动：`acc04-c88957e`、`running/healthy`、`RestartCount=0`，本轮没有重建容器。
+
+边界：镜像只有 tag，tar 的 sha256 仍在 §16/§17 留档（删的是文件不是证据）；`acc01-d2711f7` 这个 tag 是我按 revision 补的，不是原发布流程给的；回滚到 acc01/acc02 还要配套数据库备份，单换镜像不等于状态一致。证据见 [ACC-01 §19.4](29-acc01-production-deployment-plan.md)。

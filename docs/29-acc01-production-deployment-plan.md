@@ -902,7 +902,7 @@ pattern read  nexus/v1/devices/%u/appearance
 
 未向真实设备提交配置请求（会写 NVS 并改变息屏/提示音），因此配置回传链路仍只有协议级验证；换装端到端（appearance → ACK → applied）仍无真实设备证据，需先让固件开启伙伴同步；未做 24 小时观测与浏览器登录/权限页验收。
 
-回滚：编排 `image` 改回 `acc02-88d2e90` 重建 CORE 即可，无迁移可回退（V29 未变）。
+回滚：编排 `image` 改回 `acc02-88d2e90` 重建 CORE 即可，无迁移可回退（V29 未变）。（`acc01/acc02/acc03` 的本地 tag 在 2026-11-24T22:25Z 前一度都不在本机、这样回滚实际执行不了，已用归档恢复，见 §19.4）
 
 ## 17. ACC-04 变更记录：控制台可编辑屏幕与提示音（2026-11-24）
 
@@ -939,7 +939,7 @@ pattern read  nexus/v1/devices/%u/appearance
 
 边界：仍未向真实设备提交含新字段的配置请求（会写 NVS），设备端接受与否依据协议与固件校验逻辑，不是实机证据；浏览器验证用的是 fixture 数据而非生产接口，生产侧仅确认了接口返回真实值（`sfxVolume=20`、`screen{60,40}`）与线上产物含三项文案。对生产站点的验收见 §18。
 
-回滚：编排 `image` 改回 `acc03-3fdca79` 重建 CORE；数据库无需回退。
+回滚：编排 `image` 改回 `acc03-3fdca79` 重建 CORE；数据库无需回退。（`acc01/acc02/acc03` 的本地 tag 在 2026-11-24T22:25Z 前一度都不在本机、这样回滚实际执行不了，已用归档恢复，见 §19.4）
 
 ## 18. 生产控制台浏览器级验收与运行观测基线（2026-11-24）
 
@@ -1034,4 +1034,39 @@ pattern read  nexus/v1/devices/%u/appearance
 - 脚本只覆盖服务端视角（容器、接口、磁盘、证书、5xx），不含设备实时性、功耗、音频等固件侧指标。
 - 设备观测进程没有结束条件，是上一轮遗留的无限循环；窗口到期时应手动停掉，避免长期占用。
 - 观测进程与本期部署无耦合：CORE 若在窗口内再次重建，`RestartCount` 归零会掩盖重启次数，届时应以 `StartedAt` 变化判定。
-- 磁盘盘点（只读，未清理）：`docker system df` 显示镜像 15 个共 7.61 GB（可回收 583.9 MB）、容器 252.3 MB、卷 67.2 MB、构建缓存 0；`~/images` 1.2 GB 是 ACC-02~04 的离线导入 tar，`~/staging` 92 KB、`~/nexus-backups` 600 KB，journal 11.9 MB。剩余 13 GB 的大头不在这些目录里（同期还跑着 halo×4、postgres 18、rustfs 等与本项目无关的容器），清理只能拿回约 1.8 GB，是否删除由用户决定。
+- 磁盘盘点（只读）：`docker system df` 显示镜像 15 个共 7.61 GB（可回收 583.9 MB）、容器 252.3 MB、卷 67.2 MB、构建缓存 0；`~/images` 1.2 GB 是 ACC-01~04 的离线导入 tar，`~/staging` 92 KB、`~/nexus-backups` 600 KB，journal 11.9 MB。剩余 13 GB 的大头不在这些目录里（同期还跑着 halo×4、postgres 18、rustfs 等与本项目无关的容器），清理只能拿回约 1.8 GB。
+
+### 19.4 归档清理与回滚点修复（2026-11-24 22:25Z，用户授权）
+
+用户要求清掉 `~/images` 的 1.2 GB tar。执行前先核对「这些 tar 对应的镜像还在不在本机」，发现的问题比空间本身严重：
+
+| 归档 | 声明的 tag | 清理前本机是否有该镜像 |
+| --- | --- | --- |
+| `nexus-core-acc01-amd64.tar` | 无（保存时未打 tag） | 否 |
+| `nexus-core-acc02-amd64.tar` | `acc02-88d2e90` | **否** |
+| `nexus-core-acc03-amd64.tar` | `acc03-3fdca79` | **否** |
+| `nexus-core-acc04-amd64.tar` | `acc04-c88957e` | 是（唯一在跑的） |
+
+也就是说 §16/§17 写的「回滚＝改编排 `image` 回 `acc03-3fdca79` 重建」**当时根本执行不了**：编排是 `pull_policy: never`，本地没有那个 tag，容器会直接起不来；服务器拉 GHCR 又有 TLS 超时的前科。这三份 tar 是那几个版本唯一的离线副本——直接删就等于把回滚点一起删了。
+
+处理方式（按用户选择的「先 load 再删」）：
+
+1. `docker load` 三份归档。acc02/acc03 自带 tag；acc01 的 manifest `RepoTags` 为 `null`，按 revision 标签补成 `acc01-d2711f7`。
+2. 用 `org.opencontainers.image.revision` 逐个核对：`d2711f7…`、`88d2e90…`、`3fdca79…`、`c88957e…`，与文档记录一致。
+3. 占用只涨了 **80 MB**（7.607 → 7.687 GB）：四个版本共享基础层，差异只在应用层。
+4. 删除三份 tar（acc04 的 `bc9db419…` 在镜像已加载、容器 healthy 且 `RestartCount=0` 的前提下先删）。
+
+结果：
+
+| 项 | 清理前（21:59 基线） | 清理后 |
+| --- | --- | --- |
+| `~/images` | 1.2 GB（4 份 tar） | 4 KB（空目录） |
+| 根分区 | 67 GB 已用 / 13 GB 可用（85%） | 65 GB 已用 / 15 GB 可用（82%） |
+| 可切回的版本 | 只有 `acc04-c88957e` | `acc01-d2711f7`、`acc02-88d2e90`、`acc03-3fdca79`、`acc04-c88957e` |
+| 回滚方式 | 需要 `docker load` 且当前无 tar 可 load | 改 `image` tag 后重建即可 |
+
+分两步观察：先删已加载的 acc04 归档后为 66 GB / 14 GB（83%），再 load 三版镜像（+80 MB）并删余下三份 tar 后到 65 GB / 15 GB（82%）。净增加约 2 GB 可用空间，其中约 1.1 GB 来自 tar、其余同期其他容器与日志的释放。
+
+运行态未受影响：`nexus-production-core-1` 仍是 `acc04-c88957e`、`running/healthy`、`RestartCount=0`；本轮没有重建容器。
+
+边界：镜像只有 tag、没有 digest 校验记录（tar 的 sha256 已在 §16/§17 留档，删的是文件不是证据）；`acc01` 的 tag 是我按 revision 补的，不是原发布流程给的；回滚到 acc01/acc02 还要配套数据库备份（V28/V29 差异见 §15.2），单独换镜像回退不等于状态一致。
