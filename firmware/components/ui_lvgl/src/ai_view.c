@@ -36,6 +36,7 @@ void pet_ai_view_ui_init(pet_ai_view_ui_t *v, lv_obj_t *root,
     lv_label_set_long_mode(v->detail,LV_LABEL_LONG_DOT);
     v->footer = label(root, 294, small, 0xA9BDCC);
     pet_avatar_init(&v->avatar, root);
+    lv_obj_set_height(v->avatar.object,78);
     lv_obj_set_y(v->avatar.object, 110);
     v->level = lv_bar_create(root);
     lv_obj_set_pos(v->level, 24, 214);
@@ -144,6 +145,9 @@ void pet_ai_view_ui_show(pet_ai_view_ui_t *v, const pet_ai_screen_t *m,
         !private && !m->pending && (m->session.state == PET_AI_THINKING || m->session.state == PET_AI_SPEAKING ||
             m->session.state == PET_AI_ERROR) ? "短按取消 · 长按菜单" :
         m->dismissible ? "短按返回 · 长按菜单" : "短按消息 · 长按菜单");
+    pet_reaction_t reaction=m->session.state==PET_AI_LISTENING||m->session.state==PET_AI_CONVERSATION?PET_REACT_LISTEN:
+        m->session.state==PET_AI_THINKING?PET_REACT_THINK:PET_REACT_NONE;
+    if(v->avatar.reaction!=reaction)pet_avatar_react(&v->avatar,reaction,now);
     pet_avatar_set_speech(&v->avatar,speaking&&!input->menu,(uint8_t)level);
     lv_obj_set_y(v->avatar.object,110+(!private && m->session.state==PET_AI_THINKING ? (int)(now/300%2)*2 : 0));
     pet_avatar_tick(&v->avatar, face, now, !input->menu);

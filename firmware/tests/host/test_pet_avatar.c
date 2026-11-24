@@ -61,7 +61,7 @@ int main(int argc, char **argv)
             else moved |= hash() != first;
             if (frame == 10) states[state] = hash();
             for (int y = 0; y < 320; ++y) for (int x = 0; x < 240; ++x)
-                if (x < 14 || x >= 222 || y < 62 || y >= 140)
+                if (x < 14 || x >= 222 || y < 62 || y >= 212)
                     assert(pixels[y * 240 + x] == baseline[y * 240 + x]);
             export_frame(argv[1], state, frame);
         }
@@ -82,7 +82,7 @@ int main(int argc, char **argv)
             else moved |= hash() != first;
             if (frame == 10) environments[environment] = hash();
             for (int y = 0; y < 320; ++y) for (int x = 0; x < 240; ++x)
-                if (x < 14 || x >= 222 || y < 62 || y >= 140)
+                if (x < 14 || x >= 222 || y < 62 || y >= 212)
                     assert(pixels[y * 240 + x] == baseline[y * 240 + x]);
             if (environment) export_frame(argv[1], environment + 7, frame);
         }
@@ -114,6 +114,23 @@ int main(int argc, char **argv)
     assert(flushes == before); /* 遮挡时无动画刷新。 */
     assert(pet_avatar_tick(&avatar, PET_GROWTH_HUNGRY, 4600, true));
     lv_refr_now(display);
+    pet_avatar_set_appearance(&avatar,&(pet_appearance_t){.outfit=1},true);
+    for(unsigned reaction=PET_REACT_ATTEND;reaction<=PET_REACT_WAVE;++reaction) {
+        pet_avatar_tick(&avatar,PET_GROWTH_IDLE,0,false);
+        pet_avatar_react(&avatar,(pet_reaction_t)reaction,0);
+        for(unsigned frame=0;frame<42;++frame) {
+            pet_avatar_tick(&avatar,PET_GROWTH_IDLE,frame*100,true);lv_refr_now(display);
+            export_frame(argv[1],11+reaction,frame);
+        }
+    }
+    for(unsigned rare=0;rare<6;++rare) {
+        pet_avatar_tick(&avatar,PET_GROWTH_IDLE,0,false);
+        pet_avatar_tick(&avatar,PET_GROWTH_IDLE,0,true);
+        for(unsigned frame=0;frame<42;++frame) {
+            pet_avatar_tick(&avatar,PET_GROWTH_IDLE,27500+rare*30000+frame*50,true);lv_refr_now(display);
+            export_frame(argv[1],24+rare,frame);
+        }
+    }
     lv_display_delete(display);
     lv_deinit();
     puts("pet avatar: eight states, four environment overlays, bounded animation and suspend passed");

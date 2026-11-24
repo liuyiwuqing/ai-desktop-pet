@@ -24,7 +24,7 @@ if(CONFIG_PET_MODULE_UI_ENABLED)
         list(APPEND ui_sources "src/ai_view.c")
     endif()
     if(CONFIG_PET_MODULE_GROWTH_ENABLED)
-        list(APPEND ui_sources "src/growth_view.c")
+        list(APPEND ui_sources "src/growth_view.c" "src/companion_view.c")
     endif()
 endif()
 idf_component_register(

@@ -4,6 +4,7 @@
 #include <string.h>
 #include "message_view.h"
 #include "growth_view.h"
+#include "companion_view.h"
 #include "ai_view.h"
 #include "climate_view.h"
 #include "control_view.h"
@@ -177,7 +178,7 @@ int main(int argc, char **argv)
     lv_obj_update_layout(growth.root);
     assert(lv_obj_get_y(growth.footer) + lv_obj_get_height(growth.footer) <= 320);
     input.navigation_enabled = false;
-    input.page = PET_MENU_STATUS; input.selection = 1; /* 摸头任务 */
+    input.page = PET_MENU_STATUS; input.selection = 3; /* 摸头任务 */
     stats.task_day = 20833;
     stats.task_progress[0] = 1; stats.task_progress[1] = 3; stats.task_claimed = 1;
     pet_growth_view_ui_show(&growth, &stats, &input, 3, false, false, NULL);
@@ -188,7 +189,7 @@ int main(int argc, char **argv)
     stats.task_claimed |= 2;
     pet_growth_view_ui_show(&growth, &stats, &input, 3, false, false, NULL);
     assert(strstr(lv_label_get_text(growth.action), "已领取"));
-    input.selection = 3; /* 成长成就 */
+    input.selection = 5; /* 成长成就 */
     stats.intimacy = 19; stats.level = 4; stats.achievements = PET_GROWTH_ACHIEVEMENT_CARE;
     pet_growth_view_ui_show(&growth, &stats, &input, 3, false, false, NULL);
     assert(strstr(lv_label_get_text(growth.stats), "亲密 19/20"));
@@ -248,6 +249,60 @@ int main(int argc, char **argv)
     assert(!pet_growth_view_ui_tick(&growth, 2200, true));
     screenshot(argv[2], "growth-unavailable", display);
     lv_obj_clean(lv_display_get_screen_active(display));
+    pet_companion_ui_t space;
+    pet_companion_ui_init(&space,lv_obj_create(lv_display_get_screen_active(display)),small,large);
+    lv_obj_remove_flag(space.root,LV_OBJ_FLAG_HIDDEN);
+    pet_companion_view_t cv={.eligible=4095,.themes=7,.writable=true};
+    cv.state.owned=4095;
+    pet_companion_ui_open(&space,PET_SPACE_WARDROBE,0,5000);
+    pet_companion_ui_show(&space,&stats,&cv,5000);
+    pet_companion_request_t intent;
+    assert(!pet_companion_ui_input(&space,PET_SPACE_NEXT,5010,&intent));
+    assert(pet_companion_ui_input(&space,PET_SPACE_CONFIRM,5020,&intent));
+    assert(intent.operation==PET_COMPANION_DRESS && intent.appearance.outfit==1);
+    pet_companion_ui_complete(&space,(pet_companion_result_t){PET_GROWTH_STORAGE_ERROR,false});
+    pet_companion_ui_show(&space,&stats,&cv,5030);
+    assert(strstr(lv_label_get_text(space.detail),"保存失败"));
+    screenshot(argv[2],"qitomo-wardrobe-error",display);
+    cv.state.appearance.outfit=1;
+    pet_companion_ui_complete(&space,(pet_companion_result_t){PET_GROWTH_OK,false});
+    pet_companion_ui_show(&space,&stats,&cv,5040);
+    screenshot(argv[2],"qitomo-wardrobe",display);
+    pet_companion_ui_open(&space,PET_SPACE_FURNITURE,0,5100);
+    pet_companion_ui_show(&space,&stats,&cv,5100);
+    pet_companion_ui_input(&space,PET_SPACE_NEXT,5110,&intent);
+    pet_companion_ui_input(&space,PET_SPACE_CONFIRM,5120,&intent);
+    pet_companion_ui_input(&space,PET_SPACE_NEXT,5130,&intent);
+    assert(pet_companion_ui_input(&space,PET_SPACE_CONFIRM,5140,&intent));
+    assert(intent.appearance.slots[1]==7);
+    for(unsigned kind=0;kind<3;++kind) {
+        pet_companion_ui_open(&space,PET_SPACE_GAME,kind,6000);
+        pet_companion_ui_show(&space,&stats,&cv,6000);
+        assert(space.game.phase==PET_GAME_READY);
+        assert(!pet_companion_ui_input(&space,PET_SPACE_CONFIRM,6010,&intent));
+        assert(space.game.phase==PET_GAME_RUNNING);
+        pet_companion_ui_tick(&space,6400,true);pet_companion_ui_show(&space,&stats,&cv,6400);
+        const char *names[]={"qitomo-stars","qitomo-signal","qitomo-orbit"};
+        screenshot(argv[2],names[kind],display);
+        pet_companion_ui_pause(&space,6500);uint32_t elapsed=space.game.elapsed_ms;
+        pet_companion_ui_tick(&space,66000,false);
+        assert(space.game.elapsed_ms==elapsed && space.game.phase==PET_GAME_PAUSED);
+        pet_companion_ui_input(&space,PET_SPACE_CONFIRM,66000,&intent);
+        assert(space.game.phase==PET_GAME_RUNNING);
+    }
+    pet_companion_ui_open(&space,PET_SPACE_GAME,0,70000);
+    pet_companion_ui_input(&space,PET_SPACE_CONFIRM,70000,&intent);
+    for(uint32_t t=70040;t<=115000;t+=40)pet_companion_ui_tick(&space,t,true);
+    assert(space.game.phase==PET_GAME_RESULT);
+    assert(pet_companion_ui_input(&space,PET_SPACE_CONFIRM,115001,&intent));
+    assert(intent.operation==PET_COMPANION_GAME && intent.game==0);
+    assert(!pet_companion_ui_input(&space,PET_SPACE_CONFIRM,115002,&intent));
+    pet_companion_ui_complete(&space,(pet_companion_result_t){PET_GROWTH_OK,true});
+    pet_companion_ui_show(&space,&stats,&cv,115003);
+    screenshot(argv[2],"qitomo-result",display);
+    assert(!pet_companion_ui_input(&space,PET_SPACE_CONFIRM,115004,&intent));
+    assert(space.game.phase==PET_GAME_READY);
+    lv_obj_add_flag(space.root,LV_OBJ_FLAG_HIDDEN);
     pet_ai_view_ui_t ai;
     lv_obj_t *ai_root = lv_obj_create(lv_display_get_screen_active(display));
     pet_ai_view_ui_init(&ai, ai_root, small, large);

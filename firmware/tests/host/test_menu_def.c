@@ -6,11 +6,11 @@ int main(void)
 {
     /* 根页：8 个分类 + 返回主页叶子；分类页不再嵌套子页，菜单深度恒为 2。 */
     const pet_menu_page_t *root = pet_menu_page(PET_MENU_ROOT);
-    assert(root && root->title && root->count == 9);
+    assert(root && root->title && root->count == 6);
     for (unsigned i = 0; i < root->count; ++i) {
         const pet_menu_item_t *item = &root->items[i];
         assert(item->label && *item->label);
-        if (i + 1 < root->count) {
+        if (i < root->count) {
             assert(item->page != PET_MENU_NO_PAGE);
             assert(item->action == PET_MENU_NO_ACTION);
         } else {
@@ -26,7 +26,7 @@ int main(void)
             assert(pg->items[i].action != PET_MENU_NO_ACTION);
             assert(pg->items[i].label && *pg->items[i].label);
             if (page != PET_MENU_SYSTEM)
-                assert(pg->items[i].action < PET_MENU_ABOUT);
+                assert(pg->items[i].action < PET_MENU_ACTION_COUNT);
         }
     }
     /* 关键页内容固定：AI 页四项语音动作、设置页 8 个调整项、系统页仅版本。 */
@@ -36,7 +36,7 @@ int main(void)
     assert(ai->items[1].action == PET_GROWTH_MENU_AI_MUTE);
     assert(ai->items[2].action == PET_GROWTH_MENU_AI_DND);
     assert(ai->items[3].action == PET_GROWTH_MENU_AI_CLEAR);
-    assert(pet_menu_page(PET_MENU_SETTINGS)->count == 8);
+    assert(pet_menu_page(PET_MENU_SETTINGS)->count == 13);
     assert(pet_menu_page(PET_MENU_SETTINGS)->items[0].action == PET_MENU_VOLUME_UP);
     assert(pet_menu_page(PET_MENU_SETTINGS)->items[6].action == PET_MENU_SCREEN_TIMEOUT);
     assert(pet_menu_page(PET_MENU_SYSTEM)->count == 1);

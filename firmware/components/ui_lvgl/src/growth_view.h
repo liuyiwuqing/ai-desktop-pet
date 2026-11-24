@@ -1,11 +1,15 @@
 #pragma once
 #include "lvgl.h"
 #include "pet/growth.h"
+#include "pet/config_generated.h"
 #include "growth_input.h"
 #include "pet_avatar.h"
 typedef struct {
     lv_obj_t *root, *title, *status, *stats, *action, *footer;
     const lv_font_t *small, *large;
+    lv_obj_t *rows[4], *tiles[3];
+    pet_config_t settings;
+    char clock[12];
     pet_avatar_t avatar;
     pet_growth_state_t state;
     bool animate;

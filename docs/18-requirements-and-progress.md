@@ -1823,3 +1823,9 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 v5 双槽存档与 v1–v4 读取、六件穿戴/六件摆件、三主题门控、个人纪录、八条里程碑回忆；游戏、购买、装扮通过同一事务边界，外观 CAS 与持久命令去重。离线不扣状态、冷落不扣亲密、疏于照料不掉健康；旧低健康在线恢复。旧备份恢复保留收藏/已消费标记，不退还已花金币。详见 [31](31-qitomo-companion.md)。
 
 验证：`LC_ALL=C bash tools/ci/test_host.sh` 全套退出 0；新增事务用例通过 `cc -std=c17 -Wall -Wextra -Werror -pthread -fsanitize=address,undefined` 编译并运行真实 growth_engine/companion_model/growth_store/growth_service/growth_environment，退出 0。覆盖写失败无奖励、重复/冲突、练习成绩、未拥有装扮拒绝、重启身份持久化和回档不退币。仅模型与服务完成；界面/跨端协议在后续切片，未烧录。
+
+## PET-UI-01 · 栖团小舱、六类菜单与三键游乐场（2026-11-24）
+
+栖团瓷白电子精灵和 208×150 小舱、六类根菜单/四行子菜单、记住选择、设置连续调节、衣橱/摆件位置/主题预览、回忆/属性页，以及三个小游戏的真实 LVGL 画面与三键操作已接入。普通消息延后，语音/重要消息/显示异常/控制确认/息屏暂停游戏，A 主动恢复；成绩异步双槽提交，失败可重试。C 短按进入 VAD 会话而非锁住 PTT，长按静音；BOOT/SW 原长按路径保留。角色支持十二动作和六种稀有待机，聆听/思考/专注与真实状态绑定，照料动作在保存确认后播放。见 [31 使用说明](31-qitomo-companion.md)。
+
+验证：`LC_ALL=C bash tools/ci/test_host.sh` 退出 0；`bash tools/ci/test_ui_host.sh` 10/10；`python3 tools/export_pet_preview.py` 成功生成真实动画预览。图像检查覆盖首页、菜单、衣橱失败/成功、三游戏、结算和成就；检查中修正四图形完整显示和每轮动画时间基准。`source /Users/lywq/esp/activate.sh && python3 tools/build_matrix.py --profile default --build-root firmware/build-qitomo --execute --jobs 6` 通过；最终语音路径增量以 `--profile voice --execute --jobs 6` 通过，证据位于各忽略构建目录的 build-evidence.json。首次并行构建被源码变动守卫拒绝后，已稳定源码重跑。未烧录；三键接线、实屏性能/功耗和长期语音共存仍需实机验收。CORE 外观同步在后续切片。

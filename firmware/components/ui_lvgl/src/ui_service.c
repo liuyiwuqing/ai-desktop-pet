@@ -47,6 +47,7 @@
 #endif
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
 #include "growth_view.h"
+#include "companion_view.h"
 #include "svc_growth/api.h"
 #include "freertos/queue.h"
 #endif
@@ -64,6 +65,10 @@ extern const uint8_t font24_start[] asm("_binary_pet_noto_sc_24_bin_start");
 extern const uint8_t font24_end[] asm("_binary_pet_noto_sc_24_bin_end");
 
 static const char *TAG = "ui";
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+typedef struct { bool companion; pet_growth_request_t growth; pet_companion_request_t space; } ui_growth_job_t;
+typedef struct { bool companion; pet_growth_action_t action; pet_companion_result_t result; } ui_growth_result_t;
+#endif
 typedef struct {
     const pet_display_t *panel;
     const pet_button_input_t *button;
@@ -114,6 +119,8 @@ typedef struct {
     bool interrupt_latch; /* 按键打断 TTS：播放期间保持 interrupted，播完自动解除。 */
 #endif
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
+    pet_companion_ui_t space;
+    pet_companion_view_t companion_snapshot;
     pet_growth_view_ui_t growth_view;
     pet_growth_view_t growth_snapshot;
     QueueHandle_t growth_requests, growth_results;
@@ -255,6 +262,19 @@ static void privacy_badge(ui_context_t *ui)
     if (!lv_obj_has_flag(ui->ai_view.root, LV_OBJ_FLAG_HIDDEN) && full_status)
         text = "";
 #endif
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+    bool space_visible=!lv_obj_has_flag(ui->space.root,LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_pos(ui->privacy,space_visible?126:14,space_visible?16:272);
+    lv_obj_set_width(ui->privacy,space_visible?100:208);
+    if(space_visible) {
+#if PET_UI_AI
+        if(ui->ai_snapshot.faulted)text="音频异常";
+        else if(ui->ai_snapshot.policy_pending)text="正在停止音频";
+        else if(ui->muted)text=ui->dnd?"静音·勿扰":"语音已静音";
+#endif
+    }
+#endif
+    lv_obj_move_foreground(ui->privacy);
     if (strcmp(lv_label_get_text(ui->privacy), text) != 0) lv_label_set_text(ui->privacy, text);
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
     if (ui->growth_input.menu) lv_obj_add_flag(ui->privacy, LV_OBJ_FLAG_HIDDEN);
@@ -304,6 +324,13 @@ static void ai_snapshot(ui_context_t *ui)
         (ui->ai_snapshot.view.reason == PET_AI_REASON_DRAINED ||
          ui->ai_snapshot.view.reason == PET_AI_REASON_CONV_TIMEOUT))
         ui->voice_panel = false;
+}
+
+static void ai_start_session(ui_context_t *ui)
+{
+    ui->growth_input.menu=false;ui->voice_panel=true;ui->dismiss_pending=false;
+    /* Released short keys enter VAD, while BOOT/SW retains the held PTT path. */
+    if(pet_ai_agent_post(PET_AI_WAKE_DETECTED,0)!=ESP_OK)feedback(ui,"语音暂不可用，请检查静音",true);
 }
 
 static void ai_command(ui_context_t *ui, int command)
@@ -395,13 +422,31 @@ static void settings_tick(ui_context_t *ui, uint32_t epoch)
 static void growth_worker(void *arg)
 {
     ui_context_t *ui = arg;
-    pet_growth_request_t request;
+    ui_growth_job_t request;
     for (;;) {
         if (xQueueReceive(ui->growth_requests, &request, portMAX_DELAY) == pdTRUE) {
-            pet_growth_result_t result = pet_growth_interact(&request);
+            ui_growth_result_t result={.companion=request.companion,.action=request.growth.action};
+            if(request.companion)result.result=pet_companion_submit(&request.space);
+            else result.result.result=pet_growth_interact(&request.growth);
             xQueueSend(ui->growth_results, &result, portMAX_DELAY);
         }
     }
+}
+static void space_input(ui_context_t *ui,pet_space_input_t input)
+{
+    pet_companion_request_t request;
+    if(pet_companion_ui_input(&ui->space,input,now_ms(),&request)) {
+        pet_growth_view_t view;
+        pet_growth_result_t result=pet_growth_get_snapshot(&view);
+        if(result==PET_GROWTH_OK) {
+            request.request_id=view.next_request_id;request.issued_at_ms=(uint64_t)esp_timer_get_time()/1000;
+            ui_growth_job_t job={.companion=true,.space=request};
+            ui->growth_pending=xQueueSend(ui->growth_requests,&job,0)==pdTRUE;
+            if(!ui->growth_pending)result=PET_GROWTH_NOT_READY;
+        }
+        if(result!=PET_GROWTH_OK)pet_companion_ui_complete(&ui->space,(pet_companion_result_t){result,false});
+    }
+    ui->home_updated_ms=now_ms()-1000;
 }
 #endif
 
@@ -560,14 +605,23 @@ static void handle_selection(ui_context_t *ui, int selected, uint32_t epoch)
         return;
     }
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
+    if(selected>=PET_MENU_GAME_STARS && selected<=PET_MENU_ATTRIBUTES) {
+        pet_space_page_t page=selected<=PET_MENU_GAME_ORBIT?PET_SPACE_GAME:
+            selected==PET_MENU_WARDROBE?PET_SPACE_WARDROBE:selected==PET_MENU_FURNITURE?PET_SPACE_FURNITURE:
+            selected==PET_MENU_THEMES?PET_SPACE_THEMES:selected==PET_MENU_MEMORIES?PET_SPACE_MEMORIES:PET_SPACE_ATTRIBUTES;
+        pet_companion_ui_open(&ui->space,page,selected<=PET_MENU_GAME_ORBIT?selected-PET_MENU_GAME_STARS:0,now_ms());
+        ui->home_rendered=false;return;
+    }
     if (selected >= 0 && selected < PET_GROWTH_ACTION_COUNT) {
         pet_growth_view_t snapshot;
         pet_growth_result_t result = pet_growth_get_snapshot(&snapshot);
         if (result == PET_GROWTH_OK && snapshot.time_ready && snapshot.storage_ready) {
             pet_growth_request_t request = {snapshot.next_request_id,
                 (uint64_t)esp_timer_get_time() / 1000, (pet_growth_action_t)selected, snapshot.task_day};
-            ui->growth_pending = xQueueSend(ui->growth_requests, &request, 0) == pdTRUE;
+            ui_growth_job_t job={.growth=request};
+            ui->growth_pending = xQueueSend(ui->growth_requests, &job, 0) == pdTRUE;
             if (!ui->growth_pending) result = PET_GROWTH_NOT_READY;
+            else pet_avatar_react(&ui->growth_view.avatar,PET_REACT_ATTEND,now_ms());
         } else if (result == PET_GROWTH_OK) {
             result = snapshot.storage_ready ? PET_GROWTH_TIME_UNAVAILABLE : PET_GROWTH_STORAGE_UNCERTAIN;
         }
@@ -599,6 +653,31 @@ static pet_ui_scene_t key_scene(const ui_context_t *ui)
 static void key_dispatch(ui_context_t *ui, const pet_key_event_t *event, uint32_t epoch)
 {
     const pet_ui_scene_t scene = key_scene(ui);
+#if PET_UI_AI
+    if(event->key==PET_KEY_VOICE && event->kind==PET_KEY_EVENT_LONG_PRESS) {
+        screen_activity(ui);ai_command(ui,PET_GROWTH_MENU_AI_MUTE);return;
+    }
+#endif
+#if CONFIG_PET_MODULE_CLIMATE_ENABLED
+    if(ui->climate_panel && scene!=PET_UI_SCENE_MESSAGE) {
+        if(event->key==PET_KEY_NEXT && event->kind==PET_KEY_EVENT_LONG_PRESS)ui->climate_panel=false;
+        if(event->key==PET_KEY_CONFIRM && event->kind==PET_KEY_EVENT_SHORT_PRESS && pet_climate_retry()==ESP_OK)ui->retry_at=now_ms();
+        if(event->key!=PET_KEY_VOICE)return;
+    }
+#endif
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+    if(ui->space.page!=PET_SPACE_CLOSED && scene!=PET_UI_SCENE_SCREEN_OFF &&
+        scene!=PET_UI_SCENE_MESSAGE && scene!=PET_UI_SCENE_AI_TALK && scene!=PET_UI_SCENE_TTS_PLAYBACK) {
+        screen_activity(ui);
+        if(event->kind==PET_KEY_EVENT_SHORT_PRESS && event->key!=PET_KEY_VOICE) {
+            space_input(ui,event->key==PET_KEY_CONFIRM?PET_SPACE_CONFIRM:PET_SPACE_NEXT);return;
+        }
+        if(event->kind==PET_KEY_EVENT_LONG_PRESS && event->key==PET_KEY_NEXT) {space_input(ui,PET_SPACE_BACK);return;}
+        /* Games do not turn overlapping keys into screen/reboot combinations. */
+        if(event->kind!=PET_KEY_EVENT_SHORT_PRESS || event->key!=PET_KEY_VOICE)return;
+        pet_companion_ui_pause(&ui->space,now_ms());
+    }
+#endif
     const pet_ui_action_t action =
         pet_ui_key_action(scene, (pet_key_event_kind_t)event->kind, (pet_key_id_t)event->key);
     if (action == PET_UI_ACTION_NONE) return;
@@ -610,8 +689,13 @@ static void key_dispatch(ui_context_t *ui, const pet_key_event_t *event, uint32_
         pet_growth_input_open_menu(&ui->growth_input, now);
         break;
     case PET_UI_ACTION_CONFIRM:
-        if (scene == PET_UI_SCENE_MENU)
+        if (scene == PET_UI_SCENE_MENU) {
+#if PET_UI_AI
+            if(pet_growth_input_selected_action(&ui->growth_input)==PET_GROWTH_MENU_AI_TALK)ai_start_session(ui);
+            else
+#endif
             handle_selection(ui, pet_growth_input_activate(&ui->growth_input, now), epoch);
+        }
         /* 消息场景的确认已读复用 BOOT 路径语义，直接回执；主页由循环末尾 idle 重绘。 */
         else if (scene == PET_UI_SCENE_MESSAGE && ui->presenter.visible &&
                  pet_message_hub_ack(ui->presenter.id, PET_MESSAGE_STATE_READ) == PET_MESSAGE_OK)
@@ -658,7 +742,7 @@ static void key_dispatch(ui_context_t *ui, const pet_key_event_t *event, uint32_
 #if PET_UI_AI
     case PET_UI_ACTION_START_TALK:
     case PET_UI_ACTION_WAKE_TALK:
-        ai_command(ui, PET_GROWTH_MENU_AI_TALK);
+        ai_start_session(ui);
         break;
     case PET_UI_ACTION_END_TALK:
         ai_command(ui, PET_GROWTH_INPUT_AI_CANCEL);
@@ -699,6 +783,9 @@ static void key_dispatch(ui_context_t *ui, const pet_key_event_t *event, uint32_
 
 static void idle(ui_context_t *ui, uint8_t count)
 {
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+    lv_obj_add_flag(ui->space.root,LV_OBJ_FLAG_HIDDEN);
+#endif
     lv_obj_add_flag(ui->view.root, LV_OBJ_FLAG_HIDDEN);
 #if CONFIG_PET_MODULE_CLIMATE_ENABLED
     if (ui->climate_panel) {
@@ -751,14 +838,30 @@ static void idle(ui_context_t *ui, uint8_t count)
         ui->growth_snapshot = snapshot;
         ui->growth_valid = true;
     }
+    (void)pet_companion_snapshot(&ui->companion_snapshot);
+    if(ui->space.page!=PET_SPACE_CLOSED) {
+        lv_obj_add_flag(ui->growth_view.root,LV_OBJ_FLAG_HIDDEN);
+        pet_growth_view_ui_tick(&ui->growth_view,now_ms(),false);
+        lv_obj_remove_flag(ui->space.root,LV_OBJ_FLAG_HIDDEN);lv_obj_move_foreground(ui->space.root);
+        pet_companion_ui_show(&ui->space,ui->growth_valid?&ui->growth_snapshot:NULL,&ui->companion_snapshot,now_ms());
+        privacy_badge(ui);ui->home_rendered=refresh(ui);ui->home_updated_ms=now_ms();return;
+    }
+    pet_avatar_set_appearance(&ui->growth_view.avatar,&ui->companion_snapshot.state.appearance,true);
+    ui->growth_view.settings=ui->settings.config;
+    uint32_t epoch=ui->clock?ui->clock():0;
+    int16_t offset=0;(void)pet_config_utc_offset(&ui->settings.config,&offset);
+    if(epoch) {uint32_t minute=(uint32_t)(((int64_t)epoch+offset*60)/60%1440);
+        snprintf(ui->growth_view.clock,sizeof(ui->growth_view.clock),"%02u:%02u",(unsigned)(minute/60),(unsigned)(minute%60));}
     pet_growth_view_ui_show(&ui->growth_view, ui->growth_valid ? &ui->growth_snapshot : NULL,
-                            &ui->growth_input, count, false, ui->growth_pending,
+                            &ui->growth_input, count, ui->dnd, ui->growth_pending,
                             !ui->voice_feedback && (int32_t)(ui->feedback_until_ms - now_ms()) > 0 ?
                                 ui->feedback : NULL);
     pet_focus_t focus;
     if (pet_focus_snapshot(&focus)==ESP_OK && (focus.state==PET_FOCUS_RUNNING||focus.state==PET_FOCUS_PAUSED))
         lv_label_set_text_fmt(ui->growth_view.action,"%s %02u:%02u",focus.state==PET_FOCUS_PAUSED?"已暂停":"专注中",
             (unsigned)(focus.remaining_ms/60000),(unsigned)(focus.remaining_ms/1000%60));
+    if(ui->focus_running && ui->growth_view.avatar.reaction==PET_REACT_NONE)
+        pet_avatar_react(&ui->growth_view.avatar,PET_REACT_FOCUS,now_ms());
     pet_growth_view_ui_tick(&ui->growth_view, now_ms(), true);
 #else
     lv_obj_remove_flag(ui->view.root, LV_OBJ_FLAG_HIDDEN);
@@ -787,7 +890,7 @@ static void ui_task(void *arg)
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
     if (ui->button->navigation_init && ui->button->navigation_read) {
         ui->navigation_available = ui->button->navigation_init() == ESP_OK;
-        if (!ui->navigation_available) ESP_LOGW(TAG, "joystick unavailable; using BOOT");
+        if (!ui->navigation_available) ESP_LOGW(TAG, "joystick unavailable; using physical keys");
     }
 #endif
 #if CONFIG_PET_INPUT_TRIPLE
@@ -834,8 +937,9 @@ static void ui_task(void *arg)
     lv_obj_t *growth_root = lv_obj_create(lv_display_get_screen_active(ui->display));
     lv_obj_set_size(growth_root, 240, 320);
     pet_growth_view_ui_init(&ui->growth_view, growth_root, ui->font16, ui->font24);
-    ui->growth_requests = xQueueCreate(1, sizeof(pet_growth_request_t));
-    ui->growth_results = xQueueCreate(1, sizeof(pet_growth_result_t));
+    pet_companion_ui_init(&ui->space,lv_obj_create(lv_display_get_screen_active(ui->display)),ui->font16,ui->font24);
+    ui->growth_requests = xQueueCreate(1, sizeof(ui_growth_job_t));
+    ui->growth_results = xQueueCreate(1, sizeof(ui_growth_result_t));
     if (!ui->growth_requests || !ui->growth_results ||
         xTaskCreate(growth_worker, "pet_interact", 4096, ui, 2, &ui->growth_worker) != pdPASS)
         goto fail;
@@ -892,13 +996,16 @@ static void ui_task(void *arg)
         if (ui->navigation_available &&
             ui->button->navigation_read(&ui->navigation_sample) != ESP_OK) {
             ui->navigation_sample.valid = false;
-            if (navigation_was_valid) ESP_LOGW(TAG, "joystick sample failed; using BOOT until neutral");
+            if (navigation_was_valid) ESP_LOGW(TAG, "joystick sample failed; using physical keys until neutral");
         }
         if (ui->navigation_sample.valid && ui->navigation_sample.pressed) screen_activity(ui);
         const bool navigation_lost = navigation_was_valid && !ui->navigation_sample.valid;
 #endif
 #if CONFIG_PET_EXT_DEVICE_CONTROL
         if(control_modal(ui,pressed,ui->snapshot,count)) {
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+            pet_companion_ui_pause(&ui->space,now_ms());
+#endif
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
             (void)pet_navigation_update(&ui->navigation_filter, &ui->navigation_sample, true, now_ms());
 #endif
@@ -951,6 +1058,9 @@ static void ui_task(void *arg)
 #endif
         /* 菜单消费短按，仍向消息状态机输入真实电平，保留跨消息按键代次保护。 */
         bool owns_idle_input = voice_focused || ui->growth_input.press_voice;
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+        owns_idle_input|=ui->space.page!=PET_SPACE_CLOSED;
+#endif
 #if PET_UI_AI
         owns_idle_input |= ui->voice_panel;
 #endif
@@ -965,6 +1075,9 @@ static void ui_task(void *arg)
         }
 #endif
         bool defer_popups = voice_focused;
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+        defer_popups|=ui->space.page!=PET_SPACE_CLOSED;
+#endif
 #if CONFIG_PET_MODULE_GROWTH_ENABLED || PET_UI_AI
         defer_popups |= was_menu || ui->growth_input.holding;
 #endif
@@ -1000,6 +1113,9 @@ static void ui_task(void *arg)
             ui->navigation_sample.valid && ui->navigation_sample.pressed);
         int selected = pet_growth_input_update(&ui->growth_input, menu_pressed,
             navigation_blocked
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+            || ui->space.page!=PET_SPACE_CLOSED
+#endif
 #if CONFIG_PET_MODULE_CLIMATE_ENABLED
             || climate_input
 #endif
@@ -1008,6 +1124,16 @@ static void ui_task(void *arg)
 #if CONFIG_PET_MODULE_CLIMATE_ENABLED
         if (climate_input) {
             if (direction == PET_NAV_LEFT) ui->climate_panel = false;
+        } else
+#endif
+#if CONFIG_PET_MODULE_GROWTH_ENABLED
+        if(ui->space.page!=PET_SPACE_CLOSED) {
+            if(!navigation_blocked && direction!=PET_NAV_NONE) {
+                if(ui->space.page==PET_SPACE_GAME)space_input(ui,direction==PET_NAV_LEFT?PET_SPACE_PREVIOUS:
+                    direction==PET_NAV_RIGHT?PET_SPACE_NEXT:direction==PET_NAV_UP?PET_SPACE_CONFIRM:PET_SPACE_BACK);
+                else space_input(ui,direction==PET_NAV_LEFT?PET_SPACE_BACK:direction==PET_NAV_RIGHT?PET_SPACE_CONFIRM:
+                    direction==PET_NAV_UP?PET_SPACE_PREVIOUS:PET_SPACE_NEXT);
+            }
         } else
 #endif
         if (selected < 0 && direction != PET_NAV_NONE)
@@ -1026,10 +1152,27 @@ static void ui_task(void *arg)
         }
 #endif
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
-        pet_growth_result_t completed;
+        ui_growth_result_t completed;
         if (xQueueReceive(ui->growth_results, &completed, 0) == pdTRUE) {
-            ui->growth_pending = false;
-            feedback(ui, pet_growth_feedback(completed), false);
+            ui->growth_pending=false;
+            if(completed.companion)pet_companion_ui_complete(&ui->space,completed.result);
+            else {
+                feedback(ui,pet_growth_feedback(completed.result.result),false);
+                pet_avatar_react(&ui->growth_view.avatar,completed.result.result!=PET_GROWTH_OK?PET_REACT_FAILURE:
+                    completed.action==PET_GROWTH_FEED?PET_REACT_FEED:completed.action==PET_GROWTH_PET?PET_REACT_PET:
+                    completed.action==PET_GROWTH_SLEEP?PET_REACT_SLEEP:completed.action==PET_GROWTH_WAKE?PET_REACT_WAKE:PET_REACT_CHEER,now_ms());
+            }
+        }
+        bool space_visible=ui->space.page!=PET_SPACE_CLOSED && !voice_focused && !ui->screen_off &&
+            ui->presenter.id[0]=='\0' && ui->display_healthy && !navigation_lost
+#if PET_UI_AI
+            && !ui->voice_panel
+#endif
+            ;
+        if(pet_companion_ui_tick(&ui->space,now_ms(),space_visible))ui->home_updated_ms=now_ms()-1000;
+        if(space_visible && ui->space.page==PET_SPACE_GAME) {
+            screen_activity(ui);
+            if(ui->space.game.phase==PET_GAME_RESULT && !ui->space.game_attempted)space_input(ui,PET_SPACE_CONFIRM);
         }
 #endif
         if (action.kind == PET_MESSAGE_SCREEN_SHOW) {
@@ -1043,6 +1186,8 @@ static void ui_task(void *arg)
             pet_avatar_tick(&ui->ai_view.avatar, PET_GROWTH_IDLE, now_ms(), false);
 #endif
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
+            lv_obj_add_flag(ui->space.root,LV_OBJ_FLAG_HIDDEN);
+            pet_companion_ui_pause(&ui->space,now_ms());
             lv_obj_add_flag(ui->growth_view.root, LV_OBJ_FLAG_HIDDEN);
             pet_growth_view_ui_tick(&ui->growth_view, now_ms(), false);
 #endif
@@ -1114,7 +1259,7 @@ static void ui_task(void *arg)
              was_selection != ui->growth_input.selection || selected >= 0))
             idle(ui, (uint8_t)count);
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
-        else if (!ui->screen_off &&
+        else if (!ui->screen_off && ui->space.page==PET_SPACE_CLOSED &&
                  pet_growth_view_ui_tick(&ui->growth_view, now_ms(), ui->presenter.id[0] == '\0'))
             ui->home_rendered = refresh(ui);
 #endif

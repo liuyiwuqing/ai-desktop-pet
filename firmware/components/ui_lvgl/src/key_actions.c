@@ -21,10 +21,10 @@ pet_ui_action_t pet_ui_key_action(pet_ui_scene_t scene, pet_key_event_kind_t kin
         switch (kind) {
         case PET_KEY_EVENT_SHORT_PRESS:
             return key == PET_KEY_CONFIRM ? PET_UI_ACTION_CONFIRM : key == PET_KEY_NEXT
-                ? PET_UI_ACTION_NEXT : PET_UI_ACTION_MENU_CATEGORY_INTERACT;
+                ? PET_UI_ACTION_NEXT : PET_UI_ACTION_START_TALK;
         case PET_KEY_EVENT_LONG_PRESS:
             return key == PET_KEY_CONFIRM ? PET_UI_ACTION_CONFIRM : key == PET_KEY_NEXT
-                ? PET_UI_ACTION_BACK : PET_UI_ACTION_QUIT_MENU;
+                ? PET_UI_ACTION_BACK : PET_UI_ACTION_MUTE_TOGGLE;
         case PET_KEY_EVENT_COMBO_NEXT_VOICE: return PET_UI_ACTION_MENU_CATEGORY_SETTINGS;
         default: return PET_UI_ACTION_NONE;
         }

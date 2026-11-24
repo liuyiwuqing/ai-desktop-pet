@@ -12,6 +12,10 @@ add_executable(test_message_view test_message_view.c
     "${PET_ROOT}/firmware/components/ui_lvgl/src/menu_def.c"
     "${PET_ROOT}/firmware/components/ui_lvgl/src/growth_input.c"
     "${PET_ROOT}/firmware/components/ui_lvgl/src/growth_view.c"
+    "${PET_ROOT}/firmware/components/ui_lvgl/src/companion_view.c"
+    "${PET_ROOT}/firmware/components/svc_growth/src/growth_engine.c"
+    "${PET_ROOT}/firmware/components/svc_growth/src/companion_model.c"
+    "${PET_ROOT}/firmware/components/presentation/src/pet_game.c"
     "${PET_ROOT}/firmware/components/ui_lvgl/src/ai_view.c"
     "${PET_ROOT}/firmware/components/ui_lvgl/src/climate_view.c"
     "${PET_ROOT}/firmware/components/ui_lvgl/src/control_view.c"
@@ -23,6 +27,7 @@ add_executable(test_message_view test_message_view.c
 target_include_directories(test_message_view PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/support"
     "${PET_ROOT}/firmware/components/svc_setup/include"
+    "${PET_ROOT}/firmware/components/svc_growth/private_include"
     "${PET_ROOT}/firmware/components/pet_hal/include"
     "${PET_ROOT}/firmware/components/contracts/include"
     "${PET_ROOT}/firmware/components/presentation/include"

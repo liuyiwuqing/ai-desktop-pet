@@ -7,7 +7,7 @@
 
 /* 输入手势返回码（非菜单动作）：松开结束 PTT / 取消语音。 */
 enum {
-    PET_GROWTH_INPUT_AI_RELEASE = PET_MENU_ABOUT + 1,
+    PET_GROWTH_INPUT_AI_RELEASE = PET_MENU_ACTION_COUNT,
     PET_GROWTH_INPUT_AI_CANCEL,
 };
 
@@ -16,6 +16,7 @@ enum {
  * “页内存在任一可用条目”。 */
 typedef struct {
     uint32_t changed_ms, pressed_ms, last_menu_ms;
+    uint8_t remembered[PET_MENU_PAGE_COUNT];
     uint8_t selection; /* 当前页内条目索引 */
     uint8_t page;      /* pet_menu_page_id_t；菜单关闭时为 PET_MENU_ROOT */
     bool initialized, raw, stable, armed, menu;
@@ -38,3 +39,5 @@ void pet_growth_input_move(pet_growth_input_t *input, bool backwards, uint32_t n
 int pet_growth_input_activate(pet_growth_input_t *input, uint32_t now);
 /* 菜单 30s 无操作自动关闭；返回 true 表示本次发生了超时关闭。 */
 bool pet_growth_input_menu_expired(pet_growth_input_t *input, uint32_t now);
+
+bool pet_growth_input_item_available(const pet_growth_input_t *input, const pet_menu_item_t *item);
