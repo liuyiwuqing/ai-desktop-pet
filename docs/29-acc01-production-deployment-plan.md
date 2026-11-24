@@ -1170,3 +1170,94 @@ docker create --name rollback-acc03-3fdca79 --entrypoint /bin/true ghcr.io/liuyi
 - **差分烧录**只写变化块，没做整片擦写与回读校验；若怀疑镜像不一致，应改用 `esptool write-flash` 全量写入后回读比对。
 - **日志缺口**：CORE 对 `MQTT input rejected` 只记录异常类名。`IllegalArgumentException` 的消息其实是 `invalid_growth_state`、`device_mismatch` 这类原因码，不含隐私，值得单独改一次，让下次同类问题不用再从两端代码里猜。
 - `sdkconfig` 不入库，设备当前的功能开关只体现在 `firmware/profiles/companion.defaults` 与本机 `sdkconfig` 里；在别的机器重建不会自动带上。
+
+## 21. 换装端到端（CORE → 设备 → ACK → applied，2026-11-24T15:20–15:26Z）
+
+§20.5 里「未做 appearance 端到端」这一项已获用户授权，本轮补齐。这是伙伴空间最后一段没有实机证据的链路。
+
+### 21.1 先读状态，再决定改什么
+
+Appearance 下发带有强校验（`CompanionService.submit` → `CompanionCodec.appearance` / `owned`），随便挑一个值会被拒，所以先只读拉一次现场：
+
+```
+GET /api/v1/devices/dodo-1/companion
+```
+
+| 字段 | 值 | 含义 |
+| --- | --- | --- |
+| `enabled` / `online` / `fresh` / `writable` | `true` ×4 | 四项前置全满足 |
+| `appearanceRevision` | `0` | 本次请求的 `expectedRevision` 必须是 0 |
+| `appearance` | `theme=0, outfit=0, slots=[0,0,0]` | 当前外观等于默认值 |
+| `owned` | `0` | 位掩码 0：**没有任何服装/家具**，非 0 值一律 `outfit_not_owned` / `furnishing_not_owned` |
+| `themes` | `3` | bit0、bit1 置位：主题 0 与主题 1 已解锁 |
+| `requests` | `[]` | 无 `pending/sent/unconfirmed`，不会被 `appearance_result_pending` 挡 |
+
+`owned=0` 但 `themes=3` 是关键约束：家具和服装一个都没拥有，唯一能改的是**主题**。于是本次取最小变更——`theme 0 → 1`，`outfit` 与 `slots` 全部保持 0，既落在已拥有集合内，也不改动家具布局。
+
+### 21.2 下发与结果
+
+```
+POST /api/v1/devices/dodo-1/companion/appearance
+{"requestId":"2b78dbde-974a-4889-b1c5-ccbc4994f72f","expectedRevision":0,
+ "appearance":{"theme":1,"outfit":0,"slots":[0,0,0]}}
+```
+
+| 时间（UTC） | 事件 |
+| --- | --- |
+| 15:24:49.473 | 返回 `HTTP 202`，`{"requestId":"2b78dbde…","created":true}`，行状态 `pending` |
+| 15:24:50.737 | 行状态变 `applied`，`attempts=1`，`last_error` 空 |
+| 15:24:57 | 快照回读：`appearanceRevision=1`，`appearance.theme=1`，`revision 326 → 328` |
+
+端到端 1.26 秒。`CompanionWorker` 是 `fixedDelay=1000` 的 1 秒轮询，所以这个耗时基本就是「等一次 tick + QoS1 往返 + 设备落盘 + ACK 上行」。
+
+链路每一段都有独立证据：
+
+1. **CORE 入库**：`device_appearance_requests` 只有一行，`status=applied`、`attempts=1`、`last_error` 为空、`appearance={"slots":[0,0,0],"theme":1,"outfit":0}`。
+2. **上线到设备**：`attempts` 从 0 变 1 说明 `claim()` 取到了该行并发过 MQTT；若发布失败会留下 `broker_unconfirmed`，这里没有。
+3. **设备真的执行了**：回执进入 `acknowledge()` 后有两道硬校验——`status=applied` 要求 `code==0` 且 `appearanceRevision==expectedRevision+1`，否则抛 `inconsistent_appearance_ack` 并**不改行状态**。行能停在 `applied`，等于 CORE 收到了一份内容自洽的回执。
+4. **设备状态确实变了**：`appearanceRevision` 由 0 涨到 1，随后上行快照里的 `appearance.theme` 变成 1、《`revision` 326 → 328》。这条不是 CORE 自己改的字段，只能来自设备的 `companion_status`。
+5. **CORE 日志干净**：`docker logs --since 10m` 无 `appearance` / `rejected` 相关告警。
+
+设备侧没有对应的 ESP_LOG 行（换装路径只回 ACK、不打日志），所以第 3、4 条是设备执行成功的**间接但闭环**的证据：`appearanceRevision+1` 与 `theme=1` 只能由固件在落盘之后自己写出来。
+
+### 21.3 反向用例（不改设备外观）
+
+用同一个设备跑四条负向请求，确认校验链路不是「什么都放行」：
+
+| # | 请求 | 期望 | 实际 |
+| --- | --- | --- | --- |
+| t1 | 复用已成功的 `requestId` + 完全相同内容 | 幂等返回 200 | `200 {"created":false}` |
+| t2 | 复用已成功的 `requestId` + 改成 `theme=0` | 409 | `409 idempotency_conflict` |
+| t3 | 新 `requestId` + 陈旧 `expectedRevision=0` | 409 | `409 appearance_revision_conflict` |
+| t4 | 新 `requestId` + `expectedRevision=1` + `theme=2`（未解锁） | 409 `theme_locked` | `400 invalid_request` |
+
+四条跑完后 `device_appearance_requests` 仍只有 1 行——被拒的请求没有落库，符合预期。
+
+t1 很重要：它说明重试是安全的。控制台点两次或网络重发，不会让设备把同一套外观再应用一遍，也不会把 `appearanceRevision` 顶到 2。
+
+t4 暴露了一个缺陷，见 21.4。
+
+### 21.4 缺陷：拒绝原因被全局异常处理器吃掉
+
+t4 应该告诉调用方「这个主题还没解锁」，实际只回了 `invalid_request`。原因在 `ApiErrors`：
+
+```java
+@ExceptionHandler({..., IllegalArgumentException.class})
+ResponseEntity<?> invalid(Exception ignored) {
+    return ResponseEntity.badRequest().body(Map.of("error", "invalid_request"));
+}
+```
+
+`CompanionCodec` 抛出的 `theme_locked`、`outfit_not_owned`、`furnishing_not_owned`、`invalid_appearance_request_id`、`invalid_companion_array` 全是 `IllegalArgumentException`，消息体里本来就有精确原因码，但参数名是 `ignored`——**一个字都没往外传，也没进日志**。
+
+后果和 §20.3 的两个静默点是同一类：**失败发生在没人观察的通道上**。用户在国际化前端只会看到「请求无效」，无法区分「主题没买」「服装没买」「请求体写错」；运维事后也查不出原因，因为日志里同样没有。
+
+这类原因码是给前端做分支用的（是否引导去商店、是否刷新版本），压在 400 里等于把设计好的错误语义扔掉了。修法不难（例如只对匹配 `[a-z][a-z0-9_]{2,40}` 的消息回传，其余仍落 `invalid_request`），但要重建镜像并重新走一遍离线导入，本轮没有擅自做——留给用户决定。
+
+### 21.5 边界
+
+- **只验证了主题**：`owned=0` 使服装与家具无法测试。要覆盖 `outfit` / `slots` 分支，得先让设备挣到对应物品（或直接改 `owned` 位掩码，但那会污染成长数据，不建议）。
+- **只验证了 `applied`**：`rejected` / `expired` / `conflict` / `storage_error` / `unconfirmed` 五种回执没有构造。`expired` 需要设备断网 30 秒以上，`storage_error` 需要 NVS 写失败，都不适合在生产设备上人为制造。
+- **没有验证掉电持久化**：`applied` 表示设备回执已落盘，但没有拔电重启再读一次。要证明「重启后仍是主题 1」，需要再观察一次 `bootId` 变化后的快照。
+- **设备当前停留在主题 1**：这是本次测试的实际副作用。要复原只需再下发一次 `expectedRevision=1` + `theme=0`（同样 1 秒内完成）。
+- **串口没抓到证据**：抓了 150 秒，只采到 3 条 `climate` 行，换装路径不打日志。想要设备侧直接证据，得临时加 `ESP_LOGI` 再烧一次，代价大于收益。

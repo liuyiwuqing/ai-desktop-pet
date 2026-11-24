@@ -1940,4 +1940,18 @@ OPS-ARCHIVE-01 后续（同日 22:31Z）：三个刚恢复的镜像在 6 分钟�
 
 复验：重烧后 `device_growth_observations` 与 `device_companion_observations` 开始入库并持续刷新（`15:08:22Z`、companion `revision=323`），`device_growth_boots`/`device_companion_boots` 各 1 行，CORE 最近 90 秒 0 条拒绝；`tools/ci/test_host.sh` 退出 0。
 
-边界：未下发换装命令（appearance 端到端仍缺实机证据，需授权）；主机测试不覆盖 `app.c` 初始化顺序，此缺陷只有实机能抓到；差分烧录未做全量擦写与回读；CORE 的 `MQTT input rejected` 只记录异常类名，本次 25 条过渡期拒绝没能自证原因，已列为待改项。证据见 [ACC-01 §20](29-acc01-production-deployment-plan.md)。
+边界：主机测试不覆盖 `app.c` 初始化顺序，此缺陷只有实机能抓到；差分烧录未做全量擦写与回读；CORE 的 `MQTT input rejected` 只记录异常类名，本次 25 条过渡期拒绝没能自证原因，已列为待改项。当时未下发换装命令，appearance 端到端在 APPEAR-E2E-01 补齐。证据见 [ACC-01 §20](29-acc01-production-deployment-plan.md)。
+
+## APPEAR-E2E-01 · 换装端到端跑通：CORE 下发 → 设备 ACK → applied（2026-11-24，已通过）
+
+用户授权后补齐伙伴空间最后一段没有实机证据的链路。下发前先只读 `GET /api/v1/devices/dodo-1/companion` 摸清约束：`enabled/online/fresh/writable` 全为真，`appearanceRevision=0`，`owned=0`（没有任何服装与家具），`themes=3`（主题 0、1 已解锁），无进行中请求。正因为 `owned=0`，服装与家具的任何非 0 值都会被 `outfit_not_owned`/`furnishing_not_owned` 拒掉，所以取最小变更：只把 `theme` 从 0 改成 1，`outfit` 与 `slots` 保持 0。
+
+下发 `POST /api/v1/devices/dodo-1/companion/appearance`（`requestId=2b78dbde…`、`expectedRevision=0`）后：`15:24:49.473Z` 返回 202 `created=true`；`15:24:50.737Z` 行状态变 `applied`、`attempts=1`、`last_error` 空，**端到端 1.26 秒**（`CompanionWorker` 是 1 秒 tick）；`15:24:57Z` 快照回读 `appearanceRevision=1`、`appearance.theme=1`、`revision 326→328`。`device_appearance_requests` 仅 1 行，CORE 近 10 分钟无换装相关告警。
+
+这次「设备真的执行了」由 CORE 的两道硬校验反证：`acknowledge()` 对 `applied` 要求 `code==0` 且 `appearanceRevision==expectedRevision+1`，否则抛 `inconsistent_appearance_ack` 且不改行状态；行能停在 `applied`，且随后上行快照里的 `theme=1`、`appearanceRevision=1` 只能由固件落盘后自己写出。设备侧换装路径不打日志，串口 150 秒只采到 3 条 `climate`，没有直接日志证据。
+
+另跑四条负向用例确认不是「什么都放行」：复用已成功 requestId 且内容相同 → 200 `created=false`（重试安全，不会把 revision 顶到 2）；同 requestId 改内容 → 409 `idempotency_conflict`；陈旧 `expectedRevision` → 409 `appearance_revision_conflict`；`expectedRevision=1` + `theme=2`（未解锁）→ 期望 409 `theme_locked`，**实际 400 `invalid_request`**。四条被拒请求都没有落库，表内仍 1 行。
+
+最后一条暴露新缺陷：`ApiErrors` 把 `IllegalArgumentException` 统一映射成 400 `invalid_request`，形参名就叫 `ignored`——`CompanionCodec` 原本准备好的 `theme_locked`/`outfit_not_owned`/`furnishing_not_owned`/`invalid_appearance_request_id` 全部被丢弃，既不回给前端也不进日志。后果与 §20.3 的两个静默点同类：失败发生在没人观察的通道上；前端只能显示「请求无效」，无法区分「主题没买」「服装没买」「请求体写错」。修法不难（只回传匹配 `[a-z][a-z0-9_]{2,40}` 的消息），但要重建镜像并重新离线导入，未擅自执行，等用户决定。
+
+边界：`owned=0` 使 `outfit`/`slots` 分支无法测试；只覆盖 `applied`，`rejected`/`expired`/`conflict`/`storage_error`/`unconfirmed` 五种回执未构造；未拔电重启验证 NVS 持久化；**设备当前停留在主题 1**，复原只需再下发一次 `expectedRevision=1` + `theme=0`。证据见 [ACC-01 §21](29-acc01-production-deployment-plan.md)。
