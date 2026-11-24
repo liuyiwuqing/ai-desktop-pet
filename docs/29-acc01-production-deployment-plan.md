@@ -1005,3 +1005,4 @@ pattern read  nexus/v1/devices/%u/appearance
 - 脚本只覆盖服务端视角（容器、接口、磁盘、证书、5xx），不含设备实时性、功耗、音频等固件侧指标。
 - 设备观测进程没有结束条件，是上一轮遗留的无限循环；窗口到期时应手动停掉，避免长期占用。
 - 观测进程与本期部署无耦合：CORE 若在窗口内再次重建，`RestartCount` 归零会掩盖重启次数，届时应以 `StartedAt` 变化判定。
+- 磁盘盘点（只读，未清理）：`docker system df` 显示镜像 15 个共 7.61 GB（可回收 583.9 MB）、容器 252.3 MB、卷 67.2 MB、构建缓存 0；`~/images` 1.2 GB 是 ACC-02~04 的离线导入 tar，`~/staging` 92 KB、`~/nexus-backups` 600 KB，journal 11.9 MB。剩余 13 GB 的大头不在这些目录里（同期还跑着 halo×4、postgres 18、rustfs 等与本项目无关的容器），清理只能拿回约 1.8 GB，是否删除由用户决定。
