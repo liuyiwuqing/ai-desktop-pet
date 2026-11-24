@@ -35,7 +35,10 @@ await expect(`${panel}?.innerText.includes('同步未启用')`,'disabled feature
 await refresh('empty');await expect(`${panel}?.innerText.includes('暂无已注册设备')`,'no registered devices');
 await refresh('waiting');await expect(`${panel}?.innerText.includes('等待同步') && ${panel}?.innerText.includes('尚未收到')`,'missing snapshot does not invent a profile');
 await refresh('fresh');await expect(`${panel}?.innerText.includes('已同步') && ${panel}?.innerText.includes('72')`,'fresh snapshot shown separately from CORE');
-await expect("document.body.innerText.includes('CORE 专注档案') && document.body.innerText.includes('开始专注')",'original focus entry remains available');
+await js("[...document.querySelectorAll('button')].find(b=>b.innerText==='CORE 专注档案').click()");
+await expect("document.body.innerText.includes('开始专注')",'original focus entry remains available');
+await js("[...document.querySelectorAll('button')].find(b=>b.innerText==='伙伴空间').click()");
+await expect(`${panel}?.innerText.includes('已同步')`,'device growth returns after CORE focus');
 await refresh('stale');await expect(`${panel}?.innerText.includes('数据已过期') && ${panel}?.innerText.includes('72')`,'stale snapshot remains readable');
 for(const [mode,text] of [['unsaved','尚未落盘'],['readonly','存档不可写'],['recovered','回退至有效存档'],['time_unavailable','时间未就绪'],['device_disabled','设备已禁用']]) {
   await refresh(mode);await expect(`${panel}?.innerText.includes(${JSON.stringify(text)})`,'visible state '+mode);

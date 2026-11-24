@@ -1835,3 +1835,11 @@ v5 双槽存档与 v1–v4 读取、六件穿戴/六件摆件、三主题门控�
 设备伙伴状态、严格外观请求、落盘确认与UUID幂等已接入；CORE V29、管理员接口、MQTT worker和ACL升级配套。设备在线/90秒新鲜度/所有权/版本校验，断连不排队，未知结果回读核对；有伙伴历史只能停用。跨仓契约见31及CORE docs/companion-space.md。
 
 验证：真实C→MQTT→PostgreSQL→HTTP四项通过（ASan/UBSan，含丢ACK与重复请求）；最新 `LC_ALL=C bash tools/ci/test_host.sh` 退出0；full预设ESP-IDF构建退出0，证据 `firmware/build-companion-target/full/build-evidence.json`。首次目标构建发现私有网络函数不可见，修正后重跑通过。CORE targeted测试通过（独立跑时跨语言项跳过），Broker策略4/4通过。未烧录、未部署；控制台新页面另项验收。
+
+## PET-CONSOLE-01 · 伙伴空间与装扮预览（2026-11-24）
+
+CORE「伙伴」新增四分区：伙伴空间、衣橱与小舱、回忆与收藏、独立CORE专注档案。SVG栖团、小舱/穿戴/摆件预览、游戏纪录、设备里程碑、招手/呼吸/眨眼与减少动态已接入。按设备隔离页面草案，手机提供可搜索设备选择；管理员在线且状态新鲜可写才可应用，202等待设备、applied才保存完成，冲突保留草案并重新加载，未知提交保留请求身份重试。旧设备成长与CORE专注入口保留。
+
+验证：CORE全量 `python3 tools/run_local.py build` 通过（196项、0失败、6环境跳过）；最终页面变更后Vue类型/token/Vite/打包复验通过。Playwright+本机Chrome使用隔离HTTP fixture与伙伴数据，1440×1000、390×844检查无横向溢出，覆盖设备选择、预览、离线禁止提交、版本冲突、等待/保存结果、回忆、CORE专注入口、只读角色、键盘与减少动态，页面无运行异常。截图 `/tmp/qitomo-desktop.png`、`/tmp/qitomo-mobile.png`。真实LVGL复验10/10通过。旧成长UI回归脚本同步新页签路径（该ego-browser脚本本次未执行，页面以Playwright验证）。未烧录/部署/真实设备操作，实屏性能、接线、功耗与真实联网验收仍待硬件验证。
+
+同步切片已推送并核验：固件 `236faee36d385d210a6fd56ed8f15ee041b0adf8`，配套CORE `c0c0e064a93a6d963292756211436eda247d9f04`。控制台切片分别提交于两仓，具体提交见Git历史。
