@@ -964,9 +964,44 @@ pattern read  nexus/v1/devices/%u/appearance
 ### 18.3 未完成与边界
 
 - **验收自身的副作用**：五次登录尝试在 `access_audit` 留下 13 行 `POST /api/v1/session`（9 行 200、4 行 401），除此之外没有任何写入；没有建角色令牌、没有签发凭据、没有下发配置。本机存过的生产令牌副本用完即删。
-- **24 小时观测仍未完成**：本节只有约 15 分钟基线（容器 8 分钟、样本 219 条）。`ERROR`/`WARN` 为 0 只代表这段时间；真正的 24 小时口径要另起一轮，按 §10.3 的清单逐时记录。
+- **24 小时观测仍未完成**：本节只有约 15 分钟基线（容器 8 分钟、样本 219 条）。`ERROR`/`WARN` 为 0 只代表这段时间；正式窗口已在 §19 启动（`2026-11-24T14:14Z` 起，96 条/15 分钟），到期才能判。
 - **角色页只验了管理员**：生产只有管理员令牌（`tokens.json` `format=1`、`revision=2`，权限页显示「暂无角色令牌」）。`operator`/`viewer` 的界面可见性与写入拦截仍只由 `RoleAccessFlowTest` 等自动化覆盖，没有浏览器证据；要补得先在生产签发一个只读角色令牌，属于新增凭据，需用户确认。
 - **设备侧仍未写**：没有向 `dodo-1` 下发含新字段的配置请求（会写 NVS）；换装端到端仍需固件开启 `CONFIG_PET_COMPANION_SYNC_ENABLED`。
 - **磁盘 85%**：根分区剩 13 GB，本轮不处理，但再叠几次离线镜像归档（单个约 300 MB）前应先清理 `/tmp/nexus-core-acc0*.tar`。
 
 回滚：本轮没有改动任何生产状态，无需回滚。
+
+## 19. ACC-04 二十四小时观测（进行中，2026-11-24T14:14Z 起）
+
+§18 只给了 15 分钟基线，24 小时口径按 §10.3 另起一轮。本轮窗口：
+
+| 项 | 值 |
+| --- | --- |
+| 起点 | `2026-11-24T14:14:06Z`（22:14 CST），终点 `2026-11-25T14:14Z`，共 96 条（每 15 分钟） |
+| 载体 | 服务器 `nexus-deploy@pet.muyin.site` 的 `~/nexus-observe.sh`，日志 `~/nexus-observe/observe-acc04-20261124T1414Z.ndjson`（目录 700） |
+| 覆盖对象 | 当前运行物 `acc04-c88957e`（`StartedAt=2026-11-24T13:50:42Z`） |
+| 只读性 | 只做 `docker inspect/stats/logs/cp`、`psql` 计数、`curl /api/v1/status`、`df`、`openssl s_client`；不写库、不重启、不改配置 |
+| 字段 | `core/pg/mqtt` 状态与 `RestartCount`、`status`（MQTT 与数据库 ready）、`disk_avail_kb`/`disk_used_pct`、`pg_conn`、`core_mem`、`mqtt_reconnect_16m`、`http5xx_last200`、HTTPS/MQTT 证书到期 |
+
+首条样本（`14:14:06Z`）：`core=running/healthy/0`、`pg=running/healthy/0`、`mqtt=running/0`、`status={"schemaVersion":1,"mqtt":"ready","database":"ready"}`、`disk_avail_kb=13,958,456`（84%）、`pg_conn=12`、`core_mem=250MiB/1GiB`、`mqtt_reconnect_16m=0`、`http5xx_last200=0`、HTTPS 证书到 `2027-02-13`、MQTT 证书到 `2029-02-17`。
+
+### 19.1 采集脚本的两处修正
+
+第一次启动就发现问题：首条样本 `status` 是 `{"error":"unauthorized"}`。原因是脚本用 `docker cp ... - | awk '/"token"/ {...}'` 从 **tar 流**里抓令牌，依赖 `tokens.json` 的排版——ACC-01 那轮能取到是排版运气，镜像重建后排版变了就取到空串。改成 `docker cp` 落到 `mktemp` 临时文件（`chmod 600`）、用 `python3 -c` 按结构取 `admin.current.token`、读完即删；环境变量 `NEXUS_ADMIN_TOKEN` 只作回退。另外把 `DURATION_S`（默认 86400）与 `INTERVAL_S`（默认 900）提成参数，便于先跑短窗口自检。
+
+自检：`DURATION_S=30 INTERVAL_S=10` 跑出 3 条样本 + `stop`，`status` 恢复为 `{"schemaVersion":1,"mqtt":"ready","database":"ready"}`，随后删掉这份探针日志再正式启动。
+
+### 19.2 设备侧同期数据与一个不能糊过去的结论
+
+服务器上另有一个 5 分钟周期的设备观测进程（`~/nexus-device-observe.sh`，写 `~/nexus-observe/device-dodo-1.ndjson`，只读查 `devices` 与 `device_telemetry_samples`）。从 `2026-11-23T14:32:48Z` 起的 284 条样本：间隔无断档（>5.5 分钟的空洞 0 个）、`query_failed` 0 次。
+
+但这段跨度的结论是**负面**的：`dodo-1` 在 `2026-11-23T14:47:48Z` 进入离线，直到 `2026-11-24T13:08:16Z` 才回来，中间连续 22 小时 20 分钟 `fresh_online=false`；在线部分的 RSSI 为 `-46…-35 dBm`（中位 `-41`，注意离线期该值是最近一次上报的旧值）、`disconnect_events_16m` 全为 0。
+
+所以这 23.59 小时**不能**当作「新版本 24 小时设备稳定性」——设备实际只在窗口最后约 1 小时在线。设备侧的 24 小时证据要等设备继续在网、并让观测进程积累一整段在线记录后才成立；这也是 §18.3 里「换装端到端无真实证据」的同一条根因：固件那侧没有持续在线的前提。
+
+### 19.3 边界
+
+- 窗口未结束，**不判定通过**；到期后要按日志逐条核对 96 条、确认 5xx/重连/重启计数与证书到期，再写结论。
+- 脚本只覆盖服务端视角（容器、接口、磁盘、证书、5xx），不含设备实时性、功耗、音频等固件侧指标。
+- 设备观测进程没有结束条件，是上一轮遗留的无限循环；窗口到期时应手动停掉，避免长期占用。
+- 观测进程与本期部署无耦合：CORE 若在窗口内再次重建，`RestartCount` 归零会掩盖重启次数，届时应以 `StartedAt` 变化判定。

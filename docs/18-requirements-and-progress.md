@@ -1881,3 +1881,13 @@ CORE「伙伴」新增四分区：伙伴空间、衣橱与小舱、回忆与收�
 同时记下运行基线：CORE `acc04-c88957e` `healthy`、`RestartCount=0`、启动后日志 30 行且 `ERROR`/`WARN`/`MQTT input rejected` 均为 0；Flyway 29 已就绪；`dodo-1` `online=true`；遥测样本 208→219 条、相邻间隔恒 30 秒；快照持续带 `screen{60,40}` 与 `sfxVolume=20`，说明契约修复在真实链路上持续生效；库 9.7 MB、PostgreSQL 连续 6 天；根分区 85%（剩 13 GB）。
 
 边界：24 小时观测只有这 15 分钟基线，仍需另起一轮按 §10.3 逐时记录；生产只有管理员令牌，`operator`/`viewer` 的界面可见性仍靠 `RoleAccessFlowTest` 等自动化，浏览器侧无证据（补验需在生产签发只读角色令牌，属新增凭据，待用户确认）；仍未向 `dodo-1` 下发含新字段的配置请求，换装端到端仍待固件开启伙伴同步。证据见 [ACC-01 §18](29-acc01-production-deployment-plan.md)。
+
+## OBSERVE-ACC04-01 · ACC-04 二十四小时观测启动（2026-11-24，进行中）
+
+按 ACC-01 §10.3 的口径为当前运行物 `acc04-c88957e` 起一轮正式观测：`2026-11-24T14:14:06Z` 至 `2026-11-25T14:14Z`，每 15 分钟一条共 96 条，日志在服务器 `~/nexus-observe/observe-acc04-20261124T1414Z.ndjson`，只读采集（容器状态与 RestartCount、`/api/v1/status`、磁盘、`pg_conn`、内存、MQTT 重连、近 200 条 5xx、HTTPS/MQTT 证书到期）。首条样本三服务 healthy、`status` 双 ready、磁盘 84%（剩 13,958,456 kB）、`pg_conn=12`、`core_mem=250MiB/1GiB`、重连与 5xx 均为 0。
+
+过程中修掉采集脚本两处硬伤：原实现用 `docker cp ... - | awk '/"token"/'` 从 tar 流里抓令牌，依赖 `tokens.json` 排版，ACC-01 那轮能取到属运气，镜像重建后首条样本 `status` 直接变成 `{"error":"unauthorized"}`；改为 `docker cp` 落到 `mktemp`（0600）+ `python3` 按结构取 `admin.current.token`、读完即删，环境变量仅作回退。另把 `DURATION_S`/`INTERVAL_S` 提成参数，用 `DURATION_S=30 INTERVAL_S=10` 短窗口自检验证 3 条样本 + `stop` 且 `status` 恢复双 ready，再正式启动。
+
+同期设备侧数据给出的是**负面结论**：既有 5 分钟设备观测进程从 `2026-11-23T14:32:48Z` 起积累 284 条、无断档无查询失败，但 `dodo-1` 在 `2026-11-23T14:47:48Z` 离线、`2026-11-24T13:08:16Z` 才回来，连续 22 小时 20 分钟不在线；在线部分 RSSI `-46…-35 dBm`、`disconnect_events_16m` 全 0。因此这 23.59 小时不能算「新版本 24 小时设备稳定性」，设备侧证据要等一整段在网记录。
+
+边界：窗口未结束，不判定通过；脚本只覆盖服务端视角，不含固件侧指标；设备观测进程是上一轮遗留的无限循环，窗口到期应手动停止；若窗口内 CORE 再次重建，`RestartCount` 会归零，需改看 `StartedAt`。证据见 [ACC-01 §19](29-acc01-production-deployment-plan.md)。
