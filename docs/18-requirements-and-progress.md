@@ -1925,3 +1925,7 @@ README 记下四条真实踩过的坑：令牌不能从 `docker cp` 的 tar 流�
 结果：`~/images` 1.2 GB → 4 KB；根分区 67 GB/13 GB（85%）→ 65 GB/15 GB（82%）；可切回版本从 1 个变 4 个，回滚从「需要 docker load 且已无 tar」变成「改 tag 重建」。运行态未动：`acc04-c88957e`、`running/healthy`、`RestartCount=0`，本轮没有重建容器。
 
 边界：镜像只有 tag，tar 的 sha256 仍在 §16/§17 留档（删的是文件不是证据）；`acc01-d2711f7` 这个 tag 是我按 revision 补的，不是原发布流程给的；回滚到 acc01/acc02 还要配套数据库备份，单换镜像不等于状态一致。证据见 [ACC-01 §19.4](29-acc01-production-deployment-plan.md)。
+
+OPS-ARCHIVE-01 后续（同日 22:31Z）：三个刚恢复的镜像在 6 分钟后被外部 `prune` 清掉（`docker events` 记到 22:31:08 与 22:31:16 两轮，untag+delete 的正是 acc01/02/03 与我临时用的 `alpine:3`），§19.4 的「可切回 4 个版本」当场失效。触发源未归因：宿主机跑 `1panel-core`/`1panel-agent`，`/opt/1panel` 用 root 容器挂不到内容，`1panel-mcp` 无日志；两次相隔 8 秒，像面板「清理镜像」的两步。已用开发机镜像经 `docker save | ssh docker load` 流式恢复（每个约 51 秒、共约 2.6 分钟、三版只占 80 MB），并用三个 `Created` 状态容器 `rollback-acc01/02/03` 把镜像钉住（`image prune` 会跳过被任何容器引用的镜像，但 `container prune` 会先删掉它们）。
+
+顺带实测出回滚矩阵：`acc01-d2711f7` 最高迁移 `V28`，`acc02/acc03/acc04` 均为 `V29`——所以只有 acc02/03/04 之间能「只改 image」，回退 acc01 必须同时回到 V28 的库。证据见 [ACC-01 §19.5](29-acc01-production-deployment-plan.md)。

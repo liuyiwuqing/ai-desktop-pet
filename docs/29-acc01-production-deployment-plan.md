@@ -1062,7 +1062,7 @@ pattern read  nexus/v1/devices/%u/appearance
 | --- | --- | --- |
 | `~/images` | 1.2 GB（4 份 tar） | 4 KB（空目录） |
 | 根分区 | 67 GB 已用 / 13 GB 可用（85%） | 65 GB 已用 / 15 GB 可用（82%） |
-| 可切回的版本 | 只有 `acc04-c88957e` | `acc01-d2711f7`、`acc02-88d2e90`、`acc03-3fdca79`、`acc04-c88957e` |
+| 可切回的版本 | 只有 `acc04-c88957e` | `acc01-d2711f7`、`acc02-88d2e90`、`acc03-3fdca79`、`acc04-c88957e`（**6 分钟后被外部 prune 清掉，见 §19.5**） |
 | 回滚方式 | 需要 `docker load` 且当前无 tar 可 load | 改 `image` tag 后重建即可 |
 
 分两步观察：先删已加载的 acc04 归档后为 66 GB / 14 GB（83%），再 load 三版镜像（+80 MB）并删余下三份 tar 后到 65 GB / 15 GB（82%）。净增加约 2 GB 可用空间，其中约 1.1 GB 来自 tar、其余同期其他容器与日志的释放。
@@ -1070,3 +1070,47 @@ pattern read  nexus/v1/devices/%u/appearance
 运行态未受影响：`nexus-production-core-1` 仍是 `acc04-c88957e`、`running/healthy`、`RestartCount=0`；本轮没有重建容器。
 
 边界：镜像只有 tag、没有 digest 校验记录（tar 的 sha256 已在 §16/§17 留档，删的是文件不是证据）；`acc01` 的 tag 是我按 revision 补的，不是原发布流程给的；回滚到 acc01/acc02 还要配套数据库备份（V28/V29 差异见 §15.2），单独换镜像回退不等于状态一致。
+
+### 19.5 外部 prune 事件与回滚点加固（2026-11-24T22:31Z 发现）
+
+§19.4 写完后 6 分钟，三个刚恢复的镜像就没了。`docker events` 记到两轮 `prune`：
+
+```
+2026-11-24T22:31:08Z  prune
+2026-11-24T22:31:16Z  untag/delete  sha256:c0831912…  (acc03)
+                      untag/delete  sha256:a8f98e16…  (acc01)
+                      untag/delete  sha256:a68b4cbc…  (acc02)
+                      untag/delete  sha256:3ea06e4c…  (alpine:3，我读 /etc/nexus 用的临时镜像)
+2026-11-24T22:31:16Z  prune
+```
+
+也就是说 §19.4 里「可切回 4 个版本」这句在写下后几分钟就不成立了。触发源没有归因：宿主机上跑着 `1panel-core` / `1panel-agent`（非 systemd `1panel` 单元），`/opt/1panel` 用 root 容器挂载读不到内容，`1panel-mcp` 日志无记录；两次 `prune` 相隔 8 秒，像是面板「清理镜像」按钮或计划任务走的两步（镜像 + 构建缓存/悬空对象）。**需要操作者确认 22:31 是不是自己在 1Panel 里点了清理**——如果那是定时任务，任何「load 上去的历史镜像」都会被周期性扫掉。
+
+**恢复**：开发机仍保有全部四个版本的镜像（`acc01` 在本机是 untagged 的 `a8f98e16`），用流式管道直接灌回去，无需落盘：
+
+```sh
+docker save a8f98e163337 | ssh nexus-prod 'docker load'   # acc01 落为 untagged，需补 tag
+docker save ghcr.io/liuyiwuqing/nexus-core:acc02-88d2e90 | ssh nexus-prod 'docker load'
+docker save ghcr.io/liuyiwuqing/nexus-core:acc03-3fdca79 | ssh nexus-prod 'docker load'
+```
+
+实测每个约 **51 秒**（319 MB，上行约 6.5 MB/s），三个共约 2.6 分钟；恢复后三个镜像只占 **80 MB**（共享基础层），根分区仍是 65 GB/15 GB（82%）。
+
+**加固**：给三个历史版本各建一个**停止态容器**把镜像钉住，`docker image prune`（含 `-a`）会跳过被任何容器引用的镜像：
+
+```sh
+docker create --name rollback-acc03-3fdca79 --entrypoint /bin/true ghcr.io/liuyiwuqing/nexus-core:acc03-3fdca79
+```
+
+现为 `rollback-acc01-d2711f7`、`rollback-acc02-88d2e90`、`rollback-acc03-3fdca79` 三个 `Created` 状态容器（不运行、不占端口、不挂卷）。它们只防镜像 prune；**`docker container prune` 会先删掉它们**，那时镜像又变成可回收。
+
+**回滚矩阵**（`grep` 镜像内 `core.jar` 的迁移清单实测，`docker run --rm --network none` 取得）：
+
+| tag | revision | 最高迁移 | 数据库要求 |
+| --- | --- | --- | --- |
+| `acc01-d2711f7` | `d2711f7` | `V28__delivery_display.sql` | 需 V28 库，回退必须配 §15.2 之前的备份 |
+| `acc02-88d2e90` | `88d2e90` | `V29__companion_space.sql` | V29 |
+| `acc03-3fdca79` | `3fdca79` | `V29__companion_space.sql` | V29 |
+| `acc04-c88957e` | `c88957e` | `V29__companion_space.sql` | V29 |
+
+结论：acc02/03/04 三者之间可以只改 `image` 切换（同为 V29，无迁移差异），回退到 acc01 则必须同时回到 V28 的库。这比 §19.4 里那句「改 tag 即可」精确——**同 schema 才叫只改 tag**。
