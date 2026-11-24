@@ -36,3 +36,7 @@ coverage/
 htmlcov/
 build/
 build-*/
+
+# 本地验收证据与工作区状态（不随仓库分发）
+.screenshots/
+.workbuddy/
