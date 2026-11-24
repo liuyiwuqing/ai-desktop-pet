@@ -1,6 +1,6 @@
 # ACC-01 生产部署与数据库迁移执行计划
 
-2026-11-20 制定，2026-11-23 执行 G0–G4。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，执行结果回填在各节末尾**：G0 发布物（3.4）、G1 只读盘点（5.3）、G2 备份与隔离恢复（6.2）、G4 离线导入与升级（8.5）、G6 运行时检查（10.2.1）与 24 小时观测（10.3.1）。2026-11-24 追加执行 ACC-02 变更（CORE `d2711f7` → `88d2e90`、V29、伙伴空间启用），记录见第 15 节；同日追加 ACC-03（遥测契约缺口修复，CORE `3fdca79`），记录见第 16 节。当前生产基线以第 16 节为准。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。
+2026-11-20 制定，2026-11-23 执行 G0–G4。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，执行结果回填在各节末尾**：G0 发布物（3.4）、G1 只读盘点（5.3）、G2 备份与隔离恢复（6.2）、G4 离线导入与升级（8.5）、G6 运行时检查（10.2.1）与 24 小时观测（10.3.1）。2026-11-24 追加执行 ACC-02 变更（CORE `d2711f7` → `88d2e90`、V29、伙伴空间启用），记录见第 15 节；同日追加 ACC-03（遥测契约缺口修复，CORE `3fdca79`，第 16 节）与 ACC-04（控制台可编辑屏幕与提示音，CORE `c88957e`，第 17 节）。当前生产基线以第 17 节为准。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。
 
 ## 1. 目标、范围与完成判定
 
@@ -876,3 +876,26 @@ pattern read  nexus/v1/devices/%u/appearance
 未向真实设备提交配置请求（会写 NVS 并改变息屏/提示音），因此配置回传链路仍只有协议级验证；换装端到端（appearance → ACK → applied）仍无真实设备证据，需先让固件开启伙伴同步；未做 24 小时观测与浏览器登录/权限页验收。
 
 回滚：编排 `image` 改回 `acc02-88d2e90` 重建 CORE 即可，无迁移可回退（V29 未变）。
+
+## 17. ACC-04 变更记录：控制台可编辑屏幕与提示音（2026-11-24）
+
+§16 修好契约后，把只做透传的三项接到控制台「设置与状态」。范围只有 CORE：前端表单、类型与一条 HTTP/MQTT 流程用例；后端校验沿用 §16 的实现，无迁移、无 Broker 改动、无设备改动。
+
+| 项 | 内容 |
+| --- | --- |
+| 提交 | CORE `c88957e`（`feat(console): edit screen timeout, idle brightness and help volume`） |
+| 行为 | 「更多设置」新增息屏超时（0–3600 秒，0=永不息屏）、待机亮度（0–100%）、提示音音量（0–100%）；三项只在设备上报过时出现且可编辑，未上报的设备显示“固件升级后可在此调整”，不补默认值；待机亮度高于亮度时给出“不会降亮度”提示；折叠摘要与配置记录都显示下发值 |
+| 校验 | 前端 `fieldRule` 限制范围并在越界时阻止提交；后端 `config()` 仍按共享 schema 校验，HTTP 边界对 `sfxVolume 101`、`idleBrightness 101`、`timeoutS 3601`、`screen` 未知键返回 400 |
+| 用例 | `DeviceManagementFlowTest.configurationRequestCarriesScreenAndSoundSettings`：真实 MQTT→CORE→PostgreSQL→HTTP，先发坏样本全部 400，再提交完整配置断言 202 且下发信封里 `screen.timeoutS=300`、`idleBrightness=50`、`sfxVolume=35` 与新音量同时存在 |
+| 本地 | `npm run check`（vue-tsc + 83 个样式 token）通过；`python3 tools/run_local.py build` 198 项 0 失败 6 跳过 |
+| 发布 | 运行 [45406480670](https://github.com/liuyiwuqing/nexus-core/actions/runs/45406480670) `success`，7 项冒烟通过；CORE digest `sha256:4bbac7ea9a2ebc067b20b83ad752172bd671595f0fbf55fc0b692370ec5dbc81` |
+| 离线归档 | `/tmp/nexus-core-acc04-amd64.tar` 319,071,232 B，SHA-256 `bc9db419f84e65d03661e66112b0524cd7ea5ff73ca6a5f85067ec3728d1a93d`，服务器端一致；镜像 ID `sha256:70837052…9a56`，`revision=c88957e`，tag `acc04-c88957e` |
+| 备份 | `nexus-acc04-before-20261124T135036Z.dump`，115,208 B，SHA-256 `5842904f0f7f4aa8febdcea3f42556aa25e40c4f16d6b5daa12961a909abdf19` |
+| 编排 | `4c956726…` → `7d7381bc…`，只改 `image`；旧文件备份 `docker-compose.yml.bak-acc04-20261124` 与 `~/nexus-backups/…acc04-backup` |
+| 停机 | `13:50:27Z` 停 → `13:50:43Z` 启动 → `13:50:51Z` healthy（约 24 秒），PostgreSQL/MQTT 未停 |
+
+部署后实测：迁移 `No migration necessary`（V29），`RestartCount=0`，容器仍 `65534:65534`/只读；`MQTT input rejected` 与 `ERROR` 均为 0；设备 `dodo-1` 持续在线，快照 `observed_at=13:50:27Z`、`sfxVolume=20`、`screen={"timeoutS":60,"idleBrightness":40}`，样本 189→190，`/management` 返回 `fresh=true`、`canConfigure=true`；线上 `DevicesPanel-DgOt9p4u.js` 含「息屏超时」「待机亮度」「提示音音量」，旧构建哈希返回 404。
+
+边界：没有在浏览器里实点这三项做像素与交互验收（本机无 Playwright 依赖，未为一次检查新增依赖），验证止于类型检查、模板守卫、真实接口数据与线上产物字符串；未向真实设备提交含新字段的配置请求（会写 NVS），设备端接受与否仍依据协议与固件校验逻辑，不是实机证据。
+
+回滚：编排 `image` 改回 `acc03-3fdca79` 重建 CORE；数据库无需回退。

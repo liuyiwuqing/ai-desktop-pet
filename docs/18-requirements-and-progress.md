@@ -1861,3 +1861,13 @@ CORE「伙伴」新增四分区：伙伴空间、衣橱与小舱、回忆与收�
 部署（`pet.muyin.site`，ACC-03）：发布运行 45402756973 成功（7 项冒烟），CORE `3fdca79` digest `sha256:45ca707a…`，离线导入 tag `acc03-3fdca79`，编排只改 `image` 一行（`58c97511…`→`4c956726…`），停机约 40 秒，迁移 `No migration necessary`。上线后 `MQTT input rejected` 0 次、`ERROR` 0 次；retained 遥测被接受，快照前推到 `2026-11-24 13:30:57Z`、`sfxVolume=20`、`screen={"timeoutS":60,"idleBrightness":40}`；期间真实设备 `dodo-1` 上线，`online=true`、`fresh=true`、`configBlock=""`，30 秒级遥测持续入库并累计 149→152 条样本。证据见 [ACC-01 §16](29-acc01-production-deployment-plan.md)。
 
 边界：未向真实设备提交配置请求（会写 NVS），配置回传仍只有协议级验证；在网固件未开 `CONFIG_PET_COMPANION_SYNC_ENABLED`（`device_companion_observations=0`、伙伴 `snapshot=null`），换装端到端仍无真实设备证据；未做 24 小时观测与浏览器登录/权限页验收。契约文档已同步：[device-management-v1](../integration/contracts/device-management-v1/README.md) 与 CORE README 说明可选字段与不回填原则。
+
+## CONSOLE-SETTINGS-01 · 控制台可编辑屏幕与提示音（2026-11-24，已部署）
+
+在 MGMT-TELEMETRY-01 修好契约后，把原先只做透传的三项接入「设置与状态」：息屏超时（0–3600 秒，0=永不息屏）、待机亮度（0–100%）、提示音音量（0–100%）。三项只在设备上报过时出现并可编辑，未上报的设备显示“固件升级后可在此调整”而不补默认值；待机亮度高于亮度时提示不会生效；折叠摘要与配置记录都显示实际下发值。前端 `fieldRule` 限制范围，后端仍按共享 schema 校验。
+
+验证（本机 macOS）：`npm run check`（vue-tsc + 83 个样式 token 全定义）通过；新增 `DeviceManagementFlowTest.configurationRequestCarriesScreenAndSoundSettings` 走真实 MQTT→CORE→PostgreSQL→HTTP，先断言四类坏样本（`sfxVolume 101`、`idleBrightness 101`、`timeoutS 3601`、`screen` 未知键）均 400，再提交完整配置断言 202 且下发信封含 `screen.timeoutS=300`、`idleBrightness=50`、`sfxVolume=35`；全量 `python3 tools/run_local.py build` 198 项 0 失败 6 跳过。
+
+部署（`pet.muyin.site`，ACC-04）：运行 45406480670 成功（7 项冒烟），CORE `c88957e` digest `sha256:4bbac7ea…`，离线导入 tag `acc04-c88957e`，编排只改 image（`4c956726…`→`7d7381bc…`），停机约 24 秒，迁移 `No migration necessary`。上线后 `MQTT input rejected`/`ERROR` 均 0；真实设备 `dodo-1` 在线，`/management` 返回 `fresh=true`、`canConfigure=true`、`sfxVolume=20`、`screen={"timeoutS":60,"idleBrightness":40}`；线上 `DevicesPanel-DgOt9p4u.js` 含三项新文案，旧构建哈希 404。证据见 [ACC-01 §17](29-acc01-production-deployment-plan.md)。
+
+边界：未在浏览器实点这三项做像素/交互验收（本机无 Playwright 依赖，未为单次检查新增依赖），验证止于类型检查、模板守卫、真实接口数据与线上产物字符串；未向真实设备提交含新字段的配置请求（会写 NVS），设备端接受与否仍属协议级判断。固件侧 `CONFIG_PET_COMPANION_SYNC_ENABLED` 与换装端到端仍未验证。

@@ -1,6 +1,6 @@
 # 1Panel：直接拉取镜像部署管理台
 
-2026-11-15 已验证版本：CORE `230c809`，支持 `linux/amd64`、`linux/arm64`。发布与按 digest 回拉的 [运行 43620052738](https://github.com/liuyiwuqing/nexus-core/actions/runs/43620052738) 全部成功，7 项无源码初始化/编排/鉴权/静态资源/TLS/重建持久性检查通过。当前发布物为 CORE `3fdca79`（含 V29 伙伴空间与遥测契约修复），发布运行 [45402756973](https://github.com/liuyiwuqing/nexus-core/actions/runs/45402756973)，digest 见下方命令；上线前基线为 `88d2e90`（[45393714296](https://github.com/liuyiwuqing/nexus-core/actions/runs/45393714296)）与 `d2711f7`（V28，[45103288550](https://github.com/liuyiwuqing/nexus-core/actions/runs/45103288550)）。2026-11-24 已按本页在 `pet.muyin.site` 完成两次既有安装升级（离线导入、V29、伙伴空间启用、遥测契约修复），执行证据见 [ACC-01 §15/§16](29-acc01-production-deployment-plan.md)。完整门禁与迁移步骤同见该计划。
+2026-11-15 已验证版本：CORE `230c809`，支持 `linux/amd64`、`linux/arm64`。发布与按 digest 回拉的 [运行 43620052738](https://github.com/liuyiwuqing/nexus-core/actions/runs/43620052738) 全部成功，7 项无源码初始化/编排/鉴权/静态资源/TLS/重建持久性检查通过。当前发布物为 CORE `c88957e`（含 V29 伙伴空间、遥测契约修复与控制台屏幕/提示音设置），发布运行 [45406480670](https://github.com/liuyiwuqing/nexus-core/actions/runs/45406480670)，digest 见下方命令；上线前基线为 `3fdca79`（[45402756973](https://github.com/liuyiwuqing/nexus-core/actions/runs/45402756973)）、`88d2e90`（[45393714296](https://github.com/liuyiwuqing/nexus-core/actions/runs/45393714296)）与 `d2711f7`（V28，[45103288550](https://github.com/liuyiwuqing/nexus-core/actions/runs/45103288550)）。2026-11-24 已按本页在 `pet.muyin.site` 连续完成三次既有安装升级（离线导入、V29、伙伴空间启用、遥测契约修复、控制台设置扩展），执行证据见 [ACC-01 §15–§17](29-acc01-production-deployment-plan.md)。完整门禁与迁移步骤同见该计划。
 
 下文命令中的 digest 为历史基线，部署前按发布运行产物替换。
 
