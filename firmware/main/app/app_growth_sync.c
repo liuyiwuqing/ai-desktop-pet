@@ -14,7 +14,15 @@ static char device_id[PET_NET_DEVICE_ID_MAX+1],boot_id[33];
 static uint32_t sequence,last_report;
 void app_growth_sync_init(const char *device)
 {
-    if(device_id[0]||!pet_nexus_device_id_valid(device))return;
+    /* 允许用真实设备 ID 重新绑定：启动早期拿到的可能是编译期默认值，
+       而这里绑定的 ID 决定发布到哪个主题，绑错就等于把数据发进不存在的设备。 */
+    if(!pet_nexus_device_id_valid(device))return;
+    if(device_id[0]) {
+        if(!strcmp(device_id,device))return;
+        (void)snprintf(device_id,sizeof(device_id),"%s",device);
+        sequence=0;last_report=0;
+        return;
+    }
     (void)snprintf(device_id,sizeof(device_id),"%s",device);
     unsigned char random[16];esp_fill_random(random,sizeof(random));
     for(unsigned i=0;i<16;i++)(void)snprintf(boot_id+i*2,3,"%02x",random[i]);

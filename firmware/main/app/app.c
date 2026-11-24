@@ -501,7 +501,6 @@ esp_err_t app_start(void)
 
 #if CONFIG_PET_MODULE_GROWTH_ENABLED
     const esp_err_t growth_err = pet_growth_start();
-    app_growth_sync_init(s_device_id);
     if (growth_err != ESP_OK)
         ESP_LOGW(TAG, "growth unavailable: %s", esp_err_to_name(growth_err));
 #endif
@@ -531,6 +530,10 @@ esp_err_t app_start(void)
     /* 配置与身份都在启动收件前固定；配置字符串必须覆盖整个运行期。 */
     static pet_net_config_t net_config;
     const bool net_configured = load_net_config(&net_config);
+    /* 必须放在 load_net_config 之后：这里 s_device_id 才是 NVS 里的真实 ID。
+       ACC-04 烧录后成长/伙伴同步一条都没上报，就是因为这行原先配置加载之前调用，
+       拿到了编译期默认 pet-dev-01，把数据发布到了不存在的设备主题，CORE 侧按未知设备静默丢弃。 */
+    app_growth_sync_init(s_device_id);
     esp_err_t msg_err = pet_message_hub_init(s_device_id, publish_ack, NULL, app_epoch_now);
     if (msg_err != ESP_OK) {
         ESP_LOGW(TAG, "message hub init failed: %s", esp_err_to_name(msg_err));

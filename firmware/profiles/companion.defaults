@@ -1,0 +1,11 @@
+# Companion space on the device: publish read-only growth snapshots and accept
+# versioned appearance commands. Requires CORE companion support and the
+# per-device broker ACLs (nexus/v1/devices/%u/{growth_status,companion_status,
+# appearance,appearance_acks}).
+#
+# Apply on top of a normal build profile, e.g.
+#   idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;profiles/companion.defaults" build
+# or set the two symbols in menuconfig. Companion sync depends on growth sync,
+# so both are required.
+CONFIG_PET_GROWTH_SYNC_ENABLED=y
+CONFIG_PET_COMPANION_SYNC_ENABLED=y
