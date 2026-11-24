@@ -1905,3 +1905,13 @@ ACC-01 §10.3 的 24 小时窗口实际在 `2026-11-24T07:55:07Z` 就收尾了�
 设备侧同期（同一窗口的 `device-dodo-1.ndjson`，284 条/23.59 h）：`dodo-1` 在 `11-23T14:47:48Z` 离线、`11-24T13:08:16Z` 才回来，268 条样本（约 22.26 h）离线，在线段 RSSI `-46…-35 dBm`。
 
 边界：ACC-01 的 24 小时只能确认「不重启、资源平稳、证书有效」，不能确认「`/api/v1/status` 24 小时双 ready」；要改记为通过需用修好的采集脚本重跑（ACC-04 窗口见 OBSERVE-ACC04-01）。另外 `11-23T08:32Z` 那次 `tokens.json` 重写在仓库里没有对应记录，无法归因——若属控制台「修改管理员令牌」，今后应补进台账，因为它会让所有旧令牌立刻失效。证据见 [ACC-01 §10.3.3](29-acc01-production-deployment-plan.md)。
+
+## OBSERVE-SCRIPTS-01 · 观测脚本纳入版本控制（2026-11-24）
+
+两段采集脚本此前只存在于服务器 `nexus-deploy` 家目录，仓库里只有文档在描述它们的行为——这也解释了为什么 ACC-01 的 23 小时 401 能藏住：在跑的东西从来没有受控副本，哈希、差异、回归都无从谈起。本项把它们收进 `deployment/observe/`：`service_watch.sh`（原 `~/nexus-observe.sh`，15 分钟一条）与 `device_watch.sh`（原 `~/nexus-device-observe.sh`，5 分钟一条），两份文件与目标机在跑版本**逐字节相同**，`sha256sum` 两侧一致（`7402bb39…`、`8a0f3214…`），README 里写明这层约束：改脚本必须同时在目标机替换并重算哈希。
+
+README 记下四条真实踩过的坑：令牌不能从 `docker cp` 的 tar 流里用 awk 抓（`tokens.json` 变单行紧凑 JSON 后每条都 401，而容器健康、5xx 为 0，表观看不出异常）；`pkill -f <脚本名>` 会杀掉自己的远端 shell（exit 255），要按 PID 停；`status=null` 与 `{"error":"unauthorized"}` 含义不同，都不等于服务不可用；不要原地改正在运行的脚本（`sh` 按偏移续读，长度一变就执行到错位字节）。
+
+同时列出三项待落地改进：两个脚本写 PID 文件并用 `--stop` 代替手工 kill；`device_watch.sh` 补 `DURATION_S` 并把设备/日志路径提成环境变量（当前写死 `dodo-1`，README 里如实写明，没有把没实现的参数写成可用）；`service_watch.sh` 记录容器 `StartedAt` 以识别窗口内重建。
+
+验证：`sha256sum` 两侧逐字节一致（本地 `deployment/observe/*.sh` 与服务器 `~/nexus-observe*.sh`）；README 中的启动/停止/自检命令与实际脚本行为逐条核对，发现并改掉了自己初稿里「`DEVICE=…` 可覆盖」的错误描述；未改动任何在跑进程（`observe-acc04-…ndjson` 窗口仍在写）。

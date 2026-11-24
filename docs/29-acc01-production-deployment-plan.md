@@ -1018,6 +1018,8 @@ pattern read  nexus/v1/devices/%u/appearance
 
 自检：`DURATION_S=30 INTERVAL_S=10` 跑出 3 条样本 + `stop`，`status` 恢复为 `{"schemaVersion":1,"mqtt":"ready","database":"ready"}`，随后删掉这份探针日志再正式启动。
 
+脚本本身也已收进仓库：`deployment/observe/service_watch.sh` 与 `device_watch.sh`，与目标机在跑版本逐字节相同（见该目录 README 的哈希与约束）。在此之前它们只存在于服务器上，没有任何受控副本。
+
 ### 19.2 设备侧同期数据与一个不能糊过去的结论
 
 服务器上另有一个 5 分钟周期的设备观测进程（`~/nexus-device-observe.sh`，写 `~/nexus-observe/device-dodo-1.ndjson`，只读查 `devices` 与 `device_telemetry_samples`）。从 `2026-11-23T14:32:48Z` 起的 284 条样本：间隔无断档（>5.5 分钟的空洞 0 个）、`query_failed` 0 次。
