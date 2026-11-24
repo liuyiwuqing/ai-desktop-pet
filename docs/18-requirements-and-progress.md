@@ -1870,4 +1870,6 @@ CORE「伙伴」新增四分区：伙伴空间、衣橱与小舱、回忆与收�
 
 部署（`pet.muyin.site`，ACC-04）：运行 45406480670 成功（7 项冒烟），CORE `c88957e` digest `sha256:4bbac7ea…`，离线导入 tag `acc04-c88957e`，编排只改 image（`4c956726…`→`7d7381bc…`），停机约 24 秒，迁移 `No migration necessary`。上线后 `MQTT input rejected`/`ERROR` 均 0；真实设备 `dodo-1` 在线，`/management` 返回 `fresh=true`、`canConfigure=true`、`sfxVolume=20`、`screen={"timeoutS":60,"idleBrightness":40}`；线上 `DevicesPanel-DgOt9p4u.js` 含三项新文案，旧构建哈希 404。证据见 [ACC-01 §17](29-acc01-production-deployment-plan.md)。
 
-边界：未在浏览器实点这三项做像素/交互验收（本机无 Playwright 依赖，未为单次检查新增依赖），验证止于类型检查、模板守卫、真实接口数据与线上产物字符串；未向真实设备提交含新字段的配置请求（会写 NVS），设备端接受与否仍属协议级判断。固件侧 `CONFIG_PET_COMPANION_SYNC_ENABLED` 与换装端到端仍未验证。
+补充界面验证（同日）：`playwright-core` + 本机 Chrome（只装 `/tmp`，不下载浏览器、不加项目依赖）配临时 Vite harness（挂 `DeviceManagementPanel`、全局 `style.css` 与浅色主题）与 fixture 接口，实测三项按真实值渲染（60 / 40% / 20%、摘要含「息屏 60 秒」）、两列栅格与文案不重叠、390×844 无横向溢出、旧固件设备只显示升级提示且无字段、把息屏超时改成 300 后出现未提交标记且保存载荷为 `screen.timeoutS=300`+`sfxVolume=20` 其余字段不变。截图 `.screenshots/settings-{desktop,mobile,detail,legacy}.png`（未入库）。教训：harness 漏引全局 `style.css` 会把两列栅格渲染成单列，验证布局必须带真实主题与样式。
+
+边界：仍未向真实设备提交含新字段的配置请求（会写 NVS），设备端接受与否仍属协议级判断；浏览器验证用 fixture 数据，生产侧只确认接口返回真实值与线上产物含文案。固件侧 `CONFIG_PET_COMPANION_SYNC_ENABLED` 与换装端到端仍未验证。

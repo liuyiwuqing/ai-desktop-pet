@@ -896,6 +896,20 @@ pattern read  nexus/v1/devices/%u/appearance
 
 部署后实测：迁移 `No migration necessary`（V29），`RestartCount=0`，容器仍 `65534:65534`/只读；`MQTT input rejected` 与 `ERROR` 均为 0；设备 `dodo-1` 持续在线，快照 `observed_at=13:50:27Z`、`sfxVolume=20`、`screen={"timeoutS":60,"idleBrightness":40}`，样本 189→190，`/management` 返回 `fresh=true`、`canConfigure=true`；线上 `DevicesPanel-DgOt9p4u.js` 含「息屏超时」「待机亮度」「提示音音量」，旧构建哈希返回 404。
 
-边界：没有在浏览器里实点这三项做像素与交互验收（本机无 Playwright 依赖，未为一次检查新增依赖），验证止于类型检查、模板守卫、真实接口数据与线上产物字符串；未向真实设备提交含新字段的配置请求（会写 NVS），设备端接受与否仍依据协议与固件校验逻辑，不是实机证据。
+### 17.1 界面验证（2026-11-24 补充）
+
+初版只做到类型检查与产物字符串，随后用浏览器补验，不新增项目依赖：`playwright-core`（约 1.5 MB，只装在 `/tmp`，不下载浏览器）+ 本机 Chrome，配一个临时 Vite harness 只挂载 `DeviceManagementPanel`、全局 `style.css` 与 `NConfigProvider` 浅色主题（漏掉全局样式会渲染成单列，第一次截图就是这样误判的），接口由 `/tmp` 的 fixture 服务提供两台设备：`dodo-screen` 上报 `screen{60,40}` 与 `sfxVolume 20`，`dodo-legacy` 不上报。
+
+| 断言 | 结果 |
+| --- | --- |
+| 三项按真实值渲染 | 息屏超时 `60`、待机亮度「· 40%」、提示音音量「· 20%」，折叠摘要含「息屏 60 秒」 |
+| 布局 | 1440×1000 下与原有时区/消息容量一致的两列栅格，说明文案在控件下方不重叠；390×844 无横向溢出（`scrollWidth - clientWidth = 0`） |
+| 旧固件 | `dodo-legacy` 面板不渲染息屏超时字段，显示「当前设备未上报屏幕与提示音设置，固件升级后可在此调整」 |
+| 编辑与提交 | 息屏超时改 300 后出现「有未提交的修改」，点击保存的载荷为 `screen:{timeoutS:300,idleBrightness:40}`、`sfxVolume:20`，音量/亮度/免打扰/消息等其余字段原样保留 |
+| 运行期 | 无页面异常；修复 fixture 路由后请求全为 2xx |
+
+截图（本机 `.screenshots/`，未入库）：`settings-desktop.png`、`settings-mobile.png`、`settings-detail.png`、`settings-legacy.png`。harness 与 fixture 均在 `/tmp`，验证后已删除仓库内临时目录。
+
+边界：仍未向真实设备提交含新字段的配置请求（会写 NVS），设备端接受与否依据协议与固件校验逻辑，不是实机证据；浏览器验证用的是 fixture 数据而非生产接口，生产侧仅确认了接口返回真实值（`sfxVolume=20`、`screen{60,40}`）与线上产物含三项文案。
 
 回滚：编排 `image` 改回 `acc03-3fdca79` 重建 CORE；数据库无需回退。
