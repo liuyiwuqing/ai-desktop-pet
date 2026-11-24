@@ -1952,6 +1952,22 @@ OPS-ARCHIVE-01 后续（同日 22:31Z）：三个刚恢复的镜像在 6 分钟�
 
 另跑四条负向用例确认不是「什么都放行」：复用已成功 requestId 且内容相同 → 200 `created=false`（重试安全，不会把 revision 顶到 2）；同 requestId 改内容 → 409 `idempotency_conflict`；陈旧 `expectedRevision` → 409 `appearance_revision_conflict`；`expectedRevision=1` + `theme=2`（未解锁）→ 期望 409 `theme_locked`，**实际 400 `invalid_request`**。四条被拒请求都没有落库，表内仍 1 行。
 
-最后一条暴露新缺陷：`ApiErrors` 把 `IllegalArgumentException` 统一映射成 400 `invalid_request`，形参名就叫 `ignored`——`CompanionCodec` 原本准备好的 `theme_locked`/`outfit_not_owned`/`furnishing_not_owned`/`invalid_appearance_request_id` 全部被丢弃，既不回给前端也不进日志。后果与 §20.3 的两个静默点同类：失败发生在没人观察的通道上；前端只能显示「请求无效」，无法区分「主题没买」「服装没买」「请求体写错」。修法不难（只回传匹配 `[a-z][a-z0-9_]{2,40}` 的消息），但要重建镜像并重新离线导入，未擅自执行，等用户决定。
+最后一条暴露新缺陷：`ApiErrors` 把 `IllegalArgumentException` 统一映射成 400 `invalid_request`，形参名就叫 `ignored`——`CompanionCodec` 原本准备好的 `theme_locked`/`outfit_not_owned`/`furnishing_not_owned`/`invalid_appearance_request_id` 全部被丢弃，既不回给前端也不进日志。后果与 §20.3 的两个静默点同类：失败发生在没人观察的通道上；前端只能显示「请求无效」，无法区分「主题没买」「服装没买」「请求体写错」。修法不难（只回传领域原因码形态的消息），但要重建镜像并重新离线导入，当时未擅自执行，等用户决定，后由 API-ERRCODE-01 修掉并上线。
 
 边界：`owned=0` 使 `outfit`/`slots` 分支无法测试；只覆盖 `applied`，`rejected`/`expired`/`conflict`/`storage_error`/`unconfirmed` 五种回执未构造；未拔电重启验证 NVS 持久化；**设备当前停留在主题 1**，复原只需再下发一次 `expectedRevision=1` + `theme=0`。证据见 [ACC-01 §21](29-acc01-production-deployment-plan.md)。
+
+## API-ERRCODE-01 · 修复 400 原因码丢失并重新发布（2026-11-24，已上线）
+
+APPEAR-E2E-01 暴露的缺陷：`ApiErrors` 用同一个 `@ExceptionHandler` 收 `IllegalArgumentException`，形参名 `ignored`，把 `CompanionCodec` 准备好的 `theme_locked`/`outfit_not_owned`/`furnishing_not_owned` 全部压成 400 `invalid_request`，既不回前端也不进日志。用户要求修掉并重新走离线导入。
+
+改法：拆成两个处理器，框架校验异常继续回 `invalid_request`；`IllegalArgumentException` 只在消息匹配 `[a-z][a-z0-9]*(?:_[a-z0-9]+){1,6}` 时原样透出。要求「至少一段下划线」是因为扫过 `src/main/java` 里全部 `IllegalArgumentException("…")` 原因码，一百多个**无一例外**带下划线，这条能把 `timeout`/`malformed` 这类裸英文单词挡在外面。新增 `ApiErrorsTest`（纯单测，不启 Spring）固定「六个领域码透出 / 六种实现细节折叠 / `ResponseStatusException` 保留 reason」。
+
+测试：`ApiErrorsTest` 3/3 通过；`CompanionFlowTest` 4 条（3 通过、1 跳过，跨语言 peer 需环境变量）。本机无 mvn，用 `maven:3.9.11-eclipse-temurin-21` 容器跑，集成用例挂宿主 `docker.sock` + `TESTCONTAINERS_HOST_OVERRIDE`。
+
+发布：`2855fd4` 触发 `publish-images.yml`（运行 45426560268），validate/publish/verify-published 全绿；开发机拉 amd64 后 `docker save | ssh docker load`，**50 秒**导入，两端镜像 ID 同为 `sha256:3b9c8fd547b3…`（314 MB），服务端打标 `acc05-2855fd4`。
+
+部署这次绕了远路：`nexus-deploy` 无免密 sudo 且编排目录 root-only，而 `docker:cli` 拉不下来（Docker Hub 超时）、alpine 装 CLI 被 SIGKILL（宿主可用内存仅 969 MB）、宿主 compose 插件是动态链接 ELF 在 musl 上跑不了。最后用新导入的 CORE 镜像当客户端（Ubuntu/glibc），挂宿主 compose 插件 + `--user 0:0` + 编排按宿主原路径挂载，`config --quiet` 校验后才 `up -d --no-deps --force-recreate core`。编排只改 `image` 一行（`7d7381bc…` → `c3c0f6e7…`），备份 `docker-compose.yml.bak-acc05-20261124`；postgres/mosquitto 未动。`15:54:36Z` 启动、`15:54:51Z` healthy、`RestartCount=0`。
+
+验收：八条用例在新版重跑，**状态码一个没变**，只有 `error` 变精确——`theme_locked`、`outfit_not_owned`、`furnishing_not_owned`、`invalid_appearance_request_id`、`invalid_furnishing_slot` 五个原先都是 `invalid_request`。拒绝的请求仍不落库（表内 1 行），设备外观未变（`appearanceRevision=1`、`theme=1`）。运行态首页 200、无令牌 401、`dodo-1` 在线、伙伴快照 `revision 328→334` 持续刷新、启动日志无异常、Flyway V29 已最新无需迁移。
+
+边界：`c25ec91`（补 `docs/companion-space.md` 的原因码规则）在镜像之后提交，`acc05-2855fd4` 不含它，未为文档再发镜像；前端 `errorNames` 未补新码，未登记码走 `failureText` 兜底显示「提示（HTTP 400 · theme_locked）」，不影响功能但比登记文案啰嗦，要补得再发一版前端；`MQTT input rejected` 只记异常类名那条待办仍未处理；只跑了两个测试类，未跑完整 196 项。证据见 [ACC-01 §22](29-acc01-production-deployment-plan.md)。

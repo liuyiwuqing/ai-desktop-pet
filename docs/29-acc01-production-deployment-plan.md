@@ -1252,7 +1252,7 @@ ResponseEntity<?> invalid(Exception ignored) {
 
 后果和 §20.3 的两个静默点是同一类：**失败发生在没人观察的通道上**。用户在国际化前端只会看到「请求无效」，无法区分「主题没买」「服装没买」「请求体写错」；运维事后也查不出原因，因为日志里同样没有。
 
-这类原因码是给前端做分支用的（是否引导去商店、是否刷新版本），压在 400 里等于把设计好的错误语义扔掉了。修法不难（例如只对匹配 `[a-z][a-z0-9_]{2,40}` 的消息回传，其余仍落 `invalid_request`），但要重建镜像并重新走一遍离线导入，本轮没有擅自做——留给用户决定。
+这类原因码是给前端做分支用的（是否引导去商店、是否刷新版本），压在 400 里等于把设计好的错误语义扔掉了。修法不难（只对匹配领域原因码形态的消息回传，其余仍落 `invalid_request`），但要重建镜像并重新走一遍离线导入，本轮没有擅自做——用户随后要求修掉，过程与验收见 §22。
 
 ### 21.5 边界
 
@@ -1261,3 +1261,97 @@ ResponseEntity<?> invalid(Exception ignored) {
 - **没有验证掉电持久化**：`applied` 表示设备回执已落盘，但没有拔电重启再读一次。要证明「重启后仍是主题 1」，需要再观察一次 `bootId` 变化后的快照。
 - **设备当前停留在主题 1**：这是本次测试的实际副作用。要复原只需再下发一次 `expectedRevision=1` + `theme=0`（同样 1 秒内完成）。
 - **串口没抓到证据**：抓了 150 秒，只采到 3 条 `climate` 行，换装路径不打日志。想要设备侧直接证据，得临时加 `ESP_LOGI` 再烧一次，代价大于收益。
+
+## 22. 修复 400 原因码丢失并重新发布（2026-11-24T15:27–15:58Z）
+
+§21.4 记的那个缺陷——`ApiErrors` 把 `IllegalArgumentException` 一律折叠成 `invalid_request`、连原因码都不进日志——本节修掉并重新上线。
+
+### 22.1 改动
+
+`ApiErrors` 原先用同一个处理器收 `IllegalArgumentException`，参数名就叫 `ignored`：
+
+```java
+@ExceptionHandler({..., IllegalArgumentException.class})
+ResponseEntity<?> invalid(Exception ignored) {
+    return ResponseEntity.badRequest().body(Map.of("error", "invalid_request"));
+}
+```
+
+改成两个处理器：框架层的校验异常（`MethodArgumentNotValidException`、`ConstraintViolationException`、`HandlerMethodValidationException`、`HttpMessageNotReadableException`）继续返回 `invalid_request`；`IllegalArgumentException` 单独处理，只有当消息是领域原因码形态时才原样回传：
+
+```java
+private static final Pattern REASON = Pattern.compile("[a-z][a-z0-9]*(?:_[a-z0-9]+){1,6}");
+```
+
+**为什么要求「至少一段下划线」而不只是「纯小写」**：先扫了一遍 `src/main/java` 里所有 `IllegalArgumentException("…")`，一百多个原因码（`theme_locked`、`invalid_growth_state`、`invalid_config_envelope`…）**全部**带下划线，没有例外。加上这条就能把 `timeout`、`malformed` 这类裸英文单词挡在外面，不至于把某个库的随手消息当成错误码甩给用户。`NumberFormatException`（消息形如 `For input string: "x"`）和 Jackson 反序列化细节也自然落回 `invalid_request`。
+
+配套 `src/test/java/dev/nexus/core/web/ApiErrorsTest`（纯单元测试，不启 Spring、不要 Docker）固定三条边界：六个领域码原样透出；六种实现细节（含 `null`、空串、`UPPER_CASE`、裸单词 `theme`）折叠为 `invalid_request`；`ResponseStatusException` 仍保留自己的 reason。
+
+### 22.2 测试
+
+| 范围 | 结果 |
+| --- | --- |
+| `ApiErrorsTest`（新） | 3/3 通过，0.072 s |
+| `CompanionFlowTest`（集成，Testcontainers） | 4 条：3 通过、0 失败、1 跳过（跨语言 peer 用例需 `NEXUS_COMPANION_PEER`） |
+
+本地没有 mvn（只有 JDK 21），用 `maven:3.9.11-eclipse-temurin-21` 容器跑；集成用例把宿主 `docker.sock` 挂进容器并设 `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal`。
+
+### 22.3 发布与离线导入
+
+`2855fd4` 推到 `codex/core-baseline`，`gh workflow run publish-images.yml` → 运行 [45426560268](https://github.com/liuyiwuqing/nexus-core/actions/runs/45426560268)，`validate` + `publish`（amd64/arm64）+ `verify-published`（58 s，真正拉回仓库镜像核对）全绿。
+
+服务器到 GHCR 仍不可用，继续走 §5.2 的离线导入：开发机 `docker pull --platform linux/amd64 ghcr.io/liuyiwuqing/nexus-core:sha-2855fd4b8c7ab2a0d26094a797f52f90f99c2121` → `docker save | ssh nexus-prod 'docker load'`，**50 秒**、不落盘。两端镜像 ID 一致：`sha256:3b9c8fd547b3…`，314 MB。服务端另打标签 `acc05-2855fd4`，与既有的 `acc01`–`acc04` 命名一致。
+
+### 22.4 编排与重建：为什么绕了这么大一圈
+
+`nexus-deploy` 无免密 sudo，`/data/1panel/docker/compose/nexus-production` 又是 root-only，`nexus-deploy` 连 `ls` 都不行——这点和 §507 记的一致。原先的做法是「用本地镜像起一个一次性 root 客户端挂宿主 `docker.sock` 跑 compose」，但这次几个现成路子都断了：
+
+| 尝试 | 结果 |
+| --- | --- |
+| `docker pull docker:cli` | Docker Hub 超时（`registry-1.docker.io` 连接被取消），镜像拿不到 |
+| `alpine` + `apk add docker-cli docker-cli-compose` | 容器被 SIGKILL（宿主可用内存只剩 969 MB、swap 已用 2.4 GB），装不上 |
+| 把宿主 compose 插件挂进 alpine 直接跑 | 插件是动态链接 ELF（`/lib64/ld-linux-x86-64.so.2`），alpine 是 musl，跑不了 |
+
+最终用**新导入的 CORE 镜像本身**当客户端：它基于 `eclipse-temurin:21-jre-jammy`（Ubuntu/glibc），把宿主 `/usr/libexec/docker/cli-plugins/docker-compose` 挂成 `/usr/local/bin/docker-compose`，`--user 0:0` 提权，编排目录按**宿主原路径**挂进去，于是 compose 既能读到 root-only 文件，bind mount 又仍然落在宿主上：
+
+```bash
+docker run --rm --user 0:0 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /usr/libexec/docker/cli-plugins/docker-compose:/usr/local/bin/docker-compose:ro \
+  -v /data/1panel/docker/compose/nexus-production:/data/1panel/docker/compose/nexus-production \
+  -v /etc/nexus/docker:/etc/nexus/docker:ro \
+  -w /data/1panel/docker/compose/nexus-production \
+  --entrypoint /usr/local/bin/docker-compose \
+  ghcr.io/liuyiwuqing/nexus-core:acc05-2855fd4 \
+  -p nexus-production up -d --no-deps --force-recreate core
+```
+
+先跑 `config --quiet` 校验（退出 0）再 `up`。编排只改 `image` 一行：`7d7381bc…` → `c3c0f6e7…`，`diff` 只有那一行；备份 `docker-compose.yml.bak-acc05-20261124`（哈希与改前一致）。postgres 与 mosquitto 未触碰（`--no-deps`）。
+
+重建后 `15:54:36Z` 启动，`15:54:51Z` healthy，`RestartCount=0`，镜像 `acc05-2855fd4`。
+
+### 22.5 验收
+
+同一组请求在新版上重跑，**状态码一个没变**，变的只有 `error` 字段：
+
+| # | 请求 | 期望 | 改前 | 改后 |
+| --- | --- | --- | --- | --- |
+| a | 幂等重放（同 id 同内容） | 200 | `200 created=false` | `200 created=false` |
+| b | 同 id 改内容 | 409 | `idempotency_conflict` | `idempotency_conflict` |
+| c | 陈旧 `expectedRevision` | 409 | `appearance_revision_conflict` | `appearance_revision_conflict` |
+| d | 未解锁主题 `theme=2` | 400 | `invalid_request` | **`theme_locked`** |
+| e | 未拥有服装 `outfit=1` | 400 | `invalid_request` | **`outfit_not_owned`** |
+| f | 未拥有家具 `slots=[7,0,0]` | 400 | `invalid_request` | **`furnishing_not_owned`** |
+| g | 非法 `requestId` | 400 | `invalid_request` | **`invalid_appearance_request_id`** |
+| h | 重复家具槽位 `[7,7,0]` | 400 | `invalid_request` | **`invalid_furnishing_slot`** |
+
+拒绝的请求依然不落库（表内仍是 1 行），设备外观也没变（`appearanceRevision=1`、`theme=1`）——八条用例没有一条改动设备状态。
+
+运行态：首页 200、无令牌 401、`dodo-1` 在线、伙伴快照 `revision 328 → 334` 持续刷新且 `fresh=true`、启动日志无异常、Flyway 直接建连即止（V29 已是最新，无需迁移）。
+
+### 22.6 边界
+
+- **镜像只含代码改动**：`c25ec91`（补文档）在镜像之后提交，`acc05-2855fd4` 不包含它。文档不影响运行，没有为它再发一次镜像。
+- **前端文案未补**：`errorNames` 里没有 `theme_locked` 等新码，未登记码会走 `failureText` 的兜底——显示「提交的内容未通过校验，请检查后重试（HTTP 400 · theme_locked）」。不会崩，但比登记过的文案啰嗦。实际影响有限：`companion.ts` 的 `valid()` 已经在提交前拦住未解锁/未拥有的组合，这些码主要出现在竞态和直接调 API 的场景。要补文案得再发一版前端。
+- **`MQTT input rejected` 仍只记异常类名**：§20.5 那条待办没动，和本次改动无关但同属「失败原因不可见」，建议下一轮一起处理。
+- **未做全量回归**：只跑了 `ApiErrorsTest` 与 `CompanionFlowTest`，没有跑仓库完整的 196 项测试。改动集中在异常映射，风险面小，但严格说不完整。
