@@ -1851,3 +1851,13 @@ CORE「伙伴」新增四分区：伙伴空间、衣橱与小舱、回忆与收�
 验证（本机 macOS + `nexus-deploy` 只读/受控操作）：升级前 dump 与私有目录备份完成且隔离恢复一致（V28、1/6/149 行）；停机约 64 s，Flyway V28→V29（0.081 s），`failed=0`，三张伙伴表建立；`/api/v1/status` 双 ready；`GET /api/v1/devices/dodo-1/companion` 返回 `enabled=true`（设备离线）；HTTPS 200、SSE 200 `text/event-stream` 含 ready/heartbeat；18088 仅回环；MQTT TLSv1.3 校验 0（CN `pet.muyin.site`）；CORE 仍是 65534/只读/1 GiB/cap_drop ALL、`RestartCount=0`；主动重启 9 s healthy 且 `No migration necessary`。证据与哈希回填在 [ACC-01 §15](29-acc01-production-deployment-plan.md)。
 
 边界与遗留：设备 `dodo-1` 自 2026-11-23T14:42Z 离线，换装端到端、设备侧 `CONFIG_PET_COMPANION_SYNC_ENABLED` 与真实 MQTT 发布未验证，ACL 只做配置级核对，未发测试消息、未烧录；未做浏览器 UI 登录/权限页与 24 小时观测。另发现既有契约缺口：固件 `0.4.0-dev` 遥测 `config` 含 `sfxVolume`/`screen`，CORE `ManagementCodec.config()` 严格字段集不含，每次启动 1 条 `MQTT input rejected: IllegalArgumentException`，新遥测因此不入库（`device_telemetry_samples` 最新 `observed_at` 2026-11-23 12:56:47Z），需在 nexus-core 放宽字段集后重新发布升级，本次未改。
+
+## MGMT-TELEMETRY-01 · 设备设置字段遥测契约修复（2026-11-24，已部署）
+
+上一项部署验收时发现的既有缺口：固件 settings 切片（INT-01-S1）上报的 `config` 含 `screen{timeoutS,idleBrightness}` 与 `sfxVolume`，共享 `config/schemas/device-config.schema.json` 早已声明为可选，但 CORE `ManagementCodec.config()` 仍只认必需字段，把整条遥测判为 `unknown_management_field` 丢弃——表现为每次启动 1 条 `MQTT input rejected`，且新格式遥测不再入库。修复只动 CORE：两项改为可选并按 schema 校验（`timeoutS` 0–3600、`idleBrightness` 0–100、`sfxVolume` 0–100、`screen` 禁止未知键），**设备没上报就不补默认值**，上报才原样保存；同时让控制台设置草稿（完整配置深拷贝）回传时不再被丢弃，避免设备按默认值重写息屏/提示音。
+
+验证（本机 macOS）：`MAVEN_ARGS=-Dtest=DeviceManagementFlowTest` 通过 14 项（新用例覆盖接受字段与 `screen` 未知键/`sfxVolume 101`/`timeoutS 3601` 三种坏样本仍整条拒绝，先以有效样本作处理屏障再断言快照未变）；回退 `ManagementCodec` 后该用例失败（`telemetry: null`）确认为有效 red。全量 `python3 tools/run_local.py build` 197 项 0 失败 6 跳过，Vue 类型/token 与 Vite 构建通过，前端产物哈希未变。
+
+部署（`pet.muyin.site`，ACC-03）：发布运行 45402756973 成功（7 项冒烟），CORE `3fdca79` digest `sha256:45ca707a…`，离线导入 tag `acc03-3fdca79`，编排只改 `image` 一行（`58c97511…`→`4c956726…`），停机约 40 秒，迁移 `No migration necessary`。上线后 `MQTT input rejected` 0 次、`ERROR` 0 次；retained 遥测被接受，快照前推到 `2026-11-24 13:30:57Z`、`sfxVolume=20`、`screen={"timeoutS":60,"idleBrightness":40}`；期间真实设备 `dodo-1` 上线，`online=true`、`fresh=true`、`configBlock=""`，30 秒级遥测持续入库并累计 149→152 条样本。证据见 [ACC-01 §16](29-acc01-production-deployment-plan.md)。
+
+边界：未向真实设备提交配置请求（会写 NVS），配置回传仍只有协议级验证；在网固件未开 `CONFIG_PET_COMPANION_SYNC_ENABLED`（`device_companion_observations=0`、伙伴 `snapshot=null`），换装端到端仍无真实设备证据；未做 24 小时观测与浏览器登录/权限页验收。契约文档已同步：[device-management-v1](../integration/contracts/device-management-v1/README.md) 与 CORE README 说明可选字段与不回填原则。

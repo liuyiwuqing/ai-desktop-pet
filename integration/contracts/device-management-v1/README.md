@@ -26,6 +26,8 @@
 
 未对时、retained、错设备、过期或非法配置都拒绝。语言仅 zh-CN，时区为 Asia/Shanghai、UTC、Etc/UTC 或 UTC±HH:MM（UTC−12 至 UTC+14，不自动切换夏令时）。成功必须经过 NVS 回读；相同完整配置的无操作成功不写盘。正常 CAS 只接受当前 revision；重投若当前 revision=expectedRevision+1 且规范配置完全一致也返回 applied。requestId 不是设备永久动作去重账本，设备幂等依靠配置 CAS 与内容一致性。
 
+`DeviceConfig` 的 `screen{timeoutS,idleBrightness}` 与 `sfxVolume` 为可选字段（默认值见共享 schema，`sfxVolume` 在旧存档缺失时沿用 `volume`）。CORE 以前只认必需字段，会把带这两项的遥测整条判为 `unknown_management_field` 丢弃；2026-11-24 起 CORE 按共享 schema 接受并校验（`timeoutS` 0–3600、`idleBrightness` 0–100、`sfxVolume` 0–100、`screen` 子对象禁止未知键），**设备上报什么就存什么、不回填默认值**，控制台设置页不编辑这两项但提交时原样回传，避免用默认值覆盖设备端已有设置。
+
 回复固定 schemaVersion/requestId/status/revision/code；status 为 applied、rejected、expired、conflict_or_storage。无法安全解析 requestId 时为空；code 为 ESP 错误值，0 才是成功。revision 为当时可读版本，读取失败为 0。ACK 发送失败不撤销已提交设置。配置 applied 只表示本地存储事务完成，不表示屏幕、声音或物理静音已经验收。
 
 本机设置经后台存储拥有者保存；入队前预留配置版本，远程旧版本在本地事务结束前不能穿插覆盖。入队失败释放预留；存储失败时本机隐私选择仍保持运行期门控并显示未保存。没有在 UI 任务直接写闪存。

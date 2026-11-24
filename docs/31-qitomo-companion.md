@@ -72,4 +72,4 @@ v5 存档为 256 字节、CRC32、双槽提交；兼容读取 v1/v2/v3/v4。旧�
 
 ### 上线状态（2026-11-24）
 
-`pet.muyin.site` 已升级到 CORE `88d2e90`（V29），编排开启 `NEXUS_COMPANION_ENABLED`，Broker ACL 与 3072 字节消息上限同步生效；伙伴接口返回 `enabled=true`，页面与静态资源已可访问。设备 `dodo-1` 当时离线，换装端到端与设备侧 `CONFIG_PET_COMPANION_SYNC_ENABLED` 未验证；另外发现旧固件遥测 `config` 新增字段被 CORE 拒绝（每次启动 1 条 `unknown_management_field` 告警，新遥测不入库），属 CORE 契约缺口，需单独修复。执行证据见 [ACC-01 §15](29-acc01-production-deployment-plan.md)。
+`pet.muyin.site` 已升级到 CORE `88d2e90`（V29）再升到 `3fdca79`（遥测契约修复），编排开启 `NEXUS_COMPANION_ENABLED`，Broker ACL 与 3072 字节消息上限同步生效；伙伴接口返回 `enabled=true`，页面与静态资源已可访问。`3fdca79` 上线时设备 `dodo-1` 真实恢复在线（`online=true`、`fresh=true`，30 秒级遥测正常入库），但 `device_companion_observations=0`、伙伴 `snapshot=null`，说明在网固件仍未开 `CONFIG_PET_COMPANION_SYNC_ENABLED`，**换装端到端（appearance→ACK→applied）仍无真实设备证据**。同时修复了固件 settings 切片（`screen`/`sfxVolume`）遥测被 CORE 整条拒绝的契约缺口。执行证据见 [ACC-01 §15/§16](29-acc01-production-deployment-plan.md)。

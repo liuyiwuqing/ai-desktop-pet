@@ -1,6 +1,6 @@
 # ACC-01 生产部署与数据库迁移执行计划
 
-2026-11-20 制定，2026-11-23 执行 G0–G4。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，执行结果回填在各节末尾**：G0 发布物（3.4）、G1 只读盘点（5.3）、G2 备份与隔离恢复（6.2）、G4 离线导入与升级（8.5）、G6 运行时检查（10.2.1）与 24 小时观测（10.3.1）。2026-11-24 追加执行 ACC-02 变更（CORE `d2711f7` → `88d2e90`、V29、伙伴空间启用），记录见第 15 节，当前生产基线以该节为准。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。
+2026-11-20 制定，2026-11-23 执行 G0–G4。基线：CORE `d2711f7`（迁移 V1–V28）、04 `042ed1f`。**本文件主体是执行计划，执行结果回填在各节末尾**：G0 发布物（3.4）、G1 只读盘点（5.3）、G2 备份与隔离恢复（6.2）、G4 离线导入与升级（8.5）、G6 运行时检查（10.2.1）与 24 小时观测（10.3.1）。2026-11-24 追加执行 ACC-02 变更（CORE `d2711f7` → `88d2e90`、V29、伙伴空间启用），记录见第 15 节；同日追加 ACC-03（遥测契约缺口修复，CORE `3fdca79`），记录见第 16 节。当前生产基线以第 16 节为准。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。生产仍未接真实设备消息；HTTPS/SSE、MQTT TLS 与端口暴露的运行时检查已记录在 10.2.1，浏览器 UI 登录/权限页、24 小时观测与实机联调未完成；第 13 节保留空白模板供后续变更使用。
 
 ## 1. 目标、范围与完成判定
 
@@ -826,11 +826,53 @@ pattern read  nexus/v1/devices/%u/appearance
 - 重启复核：`12:39:04Z` 主动 `docker restart`，9 s healthy，Flyway 输出 `No migration necessary`，`RestartCount=0`，状态仍双 ready。
 - 资源：宿主 available 约 979 MiB，根分区 14 GB（84%）；CORE 227 MiB/1 GiB、PostgreSQL 44 MiB、Mosquitto 4.8 MiB。
 
-### 15.6 已知问题与边界（本次未修）
+### 15.6 当时遗留项（第 1 项已在 §16 修复）
 
-1. **每次启动 1 条 `MQTT input rejected: IllegalArgumentException`**：由设备 retained `telemetry` 触发——固件 `0.4.0-dev` 上报的 `config` 含 `sfxVolume`、`screen`，而 CORE `ManagementCodec.config()` 的字段集仍为 `schemaVersion/timezone/language/volume/brightness/dnd/message`(+`muted`)，判定 `unknown_management_field` 后整条拒绝。影响：新格式遥测不入库（`device_telemetry_samples` 最新 `observed_at` 仍为 `2026-11-23 12:56:47Z`），`online`/`last_seen` 由 `state`/LWT 维护不受影响；该 WARN 与本次改动无关（catch 与登录路径自基线存在），修复属 CORE 契约缺口，需放宽字段集后重新发布再升级。
-2. 设备 `dodo-1` 自 `2026-11-23T14:42:34Z` 离线，**换装端到端（appearance 下发 → 设备 ACK → applied）没有真实设备验证**；Broker ACL 只做了配置级核对，未发测试消息、未做真实发布验证。
-3. 设备侧还需 `CONFIG_PET_COMPANION_SYNC_ENABLED` 才回传 `companion_status`，本次未烧录、未核对在网固件是否开启。
+1. ~~**每次启动 1 条 `MQTT input rejected: IllegalArgumentException`**~~：由设备 retained `telemetry` 触发——固件 `0.4.0-dev` 上报的 `config` 含 `sfxVolume`、`screen`，而 CORE `ManagementCodec.config()` 只认必需字段（+`muted`），判定 `unknown_management_field` 后整条拒绝。影响：新格式遥测不入库（当时 `device_telemetry_samples` 最新 `observed_at` 停在 `2026-11-23 12:56:47Z`），`online`/`last_seen` 由 `state`/LWT 维护不受影响。**已在 CORE `3fdca79` 修复并部署，见 §16。**
+2. 设备 `dodo-1` 当时自 `2026-11-23T14:42:34Z` 离线，**换装端到端（appearance 下发 → 设备 ACK → applied）没有真实设备验证**；Broker ACL 只做了配置级核对，未发测试消息、未做真实发布验证。
+3. 设备侧还需 `CONFIG_PET_COMPANION_SYNC_ENABLED` 才回传 `companion_status`，本次未烧录、未核对在网固件是否开启（§16 观测到仍未回传）。
 4. 未执行：浏览器 UI 登录/权限页、24 小时观测、1Panel 面板内编排保存（本次直接改文件，面板读取的是同一路径）、ACC-02 硬件长稳。
 
 回滚：迁移 V29 只新建三张表，不改变既有表结构，可仅把编排 `image` 改回 `acc02-88d2e90`→`acc01-d2711f7`、去掉 `NEXUS_COMPANION_ENABLED` 后重建 CORE；若同时要回退 Broker，用 `~/nexus-backups/broker-20261124/` 两个文件覆盖并 SIGHUP。数据库回退按 11.3，不删除 `postgres-data`。
+
+## 16. ACC-03 变更记录：遥测契约缺口修复与重新部署（2026-11-24）
+
+§15.6 第 1 项的修复与上线。范围仅 CORE：`ManagementCodec.config()` 接受共享 `device-config.schema.json` 里已声明、而 CORE 之前未实现的 `screen{timeoutS,idleBrightness}` 与 `sfxVolume`。不改主题、不改迁移、不动 Broker、不动设备。
+
+### 16.1 代码与本地验证
+
+| 项 | 内容 |
+| --- | --- |
+| 提交 | CORE `3fdca79`（`fix(management): accept screen and sfxVolume in device settings`） |
+| 行为 | 两项可选：`sfxVolume` 0–100；`screen` 子对象必含 `timeoutS`(0–3600)/`idleBrightness`(0–100) 且禁止未知键；**设备没上报就不补默认值**，上报才原样保存，避免 CORE 替设备编造状态或用默认值覆盖设备端设置 |
+| 顺带修正 | 控制台设置页不改这两项，但草稿是完整配置的深拷贝，过去一旦回传会被 CORE 丢弃→设备按默认值重写息屏/提示音；现在原样回传。前端仅补类型声明，产物哈希未变 |
+| 用例 | `DeviceManagementFlowTest.telemetryKeepsFirmwareSettingsFieldsAndRejectsBadOnes`：真实 MQTT→CORE→PostgreSQL→HTTP 下验证接受字段、以及 `screen` 未知键、`sfxVolume 101`、`timeoutS 3601` 三种坏样本仍整条拒绝（先用有效样本作处理屏障，再断言快照未变） |
+| red/green | 回退 `ManagementCodec` 后该用例失败（`telemetry: null`，消息被整条丢弃）；修复后通过 |
+| 全量 | `python3 tools/run_local.py build`：197 项 0 失败 6 跳过，Vue 类型/token 检查与 Vite 构建通过 |
+
+### 16.2 发布与部署
+
+| 项 | 值 |
+| --- | --- |
+| 发布运行 | [45402756973](https://github.com/liuyiwuqing/nexus-core/actions/runs/45402756973) `success`，7 项镜像冒烟通过 |
+| CORE digest | `sha256:45ca707ad5c900cbc552288cff28517ff743dde27136bcc7f85c97937a083233` |
+| 离线归档 | 319,070,720 B，SHA-256 `f5adf38223744b8be3759fa035a0015547cdccd515d9a1ac55e9b6ac3a744d0d`，两端一致 |
+| 镜像 | ID `sha256:c0831912…3313`，`linux/amd64`，`revision=3fdca79f…`，tag `acc03-3fdca79` |
+| 备份 | `~/nexus-backups/nexus-acc03-before-20261124T133043Z.dump`，114,543 B，SHA-256 `3c0f8a87050567443d697b1ca002e21ca0231ac00fca749334581fbda47d201a` |
+| 编排 | `58c97511…` → `4c956726…`，只改 `image` 一行；旧文件备份 `/compose/docker-compose.yml.bak-acc03-20261124`（写前先比对哈希确认面板未改写） |
+| 停机 | `13:30:27Z` 停 CORE → `13:30:50Z` 新容器启动 → `13:31:04Z` healthy；PostgreSQL/MQTT 未停 |
+
+### 16.3 部署后实测（含真实设备）
+
+- 迁移：`No migration necessary`（仍为 V29），`RestartCount=0`，容器 `65534:65534`/只读未变。
+- 告警：`MQTT input rejected` **0 次**（升级前每次启动 1 次），`ERROR` 0 次。
+- retained 遥测被接受：`device_telemetry` 快照由 `2026-11-23 12:56:47Z` 前推到 `2026-11-24 13:30:57Z`，`configRevision=4`，`config.sfxVolume=20`、`config.screen={"timeoutS":60,"idleBrightness":40}`；`device_telemetry_samples` 149 → 152。
+- 设备 `dodo-1` 在升级窗口内真实上线（`firmwareVersion=0.4.0-dev`，`wifiIp=192.168.5.235`）：`online=true`、`last_seen=13:31:21Z`，`/management` 返回 `fresh=true`、`configBlock=""`、`observedAt` 为实时值，30 秒级遥测持续入库——这是该契约缺口修复后第一次有真实设备的完整回读。
+- 伙伴接口：`enabled=true`、`online=true`，但 `snapshot=null`、`device_companion_observations=0` → 在网固件未开 `CONFIG_PET_COMPANION_SYNC_ENABLED`。
+- 站点：`https://pet.muyin.site/` 200，入口仍为 `index-B6SjEAb6.js`（仅类型变更，产物不变）。
+
+### 16.4 边界
+
+未向真实设备提交配置请求（会写 NVS 并改变息屏/提示音），因此配置回传链路仍只有协议级验证；换装端到端（appearance → ACK → applied）仍无真实设备证据，需先让固件开启伙伴同步；未做 24 小时观测与浏览器登录/权限页验收。
+
+回滚：编排 `image` 改回 `acc02-88d2e90` 重建 CORE 即可，无迁移可回退（V29 未变）。
