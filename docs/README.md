@@ -70,3 +70,5 @@
 - 事件命名：`<module>.<event>`，例如 `ai.state_changed`、`message.received`、`climate.alert`。
 - 跨模块调用使用 `contracts`、事件或明确的公开服务 API；组合根注册工具与平台端口，模块内部函数不对外暴露。
 - 先写失败反馈和状态机测试，再做硬件接线；主机测试不能替代实机验收。
+
+- [31 · 栖团电子伙伴](31-qitomo-companion.md)：三键基线、电子精灵、小舱、小游戏与管理台联动。

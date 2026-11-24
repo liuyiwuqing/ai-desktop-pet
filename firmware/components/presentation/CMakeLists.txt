@@ -4,6 +4,7 @@ idf_component_register(
         "src/message_presenter.c"
         "src/recovery_presenter.c"
         "src/pet_motion.c"
+        "src/pet_game.c"
     INCLUDE_DIRS
         "include"
     REQUIRES

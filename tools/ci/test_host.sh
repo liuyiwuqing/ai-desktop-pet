@@ -30,6 +30,10 @@ python3 "${repo_root}/tools/ci/test_voice_simulator.py"
 python3 "${repo_root}/tools/ci/test_sr_models.py"
 python3 "${repo_root}/tools/ci/test_control_gateway.py"
 
+build_and_run test_pet_game -I "${presentation_inc}" \
+    "${repo_root}/firmware/components/presentation/src/pet_game.c" \
+    "${repo_root}/firmware/tests/host/test_pet_game.c"
+
 build_and_run test_event_bus \
     -I "${repo_root}/firmware/tests/host/support/event_bus" \
     -I "${repo_root}/firmware/tests/host/support/ai_agent" \

@@ -1811,3 +1811,9 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 ### INT-01 实机验收记录（2026-11-23）
 
 烧录 INT-01-S1–S6 修复版（voice 预设，`0x20000` 应用 hash 校验通过）后实机验收：**S4 连续对话与 S5 专注陪伴经用户实机操作确认正常**（续轮免唤醒、会话窗口交互、专注值守亮度/提示音抑制/暂停取消均按设计工作）；串口日志交叉核对——多次 WakeNet 唤醒触发、每轮 WSS 连接与 TLS 均成功建立、无轮次失败与协议异常日志，S4 多轮连续会话与 S5 专注期间对话均未出现“连接失败”。已知瞬时异常：一次 `esp-aes` 内存分配失败导致 TLS 读错误并关闭单条连接（`E (557845) esp-aes: Failed to allocate memory`），紧随其后的会话与后续全部轮次正常，未影响验收结论，长期复现概率待观察。S1 设置项与 S3 两级菜单在实机上随手可用（用户经菜单进入专注），未单独逐项打分；S2 三键未接线未验。遗留：声学打断（M2）、专注时长设置化、三键接线验收单列。
+
+## GAME-01 · 栖团三键小游戏模型（2026-11-24）
+
+实现接星屑（45 秒/三轨/护盾）、信号接力（五轮/3–7 项）、轨道对接（五次/60 秒）纯 C 状态机；确认/下一项即可完成，方向只是快捷操作。暂停冻结模拟时间，结果屏不重复计分，时间回绕与延迟帧有界处理。模型无存储、音频或成长副作用；UI、奖励接入在后续切片，不将本项称为整机可玩。产品基线见 [31](31-qitomo-companion.md)。
+
+验证：先以缺少公开实现的链接失败建立 red；实现后 `cc -std=c17 -Wall -Wextra -Werror -fsanitize=address,undefined -Ifirmware/components/presentation/include firmware/components/presentation/src/pet_game.c firmware/tests/host/test_pet_game.c -o firmware/build-host/test_pet_game && firmware/build-host/test_pet_game` 退出 0。覆盖暂停一分种后恢复、三键完成五轮信号（250 分）、五次对接（100 分）、护盾耗尽、方向等价、无效参数、毫秒回绕和极大延迟。已接入 `tools/ci/test_host.sh`；未执行实机验证。
