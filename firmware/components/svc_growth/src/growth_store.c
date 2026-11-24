@@ -4,7 +4,7 @@
 #include "nvs.h"
 #include "pet/storage.h"
 
-#define SAVE_SIZE 104
+#define SAVE_SIZE 256
 #define ACTIVE_SIZE 16
 #define STORE_NS "pet_growth"
 
@@ -31,14 +31,14 @@ static uint32_t crc32(const uint8_t *data, size_t size)
     return ~crc;
 }
 
-/* v3 沿用 v2 的 84 B，在保留字节 78 保存成就位图；兼容 v1 80 B 与 v2 84 B。
+/* v5 为 256 B；前 104 B 继承 v4，新增收藏、外观与回忆。兼容 v1–v4。
  * 小端，CRC 覆盖整个记录，CRC 字段本身按零处理。
  * 字段偏移是磁盘契约，不使用 packed 结构或编译器内存布局。 */
 static void encode(const pet_growth_model_t *m, uint32_t revision, uint8_t *out)
 {
     memset(out, 0, SAVE_SIZE);
     memcpy(out, "PETG", 4);
-    put(out + 4, 4, 2); put(out + 6, SAVE_SIZE, 2); put(out + 8, revision, 4);
+    put(out + 4, 5, 2); put(out + 6, SAVE_SIZE, 2); put(out + 8, revision, 4);
     put(out + 16, m->last_request_id, 8);
     put(out + 24, m->exp, 4); put(out + 28, m->coins, 4);
     put(out + 32, m->saved_epoch_s, 4); put(out + 36, m->daily_day, 4);
@@ -54,6 +54,19 @@ static void encode(const pet_growth_model_t *m, uint32_t revision, uint8_t *out)
     out[83] = m->task_claimed;
     put(out+84,m->last_dialogue_event,8); put(out+92,m->last_focus_event,8);
     out[100]=m->dialogues_today; out[101]=m->focus_today;
+    const pet_companion_state_t *c = &m->companion;
+    put(out+104,c->owned,2); put(out+106,c->focus_completed,2);
+    for (unsigned i=0;i<3;++i) { put(out+108+2*i,c->best[i],2); put(out+114+2*i,c->played[i],2); }
+    out[120]=c->appearance.theme; out[121]=c->appearance.outfit;
+    memcpy(out+122,c->appearance.slots,3);
+    put(out+125,c->appearance_revision,4); put(out+129,c->memory_sequence,4);
+    put(out+133,c->last_request_hash,4); put(out+137,c->last_command_hash,4);
+    memcpy(out+141,c->last_command,16);
+    for (unsigned i=0;i<PET_COMPANION_MEMORIES;++i) {
+        uint8_t *p=out+157+12*i; const pet_memory_t *v=&c->memories[i];
+        put(p,v->sequence,4); put(p+4,v->epoch,4);
+        p[8]=v->kind; p[9]=v->detail; p[10]=v->theme; p[11]=v->outfit;
+    }
     put(out + 12, crc32(out, SAVE_SIZE), 4);
 }
 
@@ -62,8 +75,8 @@ static pet_growth_result_t decode(uint8_t *data, size_t size, pet_growth_model_t
 {
     if (size < 8 || memcmp(data, "PETG", 4) != 0) return PET_GROWTH_CORRUPT_SAVE;
     unsigned version = (unsigned)get(data + 4, 2);
-    if (version != 1 && version != 2 && version != 3 && version != 4) return PET_GROWTH_UNKNOWN_VERSION;
-    if (size != (version == 1 ? 80 : version < 4 ? 84 : SAVE_SIZE) || get(data + 6, 2) != size)
+    if (version != 1 && version != 2 && version != 3 && version != 4 && version != 5) return PET_GROWTH_UNKNOWN_VERSION;
+    if (size != (version == 1 ? 80 : version < 4 ? 84 : version == 4 ? 104 : SAVE_SIZE) || get(data + 6, 2) != size)
         return PET_GROWTH_CORRUPT_SAVE;
     uint32_t expected = (uint32_t)get(data + 12, 4);
     put(data + 12, 0, 4);
@@ -93,6 +106,21 @@ static pet_growth_result_t decode(uint8_t *data, size_t size, pet_growth_model_t
         m->dialogues_today=data[100];m->focus_today=data[101];
         if (data[102]||data[103]) return PET_GROWTH_CORRUPT_SAVE;
     }
+    if (version == 5) {
+        pet_companion_state_t *c=&m->companion;
+        c->owned=(uint16_t)get(data+104,2); c->focus_completed=(uint16_t)get(data+106,2);
+        for (unsigned i=0;i<3;++i) { c->best[i]=(uint16_t)get(data+108+2*i,2); c->played[i]=(uint16_t)get(data+114+2*i,2); }
+        c->appearance.theme=data[120]; c->appearance.outfit=data[121]; memcpy(c->appearance.slots,data+122,3);
+        c->appearance_revision=(uint32_t)get(data+125,4); c->memory_sequence=(uint32_t)get(data+129,4);
+        c->last_request_hash=(uint32_t)get(data+133,4); c->last_command_hash=(uint32_t)get(data+137,4);
+        memcpy(c->last_command,data+141,16);
+        for (unsigned i=0;i<PET_COMPANION_MEMORIES;++i) {
+            const uint8_t *p=data+157+12*i; pet_memory_t *v=&c->memories[i];
+            v->sequence=(uint32_t)get(p,4); v->epoch=(uint32_t)get(p+4,4);
+            v->kind=p[8]; v->detail=p[9]; v->theme=p[10]; v->outfit=p[11];
+        }
+        if (data[253]||data[254]||data[255]) return PET_GROWTH_CORRUPT_SAVE;
+    } else if (m->last_action >= PET_GROWTH_ACTION_COUNT) return PET_GROWTH_CORRUPT_SAVE;
     *revision = (uint32_t)get(data + 8, 4);
     return *revision != 0 && pet_growth_model_valid(m) ? PET_GROWTH_OK : PET_GROWTH_CORRUPT_SAVE;
 }

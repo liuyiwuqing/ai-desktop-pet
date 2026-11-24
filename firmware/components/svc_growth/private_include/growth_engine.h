@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pet/growth.h"
+#include "pet/companion.h"
 
 #define PET_GROWTH_UNITS 3600
 #define PET_GROWTH_VALUE_MAX (100 * PET_GROWTH_UNITS)
@@ -33,6 +34,7 @@ typedef struct {
     uint8_t achievements;
     uint64_t last_dialogue_event,last_focus_event;
     uint8_t dialogues_today,focus_today;
+    pet_companion_state_t companion;
 } pet_growth_model_t;
 
 void pet_growth_defaults(pet_growth_model_t *model);
@@ -46,3 +48,10 @@ pet_growth_view_t pet_growth_view(const pet_growth_model_t *model, uint16_t loca
                                   bool excited);
 
 pet_growth_result_t pet_growth_award_completion(pet_growth_model_t *model,bool focus,uint64_t event_id);
+
+bool pet_companion_valid(const pet_companion_state_t *state);
+uint16_t pet_companion_eligible(const pet_growth_model_t *model);
+uint8_t pet_companion_themes(const pet_growth_model_t *model);
+void pet_companion_remember(pet_growth_model_t *model, unsigned kind, unsigned detail);
+pet_companion_result_t pet_companion_apply(pet_growth_model_t *model, const pet_companion_request_t *request);
+void pet_growth_advance_offline(pet_growth_model_t *model, uint32_t seconds);

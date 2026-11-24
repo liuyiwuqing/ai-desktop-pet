@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "src/growth_engine.c"
+        "src/companion_model.c"
         "src/growth_environment.c"
         "src/growth_store.c"
         "src/growth_service.c"

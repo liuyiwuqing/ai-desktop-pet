@@ -67,18 +67,18 @@ static void check_state_health_and_long_run(void)
     pet_growth_advance(&m, 6 * 3600);
     assert(m.health == 100 * PET_GROWTH_UNITS);
     pet_growth_advance(&m, 3600);
-    assert(m.health == 98 * PET_GROWTH_UNITS);
+    assert(m.health == 100 * PET_GROWTH_UNITS);
     m.hunger = m.energy = 100 * PET_GROWTH_UNITS;
     m.mood = 60 * PET_GROWTH_UNITS;
     pet_growth_advance(&m, 3600);
-    assert(m.health == 99 * PET_GROWTH_UNITS);
+    assert(m.health == 100 * PET_GROWTH_UNITS);
 
     pet_growth_defaults(&m);
     for (unsigned h = 0; h < 30 * 24; ++h) {
         pet_growth_advance(&m, 3600);
         assert(pet_growth_model_valid(&m));
     }
-    assert(m.hunger == 0 && m.energy == 0 && m.health == 0 && m.intimacy == 0);
+    assert(m.hunger == 0 && m.energy == 0 && m.health == 100 * PET_GROWTH_UNITS && m.intimacy == 10 * PET_GROWTH_UNITS);
     uint32_t random = 7;
     pet_growth_defaults(&m);
     for (unsigned i = 0; i < 1000; ++i) {

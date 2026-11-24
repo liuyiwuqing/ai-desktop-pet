@@ -210,12 +210,14 @@ build_and_run test_config_generated \
 build_and_run test_growth \
     -I "${contracts_inc}" -I "${growth_priv_inc}" \
     "${repo_root}/firmware/components/svc_growth/src/growth_engine.c" \
+    "${repo_root}/firmware/components/svc_growth/src/companion_model.c" \
     "${repo_root}/firmware/tests/host/test_growth.c"
 
 build_and_run test_growth_sync \
     -I "${contracts_inc}" -I "${growth_priv_inc}" \
     -I "${repo_root}/firmware/components/svc_growth/include" \
     "${repo_root}/firmware/components/svc_growth/src/growth_engine.c" \
+    "${repo_root}/firmware/components/svc_growth/src/companion_model.c" \
     "${repo_root}/firmware/components/svc_growth/src/growth_sync.c" \
     "${repo_root}/firmware/tests/host/test_growth_sync.c"
 
@@ -226,6 +228,7 @@ build_and_run test_growth_service \
     -I "${repo_root}/firmware/components/storage/include" \
     -I "${repo_root}/firmware/components/svc_growth/include" \
     "${repo_root}/firmware/components/svc_growth/src/growth_engine.c" \
+    "${repo_root}/firmware/components/svc_growth/src/companion_model.c" \
     "${repo_root}/firmware/components/svc_growth/src/growth_store.c" \
     "${repo_root}/firmware/components/svc_growth/src/growth_service.c" \
     "${repo_root}/firmware/components/svc_growth/src/growth_environment.c" \

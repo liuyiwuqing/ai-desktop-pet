@@ -14,6 +14,7 @@ def main():
         flags+=['-g','-O1','-fsanitize=address,undefined','-fno-omit-frame-pointer'];env.setdefault('ASAN_OPTIONS','detect_leaks=0')
     for path in ('contracts/include','svc_growth/include','svc_growth/private_include'):flags+=['-I',str(components/path)]
     subprocess.run(['cc',*flags,str(components/'svc_growth/src/growth_engine.c'),str(components/'svc_growth/src/growth_sync.c'),
+        str(components/'svc_growth/src/companion_model.c'),
         str(ROOT/'firmware/tests/host/growth_wire_peer.c'),'-o',str(output)],check=True)
     if Path('/usr/libexec/java_home').exists():env['JAVA_HOME']=subprocess.check_output(['/usr/libexec/java_home','-v','21'],text=True).strip()
     env['NEXUS_PET_GROWTH_PEER']=str(output)

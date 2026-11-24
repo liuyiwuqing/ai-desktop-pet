@@ -10,6 +10,7 @@ cc -std=c17 -Wall -Wextra -Werror -pthread \
     -I "${components}/storage/include" -I "${components}/svc_growth/include" \
     -I "${components}/svc_growth/private_include" \
     "${components}/svc_growth/src/growth_engine.c" \
+    "${components}/svc_growth/src/companion_model.c" \
     "${components}/svc_growth/src/growth_store.c" \
     "${components}/svc_growth/src/growth_service.c" \
     "${components}/svc_growth/src/growth_environment.c" \

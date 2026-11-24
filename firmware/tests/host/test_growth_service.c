@@ -110,7 +110,7 @@ static void check_backup_restore(void)
     assert(act(PET_GROWTH_FEED,1)==PET_GROWTH_OK);
     unsigned char backup[PET_GROWTH_BACKUP_MAX];size_t bytes;uint32_t revision;
     assert(pet_growth_export(backup,sizeof(backup),&bytes,&revision)==PET_GROWTH_OK);
-    assert(bytes==104 && revision==snapshot().revision);
+    assert(bytes==256 && revision==snapshot().revision);
     assert(act(PET_GROWTH_PET,2)==PET_GROWTH_OK);
     assert(pet_growth_import(backup,bytes,revision)==PET_GROWTH_CONFLICT);
     revision=snapshot().revision;
@@ -182,11 +182,11 @@ static void check_achievement_thresholds(void)
             assert(pet_growth_tick() == PET_GROWTH_OK);
         }
     }
-    assert(snapshot().intimacy == 18 && snapshot().achievements == 7);
+    assert(snapshot().intimacy == 100 && snapshot().achievements == 7);
     assert(act(PET_GROWTH_PET, 653) == PET_GROWTH_OK);
     now_ms += 10000; now_epoch += 10;
     assert(act(PET_GROWTH_PET, 654) == PET_GROWTH_OK);
-    assert(snapshot().intimacy == 20 && snapshot().coins == 80);
+    assert(snapshot().intimacy == 100 && snapshot().coins == 80);
 }
 
 static void check_achievement_uncertain_commit(void)
@@ -377,12 +377,12 @@ static void check_time_and_recovery(void)
     pet_growth_close();
     now_epoch += 3 * 86400;
     assert(pet_growth_init(&clock_source) == PET_GROWTH_OK);
-    /* 离线三天只结算八小时睡眠：饱食 100-16，精力恢复封顶。 */
-    assert(snapshot().hunger == 84 && snapshot().energy == 100);
+    /* 离线三天不扣饱食；睡眠恢复最多八小时，精力封顶。 */
+    assert(snapshot().hunger == 100 && snapshot().energy == 100);
     uint32_t rev = snapshot().revision;
     pet_growth_close();
     assert(pet_growth_init(&clock_source) == PET_GROWTH_OK);
-    assert(snapshot().hunger == 84 && snapshot().revision == rev);
+    assert(snapshot().hunger == 100 && snapshot().revision == rev);
     pet_growth_close();
     uint32_t synchronized_epoch = now_epoch;
     now_epoch = 0;
@@ -393,15 +393,15 @@ static void check_time_and_recovery(void)
     assert(act(PET_GROWTH_WAKE, 3) == PET_GROWTH_TIME_UNAVAILABLE);
     now_epoch = synchronized_epoch + 3600;
     assert(pet_growth_tick() == PET_GROWTH_OK);
-    assert(snapshot().time_ready && snapshot().hunger == 82);
+    assert(snapshot().time_ready && snapshot().hunger == 100);
     assert(act(PET_GROWTH_WAKE, 3) == PET_GROWTH_OK);
     /* 活跃运行的墙钟回拨/跳跃均不能让 30 分钟重复结算。 */
     now_ms += 1800000;
     now_epoch = synchronized_epoch - 86400;
     assert(pet_growth_tick() == PET_GROWTH_OK);
-    assert(snapshot().hunger == 80 && snapshot().energy == 98);
+    assert(snapshot().hunger == 98 && snapshot().energy == 98);
     now_epoch = synchronized_epoch + 10 * 86400;
-    assert(pet_growth_tick() == PET_GROWTH_OK && snapshot().hunger == 80);
+    assert(pet_growth_tick() == PET_GROWTH_OK && snapshot().hunger == 98);
     assert(act(PET_GROWTH_FEED, 4) == PET_GROWTH_OK);
     now_ms += 1800000;
     assert(pet_growth_tick() == PET_GROWTH_OK && snapshot().hunger == 98);
@@ -661,8 +661,69 @@ static void check_completion_rewards(void)
     assert(pet_growth_reward(PET_GROWTH_REWARD_FOCUS,200,day)==PET_GROWTH_DUPLICATE);
 }
 
+static pet_companion_view_t companion(void)
+{
+    pet_companion_view_t view;
+    assert(pet_companion_snapshot(&view)==PET_GROWTH_OK);
+    return view;
+}
+static void check_companion_transactions(void)
+{
+    fresh();
+    pet_companion_request_t r={.request_id=1,.operation=PET_COMPANION_GAME,.game=0,.score=120};
+    fail_key="active";
+    assert(pet_companion_submit(&r).result==PET_GROWTH_STORAGE_ERROR);
+    assert(companion().state.played[0]==0 && snapshot().coins==20);
+    fail_key=NULL;
+    pet_companion_result_t result=pet_companion_submit(&r);
+    assert(result.result==PET_GROWTH_OK && result.rewarded);
+    assert(companion().state.played[0]==1 && companion().state.best[0]==120);
+    unsigned coins=snapshot().coins;
+    assert(pet_companion_submit(&r).result==PET_GROWTH_DUPLICATE);
+    r.score=121;
+    assert(pet_companion_submit(&r).result==PET_GROWTH_CONFLICT);
+    r.request_id=2; r.score=50;
+    result=pet_companion_submit(&r);
+    assert(result.result==PET_GROWTH_OK && !result.rewarded && snapshot().coins==coins);
+    assert(companion().state.best[0]==120 && companion().state.played[0]==2);
+    r=(pet_companion_request_t){.request_id=3,.operation=PET_COMPANION_BUY,.item=3};
+    assert(pet_companion_submit(&r).result==PET_GROWTH_OK);
+    r=(pet_companion_request_t){.request_id=4,.operation=PET_COMPANION_DRESS,.appearance={.outfit=3},.command_id={1}};
+    assert(pet_companion_submit(&r).result==PET_GROWTH_OK);
+    assert(companion().state.appearance_revision==1 && companion().state.appearance.outfit==3);
+    pet_growth_close(); assert(pet_growth_init(&clock_source)==PET_GROWTH_OK);
+    assert(companion().state.best[0]==120 && companion().state.owned==(1u<<2));
+    assert(pet_companion_submit(&r).result==PET_GROWTH_DUPLICATE);
+    r.request_id=5; r.command_id[0]=2;
+    assert(pet_companion_submit(&r).result==PET_GROWTH_CONFLICT);
+    r.expected_revision=1; r.appearance.outfit=2;
+    assert(pet_companion_submit(&r).result==PET_GROWTH_INVALID);
+    r.appearance.outfit=0;
+    assert(pet_companion_submit(&r).result==PET_GROWTH_OK);
+    assert(companion().state.appearance_revision==2);
+    r=(pet_companion_request_t){.request_id=6,.operation=PET_COMPANION_GAME,.game=3};
+    assert(pet_companion_submit(&r).result==PET_GROWTH_INVALID);
+    r.game=2; r.score=101;
+    assert(pet_companion_submit(&r).result==PET_GROWTH_INVALID);
+    r.score=100; r.practice=true;
+    assert(pet_companion_submit(&r).result==PET_GROWTH_OK);
+    assert(companion().state.best[2]==100);
+    assert(companion().state.memory_sequence>0);
+    /* 已解锁装扮的旧备份不能退还购置金币，远端版本不得倒退。 */
+    unsigned char backup[256];size_t bytes;uint32_t revision;
+    assert(pet_growth_export(backup,sizeof(backup),&bytes,&revision)==PET_GROWTH_OK);
+    assert(act(PET_GROWTH_PET,7)==PET_GROWTH_OK);
+    r=(pet_companion_request_t){.request_id=8,.operation=PET_COMPANION_BUY,.item=1};
+    assert(pet_companion_submit(&r).result==PET_GROWTH_OK);
+    coins=snapshot().coins;
+    assert(pet_growth_import(backup,bytes,snapshot().revision)==PET_GROWTH_OK);
+    assert(snapshot().coins==coins && (companion().state.owned&1));
+    assert(companion().state.appearance_revision==2);
+}
+
 int main(void)
 {
+    check_companion_transactions();
     check_backup_restore();
     check_first_care_achievement();
     check_achievement_thresholds();

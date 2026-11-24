@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include "pet/growth.h"
 #include "pet/climate.h"
+#include "pet/companion.h"
 
 typedef struct {
     uint64_t (*monotonic_ms)(void *context);
@@ -44,3 +45,7 @@ pet_growth_result_t pet_growth_reward(pet_growth_reward_t kind,uint64_t event_id
  * 调用方须校验备份 deviceId；expected_revision 防止覆盖并发更新。 */
 pet_growth_result_t pet_growth_export(void *out,size_t capacity,size_t *bytes,uint32_t *revision);
 pet_growth_result_t pet_growth_import(const void *data,size_t bytes,uint32_t expected_revision);
+
+pet_growth_result_t pet_companion_snapshot(pet_companion_view_t *out);
+/* Same worker-thread/storage restrictions as pet_growth_interact. */
+pet_companion_result_t pet_companion_submit(const pet_companion_request_t *request);

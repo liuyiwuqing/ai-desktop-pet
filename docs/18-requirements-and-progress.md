@@ -1817,3 +1817,9 @@ MQTT TLS 证书 CN `pet.muyin.site`、issuer `NEXUS Local CA`，有效期至 202
 实现接星屑（45 秒/三轨/护盾）、信号接力（五轮/3–7 项）、轨道对接（五次/60 秒）纯 C 状态机；确认/下一项即可完成，方向只是快捷操作。暂停冻结模拟时间，结果屏不重复计分，时间回绕与延迟帧有界处理。模型无存储、音频或成长副作用；UI、奖励接入在后续切片，不将本项称为整机可玩。产品基线见 [31](31-qitomo-companion.md)。
 
 验证：先以缺少公开实现的链接失败建立 red；实现后 `cc -std=c17 -Wall -Wextra -Werror -fsanitize=address,undefined -Ifirmware/components/presentation/include firmware/components/presentation/src/pet_game.c firmware/tests/host/test_pet_game.c -o firmware/build-host/test_pet_game && firmware/build-host/test_pet_game` 退出 0。覆盖暂停一分种后恢复、三键完成五轮信号（250 分）、五次对接（100 分）、护盾耗尽、方向等价、无效参数、毫秒回绕和极大延迟。已接入 `tools/ci/test_host.sh`；未执行实机验证。
+
+## PET-SAVE-01 · 轻养成、收藏和伙伴存档（2026-11-24）
+
+v5 双槽存档与 v1–v4 读取、六件穿戴/六件摆件、三主题门控、个人纪录、八条里程碑回忆；游戏、购买、装扮通过同一事务边界，外观 CAS 与持久命令去重。离线不扣状态、冷落不扣亲密、疏于照料不掉健康；旧低健康在线恢复。旧备份恢复保留收藏/已消费标记，不退还已花金币。详见 [31](31-qitomo-companion.md)。
+
+验证：`LC_ALL=C bash tools/ci/test_host.sh` 全套退出 0；新增事务用例通过 `cc -std=c17 -Wall -Wextra -Werror -pthread -fsanitize=address,undefined` 编译并运行真实 growth_engine/companion_model/growth_store/growth_service/growth_environment，退出 0。覆盖写失败无奖励、重复/冲突、练习成绩、未拥有装扮拒绝、重启身份持久化和回档不退币。仅模型与服务完成；界面/跨端协议在后续切片，未烧录。

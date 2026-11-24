@@ -68,7 +68,7 @@ static pet_growth_result_t restore_time_locked(uint32_t epoch, uint64_t now)
     pet_growth_model_t candidate = s.model;
     if (candidate.saved_epoch_s && epoch > candidate.saved_epoch_s) {
         uint32_t elapsed = epoch - candidate.saved_epoch_s;
-        pet_growth_advance(&candidate, elapsed > PET_GROWTH_OFFLINE_MAX_S ? PET_GROWTH_OFFLINE_MAX_S : elapsed);
+        pet_growth_advance_offline(&candidate, elapsed > PET_GROWTH_OFFLINE_MAX_S ? PET_GROWTH_OFFLINE_MAX_S : elapsed);
     }
     if (epoch > candidate.saved_epoch_s) candidate.saved_epoch_s = epoch;
     pet_growth_calendar(&candidate, candidate.saved_epoch_s, s.clock.utc_offset_min);
@@ -164,6 +164,16 @@ pet_growth_result_t pet_growth_import(const void *data,size_t bytes,uint32_t exp
         if (candidate.last_dialogue_event<s.model.last_dialogue_event) candidate.last_dialogue_event=s.model.last_dialogue_event;
         if (candidate.last_focus_event<s.model.last_focus_event) candidate.last_focus_event=s.model.last_focus_event;
         candidate.achievements|=s.model.achievements;
+        /* 回档不退还已花金币，也不撤销收藏、回忆或已应用的远端外观命令。 */
+        if (candidate.coins > s.model.coins) candidate.coins=s.model.coins;
+        pet_companion_state_t restored=candidate.companion;
+        candidate.companion=s.model.companion;
+        candidate.companion.owned|=restored.owned;
+        if (restored.focus_completed>candidate.companion.focus_completed) candidate.companion.focus_completed=restored.focus_completed;
+        for (unsigned i=0;i<3;++i) {
+            if (restored.best[i]>candidate.companion.best[i]) candidate.companion.best[i]=restored.best[i];
+            if (restored.played[i]>candidate.companion.played[i]) candidate.companion.played[i]=restored.played[i];
+        }
         if (candidate.saved_epoch_s<s.model.saved_epoch_s) candidate.saved_epoch_s=s.model.saved_epoch_s;
         if (candidate.daily_day<s.model.daily_day) {
             candidate.daily_day=s.model.daily_day;memcpy(candidate.task_progress,s.model.task_progress,3);
@@ -285,4 +295,38 @@ pet_growth_result_t pet_growth_reward(pet_growth_reward_t kind,uint64_t event_id
         }
     }
     xSemaphoreGive(s.mutex);return result;
+}
+
+pet_growth_result_t pet_companion_snapshot(pet_companion_view_t *out)
+{
+    if (!out) return PET_GROWTH_INVALID;
+    if (!s.mutex || xSemaphoreTake(s.mutex,0)!=pdTRUE) return PET_GROWTH_NOT_READY;
+    *out=(pet_companion_view_t){.state=s.model.companion,.eligible=pet_companion_eligible(&s.model),
+        .themes=pet_companion_themes(&s.model),.writable=!s.store.write_uncertain && !s.waiting_for_time};
+    xSemaphoreGive(s.mutex); return PET_GROWTH_OK;
+}
+
+pet_companion_result_t pet_companion_submit(const pet_companion_request_t *request)
+{
+    pet_companion_result_t result={PET_GROWTH_INVALID,false};
+    if (!request || !request->request_id) return result;
+    if (!s.mutex) { result.result=PET_GROWTH_NOT_READY; return result; }
+    xSemaphoreTake(s.mutex,portMAX_DELAY);
+    uint64_t now=now_ms();
+    if (s.store.write_uncertain) result.result=PET_GROWTH_STORAGE_UNCERTAIN;
+    else if ((now>=request->issued_at_ms?now-request->issued_at_ms:request->issued_at_ms-now)>300000)
+        result.result=PET_GROWTH_STALE_REQUEST;
+    else {
+        result.result=advance_locked(now);
+        if (result.result==PET_GROWTH_OK) {
+            pet_growth_model_t candidate=s.model;
+            result=pet_companion_apply(&candidate,request);
+            if (result.result==PET_GROWTH_OK) {
+                result.result=commit_locked(&candidate,now);
+                if (result.result==PET_GROWTH_OK) publish_locked();
+                else result.rewarded=false;
+            }
+        }
+    }
+    xSemaphoreGive(s.mutex); return result;
 }

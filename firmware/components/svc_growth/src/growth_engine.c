@@ -50,7 +50,7 @@ bool pet_growth_model_valid(const pet_growth_model_t *m)
            m->pet_cooldown_s <= 10 &&
            m->neglect_s <= 21600 && m->inactive_s < 86400 &&
            m->dialogues_today<=50 && m->focus_today<=8 &&
-           m->last_action < PET_GROWTH_ACTION_COUNT && m->task_claimed <= 7 &&
+           m->last_action <= PET_GROWTH_ACTION_COUNT && pet_companion_valid(&m->companion) && m->task_claimed <= 7 &&
            (m->achievements & ~PET_GROWTH_ACHIEVEMENT_ALL) == 0 &&
            m->task_progress[0] <= 1 && m->task_progress[1] <= 3 && m->task_progress[2] <= 1 &&
            (!(m->task_claimed & 1) || m->task_progress[0] == 1) &&
@@ -69,6 +69,9 @@ static void unlock_achievements(pet_growth_model_t *m, pet_growth_action_t actio
                       (unlocked & PET_GROWTH_ACHIEVEMENT_FRIEND ? PET_GROWTH_FRIEND_COINS : 0) +
                       (unlocked & PET_GROWTH_ACHIEVEMENT_LEVEL ? PET_GROWTH_LEVEL_COINS : 0);
     m->achievements |= (uint8_t)unlocked;
+    if (unlocked & PET_GROWTH_ACHIEVEMENT_CARE) pet_companion_remember(m, 1, 0);
+    if (unlocked & PET_GROWTH_ACHIEVEMENT_FRIEND) pet_companion_remember(m, 2, 0);
+    if (unlocked & PET_GROWTH_ACHIEVEMENT_LEVEL) pet_companion_remember(m, 3, m->level);
     m->coins = (uint32_t)clamp((int)m->coins + (int)reward, 0, 999999);
 }
 
@@ -186,19 +189,10 @@ void pet_growth_advance_environment(pet_growth_model_t *m, uint32_t elapsed_s, u
         if (m->hunger < 20 * PET_GROWTH_UNITS || m->energy < 20 * PET_GROWTH_UNITS)
             m->mood = clamp(m->mood - 1, -PET_GROWTH_VALUE_MAX, PET_GROWTH_VALUE_MAX);
         if (i < exposed_s) m->mood = clamp(m->mood - 1, -PET_GROWTH_VALUE_MAX, PET_GROWTH_VALUE_MAX);
-        if (m->hunger < 10 * PET_GROWTH_UNITS || m->energy < 10 * PET_GROWTH_UNITS) {
-            if (m->neglect_s < 21600) ++m->neglect_s;
-            else m->health = (uint32_t)clamp((int)m->health - 2, 0, PET_GROWTH_VALUE_MAX);
-        } else {
-            m->neglect_s = 0;
-            if (m->hunger > 50 * PET_GROWTH_UNITS && m->energy > 50 * PET_GROWTH_UNITS &&
-                m->mood > 50 * PET_GROWTH_UNITS)
-                m->health = (uint32_t)clamp((int)m->health + 1, 0, PET_GROWTH_VALUE_MAX);
-        }
-        if (++m->inactive_s == 86400) {
-            m->inactive_s = 0;
-            m->intimacy = (uint32_t)clamp((int)m->intimacy - PET_GROWTH_UNITS, 0, PET_GROWTH_VALUE_MAX);
-        }
+        /* Care is encouragement: absence never reduces health or friendship. */
+        m->neglect_s = 0;
+        m->health = (uint32_t)clamp((int)m->health + 10, 0, PET_GROWTH_VALUE_MAX);
+        m->inactive_s = (m->inactive_s + 1) % 86400u;
     }
 }
 
@@ -280,8 +274,22 @@ pet_growth_result_t pet_growth_award_completion(pet_growth_model_t *m,bool focus
     if (!m->daily_day) return PET_GROWTH_TIME_UNAVAILABLE;
     ++*count; *last=event_id;
     award_exp(m,focus?20:2);
+    if (focus) {
+        if (m->companion.focus_completed < UINT16_MAX) ++m->companion.focus_completed;
+        pet_companion_remember(m, 6, 0);
+    }
     if (focus) m->coins=(uint32_t)clamp((int)m->coins+10,0,999999);
     else m->intimacy=(uint32_t)clamp((int)m->intimacy+PET_GROWTH_UNITS,0,PET_GROWTH_VALUE_MAX);
     unlock_achievements(m,PET_GROWTH_WAKE);
     return PET_GROWTH_OK;
+}
+
+void pet_growth_advance_offline(pet_growth_model_t *m, uint32_t seconds)
+{
+    if (!pet_growth_model_valid(m)) return;
+    if (seconds > PET_GROWTH_OFFLINE_MAX_S) seconds = PET_GROWTH_OFFLINE_MAX_S;
+    m->feed_cooldown_s = seconds >= m->feed_cooldown_s ? 0 : m->feed_cooldown_s - seconds;
+    m->play_cooldown_s = seconds >= m->play_cooldown_s ? 0 : m->play_cooldown_s - seconds;
+    m->pet_cooldown_s = seconds >= m->pet_cooldown_s ? 0 : m->pet_cooldown_s - seconds;
+    if (m->sleeping) m->energy = (uint32_t)clamp((int)m->energy + (int)seconds * 8, 0, PET_GROWTH_VALUE_MAX);
 }
