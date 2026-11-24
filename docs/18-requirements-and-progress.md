@@ -1872,4 +1872,12 @@ CORE「伙伴」新增四分区：伙伴空间、衣橱与小舱、回忆与收�
 
 补充界面验证（同日）：`playwright-core` + 本机 Chrome（只装 `/tmp`，不下载浏览器、不加项目依赖）配临时 Vite harness（挂 `DeviceManagementPanel`、全局 `style.css` 与浅色主题）与 fixture 接口，实测三项按真实值渲染（60 / 40% / 20%、摘要含「息屏 60 秒」）、两列栅格与文案不重叠、390×844 无横向溢出、旧固件设备只显示升级提示且无字段、把息屏超时改成 300 后出现未提交标记且保存载荷为 `screen.timeoutS=300`+`sfxVolume=20` 其余字段不变。截图 `.screenshots/settings-{desktop,mobile,detail,legacy}.png`（未入库）。教训：harness 漏引全局 `style.css` 会把两列栅格渲染成单列，验证布局必须带真实主题与样式。
 
-边界：仍未向真实设备提交含新字段的配置请求（会写 NVS），设备端接受与否仍属协议级判断；浏览器验证用 fixture 数据，生产侧只确认接口返回真实值与线上产物含文案。固件侧 `CONFIG_PET_COMPANION_SYNC_ENABLED` 与换装端到端仍未验证。
+边界：仍未向真实设备提交含新字段的配置请求（会写 NVS），设备端接受与否仍属协议级判断；浏览器验证用 fixture 数据，生产侧只确认接口返回真实值与线上产物含文案。固件侧 `CONFIG_PET_COMPANION_SYNC_ENABLED` 与换装端到端仍未验证。对真实生产站点的验收见下一条 CONSOLE-ACCEPT-01。
+
+## CONSOLE-ACCEPT-01 · 生产控制台浏览器级验收与运行观测基线（2026-11-24）
+
+把「浏览器登录/权限页验收」从 fixture 挪到真实站点：`https://pet.muyin.site/` + 真实管理员令牌 + 在网的 `dodo-1`，`playwright-core` 与本机 Chrome（仍只装 `/tmp`，不加项目依赖），1440×900 与 390×844 两套视口，除登录外全部只读，没有点「保存到设备」。16 项断言全通过：错误令牌 401 且提示「管理令牌无效，请重新登录。」，正确令牌 `POST /api/v1/session=200` 且 `X-Nexus-Role=admin`；管理员导航（含工具/权限）齐全；设备页读到 `dodo-1` 在线与固件 `0.4.0-dev`；展开「更多设置」后息屏超时 `60`、待机亮度 `40%`、提示音音量 `20%` 均按设备真实值渲染，滑杆序列 `[音量 20, 亮度 80, 待机亮度 40, 提示音 20]` 未串位；权限页显示「暂无角色令牌」；两个视口均无横向溢出；唯一 4xx 是登录前 `/api/v1/session=401`，无 5xx。
+
+同时记下运行基线：CORE `acc04-c88957e` `healthy`、`RestartCount=0`、启动后日志 30 行且 `ERROR`/`WARN`/`MQTT input rejected` 均为 0；Flyway 29 已就绪；`dodo-1` `online=true`；遥测样本 208→219 条、相邻间隔恒 30 秒；快照持续带 `screen{60,40}` 与 `sfxVolume=20`，说明契约修复在真实链路上持续生效；库 9.7 MB、PostgreSQL 连续 6 天；根分区 85%（剩 13 GB）。
+
+边界：24 小时观测只有这 15 分钟基线，仍需另起一轮按 §10.3 逐时记录；生产只有管理员令牌，`operator`/`viewer` 的界面可见性仍靠 `RoleAccessFlowTest` 等自动化，浏览器侧无证据（补验需在生产签发只读角色令牌，属新增凭据，待用户确认）；仍未向 `dodo-1` 下发含新字段的配置请求，换装端到端仍待固件开启伙伴同步。证据见 [ACC-01 §18](29-acc01-production-deployment-plan.md)。

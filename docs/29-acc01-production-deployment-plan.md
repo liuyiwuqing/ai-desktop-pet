@@ -910,6 +910,62 @@ pattern read  nexus/v1/devices/%u/appearance
 
 截图（本机 `.screenshots/`，未入库）：`settings-desktop.png`、`settings-mobile.png`、`settings-detail.png`、`settings-legacy.png`。harness 与 fixture 均在 `/tmp`，验证后已删除仓库内临时目录。
 
-边界：仍未向真实设备提交含新字段的配置请求（会写 NVS），设备端接受与否依据协议与固件校验逻辑，不是实机证据；浏览器验证用的是 fixture 数据而非生产接口，生产侧仅确认了接口返回真实值（`sfxVolume=20`、`screen{60,40}`）与线上产物含三项文案。
+边界：仍未向真实设备提交含新字段的配置请求（会写 NVS），设备端接受与否依据协议与固件校验逻辑，不是实机证据；浏览器验证用的是 fixture 数据而非生产接口，生产侧仅确认了接口返回真实值（`sfxVolume=20`、`screen{60,40}`）与线上产物含三项文案。对生产站点的验收见 §18。
 
 回滚：编排 `image` 改回 `acc03-3fdca79` 重建 CORE；数据库无需回退。
+
+## 18. 生产控制台浏览器级验收与运行观测基线（2026-11-24）
+
+§17.1 的浏览器验证跑在临时 harness 与 fixture 上，§16.4 与 §17 都把「浏览器登录/权限页验收」与「24 小时观测」列为未做项。本节补的是**真实站点**：`https://pet.muyin.site/`、真实管理员令牌、真实 PostgreSQL/MQTT 与在网的 `dodo-1`。方法仍是不加项目依赖的 `playwright-core`（装在 `/tmp`）+ 本机 Chrome（headless），1440×900 与 390×844 两套视口。
+
+除登录本身，全部操作都是读：没有点「保存到设备」，没有改动设备配置、Broker 策略或数据库。
+
+### 18.1 验收断言（16/16 通过）
+
+| 断言 | 结果 |
+| --- | --- |
+| 登录页渲染 | h1「连接你的桌面伙伴」，与管理台一致 |
+| 错误令牌被拒 | `POST /api/v1/session` 401，停留登录页，提示「管理令牌无效，请重新登录。」 |
+| 正确令牌登录 | `POST /api/v1/session` 200，响应头 `X-Nexus-Role=admin` |
+| 管理员导航齐全 | 概览/设备/权限/工具 均可见（`tools`、`access` 带 `admin: true`） |
+| 设备页读到真实设备 | 「1 台设备 · 1 台在线」，列表含 `dodo-1`、固件 `0.4.0-dev`、Wi-Fi `502 · 192.168.5.235 · -44 dBm` |
+| 折叠摘要含设备值 | 「Asia/Shanghai · 8 条 · 20 秒上限 · 息屏 60 秒」 |
+| 息屏超时渲染 | 「息屏超时（秒）」，`#devicemanagementpanel-field-8` 值 `60` |
+| 待机亮度渲染 | 「待机亮度 · 40%」，滑杆 `aria-valuenow=40` |
+| 提示音音量渲染 | 「提示音音量 · 20%」，滑杆 `aria-valuenow=20` |
+| 其余滑杆未串位 | 滑杆序列 `[20(音量), 80(亮度), 40(待机亮度), 20(提示音)]`，与快照 `volume=20`、`brightness=80` 一致 |
+| 保存按钮存在且未点击 | 仅做存在性断言，未向设备下发任何配置 |
+| 权限页渲染 | 「权限与审计 / 刷新权限与审计 / 修改管理员令牌 / 签发角色令牌 / 暂无角色令牌」 |
+| 移动端登录页 | 390×844 下 `scrollWidth - clientWidth = 0` |
+| 移动端设置页 | 经抽屉导航进入设备 → 设置与状态 → 更多设置，同样 0 溢出 |
+| 无意外 4xx/5xx | 唯一 4xx 是登录前的 `/api/v1/session=401`（预期），无 5xx |
+
+截图（本机 `/tmp/nexus-ui-prod/shots/`）：`prod-login.png`、`prod-login-rejected.png`、`prod-overview.png`、`prod-devices.png`、`prod-settings-expanded.png`、`prod-access.png`、`prod-login-mobile.png`、`prod-settings-mobile.png`。
+
+两处只有真站点才会暴露的细节：一是三项在「更多设置」折叠区内，验证必须先展开，否则只看到摘要那行「息屏 60 秒」；二是移动端导航是 `NDrawer` 抽屉，`.nav-label` 在侧栏与抽屉里各有一份，直接按文本点会命中被 CSS 隐藏的侧栏副本，必须先点 `aria-label="打开导航"` 再点抽屉内的节点。
+
+### 18.2 运行观测基线
+
+| 项 | 值（2026-11-24 22:0x CST） |
+| --- | --- |
+| 容器 | `nexus-production-core-1` = `acc04-c88957e`，`StartedAt=13:50:42Z`，`healthy`，`RestartCount=0` |
+| 日志 | 启动后 30 行，`ERROR` 0、`WARN` 0、`MQTT input rejected` 0 |
+| 迁移 | Flyway `Successfully validated 29 migrations`，`Schema "public" is up to date` |
+| 设备 | `dodo-1` `online=true`，`last_seen` 每 30 秒推进（观测时年龄 < 10 秒） |
+| 遥测 | 样本 208 条（13:59:27Z）→ 219 条（14:04:57Z），相邻样本间隔恒为 30 秒 |
+| 快照 | `config.screen={"timeoutS":60,"idleBrightness":40}`、`sfxVolume=20`、`volume=20`、`brightness=80`、`config_revision=4` |
+| 伙伴/换装 | `device_companion_observations=0`、`device_appearance_requests=0`（在网固件未开伙伴同步） |
+| 数据库 | `nexus` 9,702 kB，`device_telemetry_samples` 96 kB；PostgreSQL 已连续运行 522,173 秒（约 6 天） |
+| 磁盘 | 根分区 79 GB 用 67 GB（85%，剩 13 GB） |
+| 无令牌访问 | `/` 200（0.13s）；`/actuator/health`、`/api/v1/devices`、`/api/v1/devices/dodo-1/telemetry` 均 401 |
+
+采样间隔恒为 30 秒、快照连续携带 `screen`/`sfxVolume` 说明 §16 的契约修复在真实链路上持续生效，不是一次性放行。
+
+### 18.3 未完成与边界
+
+- **24 小时观测仍未完成**：本节只有约 15 分钟基线（容器 8 分钟、样本 219 条）。`ERROR`/`WARN` 为 0 只代表这段时间；真正的 24 小时口径要另起一轮，按 §10.3 的清单逐时记录。
+- **角色页只验了管理员**：生产只有管理员令牌（`tokens.json` `format=1`、`revision=2`，权限页显示「暂无角色令牌」）。`operator`/`viewer` 的界面可见性与写入拦截仍只由 `RoleAccessFlowTest` 等自动化覆盖，没有浏览器证据；要补得先在生产签发一个只读角色令牌，属于新增凭据，需用户确认。
+- **设备侧仍未写**：没有向 `dodo-1` 下发含新字段的配置请求（会写 NVS）；换装端到端仍需固件开启 `CONFIG_PET_COMPANION_SYNC_ENABLED`。
+- **磁盘 85%**：根分区剩 13 GB，本轮不处理，但再叠几次离线镜像归档（单个约 300 MB）前应先清理 `/tmp/nexus-core-acc0*.tar`。
+
+回滚：本轮没有改动任何生产状态，无需回滚。
