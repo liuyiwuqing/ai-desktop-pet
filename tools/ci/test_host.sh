@@ -460,3 +460,4 @@ build_and_run test_recovery_presenter -I "${presentation_inc}" \
     "${repo_root}/firmware/tests/host/test_recovery_presenter.c"
 python3 "${repo_root}/tools/ci/test_build_matrix.py"
 python3 "${repo_root}/tools/ci/test_crash_dump.py"
+python3 "${repo_root}/tools/ci/test_observe_report.py"
